@@ -50,7 +50,7 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(0, dp(16), 0, dp(24))
         }
         header.addView(TextView(this).apply {
-            text = "DatingCopilot"
+            text = "RizzSe"
             textSize = 28f
             setTextColor(0xFF0F172A.toInt())
             typeface = Typeface.DEFAULT_BOLD

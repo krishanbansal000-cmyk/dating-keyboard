@@ -172,7 +172,7 @@ class OnboardingActivity : AppCompatActivity() {
         // Welcome page (page 0)
         fun showWelcomePage() {
             emojiView.text = "💜"
-            titleView.text = "DatingCopilot\nAI Dating Coach"
+            titleView.text = "RizzSe\nAI Dating Coach"
             optionsLayout.removeAllViews()
             
             val subtitle = TextView(this).apply {

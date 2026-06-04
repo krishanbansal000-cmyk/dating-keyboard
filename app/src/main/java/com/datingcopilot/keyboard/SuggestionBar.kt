@@ -42,7 +42,7 @@ class SuggestionBar(
     }
 
     private val emptyLabel = TextView(context).apply {
-        text = "\uD83D\uDCAC DatingCopilot"
+        text = "\u2728 RizzSe"
         textSize = 13f
         setTextColor(ContextCompat.getColor(context, R.color.accent_violet))
         gravity = Gravity.CENTER

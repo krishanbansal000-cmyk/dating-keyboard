@@ -170,14 +170,17 @@ def current_match():
 def analyze_screenshot():
     """Accept image + persona, return extracted conversation + suggestions."""
     try:
+        print(f"[ANALYZE] Received request. Files: {list(request.files.keys())}, Form: {dict(request.form)}")
         persona = request.form.get("persona", "playful")
         conversation = MOCK_CONVERSATIONS.copy()
         
         if "image" in request.files:
             image_file = request.files["image"]
+            print(f"[ANALYZE] Image received: {image_file.filename}, content_type: {image_file.content_type}")
             filename = secure_filename(image_file.filename)
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             image_file.save(filepath)
+            print(f"[ANALYZE] Image saved: {filepath}, size: {os.path.getsize(filepath)} bytes")
             
             # Try OpenAI Vision if not in mock mode
             if not USE_MOCK and openai_client:

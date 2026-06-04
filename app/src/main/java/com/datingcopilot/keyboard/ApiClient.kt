@@ -198,20 +198,29 @@ class ApiClient(context: Context) {
     // ── NEW: Upload screenshot for analysis ──
     fun uploadScreenshot(uri: Uri, persona: String, context: Context): AnalyzeResponse? {
         return try {
-            // Copy URI content to temp file
-            val tempFile = File(context.cacheDir, "upload_${System.currentTimeMillis()}.jpg")
-            context.contentResolver.openInputStream(uri)?.use { input ->
+            // Copy URI content to temp file - detect MIME type
+            val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            val extension = when {
+                mimeType.contains("png") -> ".png"
+                mimeType.contains("webp") -> ".webp"
+                else -> ".jpg"
+            }
+            
+            val tempFile = File(context.cacheDir, "upload_${System.currentTimeMillis()}$extension")
+            val inputStream = context.contentResolver.openInputStream(uri)
+            if (inputStream == null) {
+                android.util.Log.e("ApiClient", "Cannot open input stream for URI: $uri")
+                return null
+            }
+            inputStream.use { input ->
                 FileOutputStream(tempFile).use { output ->
                     input.copyTo(output)
                 }
-            } ?: return null
+            }
 
-            val mediaType = "image/jpeg".toMediaTypeOrNull()
+            val mediaType = mimeType.toMediaTypeOrNull()
             val fileBody = tempFile.asRequestBody(mediaType)
             val imagePart = MultipartBody.Part.createFormData("image", tempFile.name, fileBody)
-
-            val personaBody = persona.toRequestBody("text/plain".toMediaTypeOrNull())
-            val userIdBody = "user_001".toRequestBody("text/plain".toMediaTypeOrNull())
 
             val requestBody = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
@@ -225,15 +234,25 @@ class ApiClient(context: Context) {
                 .post(requestBody)
                 .build()
 
+            android.util.Log.d("ApiClient", "Uploading screenshot, size: ${tempFile.length()} bytes")
             val response = client.newCall(request).execute()
             tempFile.delete()
 
-            if (!response.isSuccessful) return null
+            if (!response.isSuccessful) {
+                val errorBody = response.body?.string() ?: "no body"
+                android.util.Log.e("ApiClient", "Upload failed: HTTP ${response.code} - $errorBody")
+                return null
+            }
+            
             val responseBody = response.body?.string() ?: return null
+            android.util.Log.d("ApiClient", "Upload response: ${responseBody.take(200)}")
 
             val result = gson.fromJson(responseBody, Map::class.java)
             val error = result["error"] as? String
-            if (error != null) return null
+            if (error != null) {
+                android.util.Log.e("ApiClient", "Backend returned error: $error")
+                return null
+            }
 
             // Parse conversation
             val conversationRaw = result["conversation"] as? List<Map<String, Any>> ?: emptyList()
@@ -258,7 +277,10 @@ class ApiClient(context: Context) {
                 detectedApp = result["detected_app"] as? String,
                 persona = result["persona"] as? String
             )
-        } catch (_: Exception) { null }
+        } catch (e: Exception) {
+            android.util.Log.e("ApiClient", "Upload exception: ${e.message}", e)
+            null
+        }
     }
 
     // ── NEW: Get suggestions from pasted text ──
@@ -306,10 +328,19 @@ class ApiClient(context: Context) {
                 .addHeader("Content-Type", "application/json")
             getAuthToken()?.let { reqBuilder.addHeader("Authorization", "Bearer $it") }
 
+            android.util.Log.d("ApiClient", "Sending text request to ${getBaseUrl()}/api/v1/chat/draft with body: ${json.take(200)}")
+            
             val response = client.newCall(reqBuilder.build()).execute()
-            if (!response.isSuccessful) return null
+            
+            if (!response.isSuccessful) {
+                val errBody = response.body?.string() ?: "no body"
+                android.util.Log.e("ApiClient", "Text draft failed: HTTP ${response.code} - $errBody")
+                return null
+            }
 
             val responseBody = response.body?.string() ?: return null
+            android.util.Log.d("ApiClient", "Text draft response: ${responseBody.take(200)}")
+            
             val result = gson.fromJson(responseBody, Map::class.java)
             val optionsRaw = result["options"] as? List<Map<String, Any>> ?: return null
 
@@ -319,6 +350,9 @@ class ApiClient(context: Context) {
                 val confidence = (opt["confidence"] as? Number)?.toInt() ?: 90
                 SuggestionOption(optText, confidence, optTone)
             }
-        } catch (_: Exception) { null }
+        } catch (e: Exception) {
+            android.util.Log.e("ApiClient", "Text draft exception: ${e.message}", e)
+            null
+        }
     }
 }

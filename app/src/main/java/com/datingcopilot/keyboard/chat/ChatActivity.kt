@@ -117,7 +117,7 @@ class ChatActivity : AppCompatActivity() {
         }
 
         val titleText = TextView(this).apply {
-            text = "DatingCopilot"
+            text = "RizzSe"
             textSize = 22f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(resources.getColor(R.color.text_primary, null))
@@ -174,16 +174,39 @@ class ChatActivity : AppCompatActivity() {
             )
 
             val emptyEmoji = TextView(this@ChatActivity).apply {
-                text = "💬"
-                textSize = 48f
+                text = "✨"
+                textSize = 64f
                 textAlignment = TextView.TEXT_ALIGNMENT_CENTER
                 setPadding(0, 0, 0, (16 * resources.displayMetrics.density).toInt())
             }
             addView(emptyEmoji)
 
+            val pill = TextView(this@ChatActivity).apply {
+                text = "AI DATING COACH"
+                textSize = 11f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(resources.getColor(R.color.accent_violet, null))
+                textAlignment = TextView.TEXT_ALIGNMENT_CENTER
+                setPadding(
+                    (16 * resources.displayMetrics.density).toInt(),
+                    (6 * resources.displayMetrics.density).toInt(),
+                    (16 * resources.displayMetrics.density).toInt(),
+                    (6 * resources.displayMetrics.density).toInt()
+                )
+                val pillBg = android.graphics.drawable.GradientDrawable()
+                pillBg.cornerRadius = 32 * resources.displayMetrics.density
+                pillBg.setColor(resources.getColor(R.color.bg_surface, null))
+                background = pillBg
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { gravity = Gravity.CENTER; bottomMargin = (12 * resources.displayMetrics.density).toInt() }
+            }
+            addView(pill)
+
             val emptyTitle = TextView(this@ChatActivity).apply {
-                text = "No conversation yet"
-                textSize = 18f
+                text = "Ready to up your rizz?"
+                textSize = 22f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(resources.getColor(R.color.text_primary, null))
                 textAlignment = TextView.TEXT_ALIGNMENT_CENTER
@@ -191,26 +214,40 @@ class ChatActivity : AppCompatActivity() {
             addView(emptyTitle)
 
             val emptySubtitle = TextView(this@ChatActivity).apply {
-                text = "Tap + to upload a dating app screenshot"
+                text = "Upload a screenshot or paste a conversation to get AI-powered reply suggestions that match your vibe."
                 textSize = 14f
                 setTextColor(resources.getColor(R.color.text_secondary, null))
                 textAlignment = TextView.TEXT_ALIGNMENT_CENTER
                 setPadding(
-                    (32 * resources.displayMetrics.density).toInt(),
+                    (40 * resources.displayMetrics.density).toInt(),
                     (8 * resources.displayMetrics.density).toInt(),
-                    (32 * resources.displayMetrics.density).toInt(),
+                    (40 * resources.displayMetrics.density).toInt(),
                     0
                 )
+                maxLines = 3
             }
             addView(emptySubtitle)
 
             val uploadHint = TextView(this@ChatActivity).apply {
                 text = "➕ Upload Screenshot"
-                textSize = 14f
+                textSize = 15f
                 setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(resources.getColor(R.color.accent_violet, null))
+                setTextColor(resources.getColor(R.color.white, null))
                 textAlignment = TextView.TEXT_ALIGNMENT_CENTER
-                setPadding(0, (24 * resources.displayMetrics.density).toInt(), 0, 0)
+                setPadding(
+                    (32 * resources.displayMetrics.density).toInt(),
+                    (14 * resources.displayMetrics.density).toInt(),
+                    (32 * resources.displayMetrics.density).toInt(),
+                    (14 * resources.displayMetrics.density).toInt()
+                )
+                val btnBg = android.graphics.drawable.GradientDrawable()
+                btnBg.cornerRadius = 32 * resources.displayMetrics.density
+                btnBg.setColor(resources.getColor(R.color.accent_violet, null))
+                background = btnBg
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { gravity = Gravity.CENTER; topMargin = (28 * resources.displayMetrics.density).toInt() }
                 isClickable = true
                 setOnClickListener { showImagePicker() }
             }
@@ -621,7 +658,7 @@ class ChatActivity : AppCompatActivity() {
 
     private fun copyToClipboard(text: String) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("DatingCopilot", text))
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("RizzSe", text))
     }
 
     @Suppress("UNCHECKED_CAST")
