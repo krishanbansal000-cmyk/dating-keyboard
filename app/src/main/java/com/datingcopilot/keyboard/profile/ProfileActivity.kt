@@ -2,6 +2,7 @@ package com.datingcopilot.keyboard.profile
 
 import android.content.Intent
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.LinearLayout
@@ -62,6 +63,40 @@ class ProfileActivity : AppCompatActivity() {
         val bioInput = styledInput(profile.bio, "Adventure seeker, coffee lover")
         bioInput.minLines = 3
         root.addView(bioInput)
+
+        // GitHub Authentication
+        val authLabel = sectionLabel("Authentication")
+        root.addView(authLabel)
+
+        val prefs = getSharedPreferences("dating_copilot", MODE_PRIVATE)
+        val githubToken = prefs.getString("github_token", null)
+
+        if (githubToken != null) {
+            val githubStatus = TextView(this).apply {
+                text = "✓ Connected to GitHub"
+                textSize = 14f
+                setTextColor(resources.getColor(R.color.success, null))
+                setPadding(0, 0, 0, (12 * resources.displayMetrics.density).toInt())
+            }
+            root.addView(githubStatus)
+
+            val logoutBtn = styledButton("Disconnect GitHub", R.color.red_400)
+            logoutBtn.setOnClickListener {
+                prefs.edit().remove("github_token").apply()
+                Toast.makeText(this, "GitHub disconnected", Toast.LENGTH_SHORT).show()
+                recreate()
+            }
+            root.addView(logoutBtn)
+        } else {
+            val githubLoginBtn = styledButton("Login with GitHub", R.color.accent_violet).apply {
+                setOnClickListener {
+                    val backendUrl = prefs.getString("backend_url", "http://10.0.2.2:8000") ?: "http://10.0.2.2:8000"
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$backendUrl/api/v1/auth/github/login"))
+                    startActivity(intent)
+                }
+            }
+            root.addView(githubLoginBtn)
+        }
 
         // Backend URL
         val urlLabel = sectionLabel("Backend URL")
@@ -139,6 +174,34 @@ class ProfileActivity : AppCompatActivity() {
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(resources.getColor(R.color.text_muted, null))
             setPadding(0, (16 * resources.displayMetrics.density).toInt(), 0, (8 * resources.displayMetrics.density).toInt())
+        }
+    }
+
+    private fun styledButton(text: String, bgColorId: Int): TextView {
+        return TextView(this).apply {
+            this.text = text
+            textSize = 14f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.white, null))
+            textAlignment = TextView.TEXT_ALIGNMENT_CENTER
+            setPadding(
+                (24 * resources.displayMetrics.density).toInt(),
+                (14 * resources.displayMetrics.density).toInt(),
+                (24 * resources.displayMetrics.density).toInt(),
+                (14 * resources.displayMetrics.density).toInt()
+            )
+            val bg = GradientDrawable()
+            bg.cornerRadius = 24 * resources.displayMetrics.density
+            bg.setColor(resources.getColor(bgColorId, null))
+            background = bg
+            isClickable = true
+            isFocusable = true
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = (12 * resources.displayMetrics.density).toInt()
+            }
         }
     }
 

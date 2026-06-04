@@ -50,6 +50,11 @@ Thumbs.db
 out/
 .navigation/
 
+# Debug screenshots and UI dumps
+*.png
+*.xml
+ui*.xml
+
 # Misc
 *.log
 *.tmp
