@@ -3,21 +3,22 @@ package com.datingcopilot.keyboard
 import android.content.Context
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.view.Gravity
 import android.view.View
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 
 class ToneSelector(
     private val context: Context,
     private val onToneSelected: (String) -> Unit
 ) {
 
-    private val tones = listOf("playful", "warm", "direct", "flirty", "witty")
+    private val tones = listOf("friendly", "romantic", "bold", "witty", "playful", "chill", "direct", "flirty")
     private val toneEmojis = mapOf(
-        "playful" to "\uD83D\uDE04", "warm" to "\uD83D\uDE0A", "direct" to "\uD83C\uDFAF",
-        "flirty" to "\uD83D\uDE09", "witty" to "\uD83E\uDDE0"
+        "friendly" to "\uD83D\uDE0A", "romantic" to "\uD83D\uDC9C", "bold" to "\uD83D\uDCAA",
+        "witty" to "\uD83E\uDDE0", "playful" to "\uD83D\uDE04", "chill" to "\uD83D\uDECC\uFE0F",
+        "direct" to "\uD83C\uDFAF", "flirty" to "\uD83D\uDE09"
     )
     private val chipViews = mutableListOf<TextView>()
     private var selectedTone = "playful"
@@ -40,8 +41,7 @@ class ToneSelector(
 
     private val inner = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(dpToPx(8), dpToPx(6), dpToPx(8), dpToPx(6))
+        setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(6))
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -75,23 +75,30 @@ class ToneSelector(
         for ((i, chip) in chipViews.withIndex()) {
             val isSelected = tones[i] == selectedTone
             chip.background = getChipBackground(isSelected)
-            chip.setTextColor(if (isSelected) 0xFF6366F1.toInt() else 0xFF94A3B8.toInt())
+            chip.setTextColor(
+                if (isSelected) ContextCompat.getColor(context, R.color.chip_selected_text)
+                else ContextCompat.getColor(context, R.color.chip_unselected_text)
+            )
             chip.typeface = if (isSelected) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         }
     }
 
     private fun createChip(tone: String, selected: Boolean): TextView {
+        val displayName = tone.replaceFirstChar { it.uppercase() }
         return TextView(context).apply {
-            text = "${toneEmojis[tone] ?: ""} $tone"
+            text = "${toneEmojis[tone] ?: ""} $displayName"
             textSize = 12f
             setPadding(dpToPx(14), dpToPx(8), dpToPx(14), dpToPx(8))
             background = getChipBackground(selected)
-            setTextColor(if (selected) 0xFF6366F1.toInt() else 0xFF94A3B8.toInt())
+            setTextColor(
+                if (selected) ContextCompat.getColor(context, R.color.chip_selected_text)
+                else ContextCompat.getColor(context, R.color.chip_unselected_text)
+            )
             typeface = if (selected) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, dpToPx(8), 0) }
+            ).apply { setMargins(0, 0, dpToPx(6), 0) }
         }
     }
 
@@ -99,11 +106,11 @@ class ToneSelector(
         return GradientDrawable().apply {
             cornerRadius = dpToPx(20).toFloat()
             if (selected) {
-                setColor(0xFF1E2235.toInt())
-                setStroke(dpToPx(1), 0xFF6366F1.toInt())
+                setColor(ContextCompat.getColor(context, R.color.chip_selected))
+                setStroke(dpToPx(1), ContextCompat.getColor(context, R.color.accent_purple))
             } else {
-                setColor(0xFF1A1D2E.toInt())
-                setStroke(dpToPx(1), 0xFF2D3148.toInt())
+                setColor(ContextCompat.getColor(context, R.color.bg_dark))
+                setStroke(dpToPx(1), ContextCompat.getColor(context, R.color.chip_unselected_border))
             }
         }
     }

@@ -20,7 +20,7 @@ class SuggestionBar(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         )
-        setPadding(dpToPx(8), dpToPx(6), dpToPx(8), dpToPx(4))
+        setPadding(dpToPx(8), dpToPx(6), dpToPx(8), dpToPx(2))
     }
 
     private val topRow = LinearLayout(context).apply {
@@ -35,15 +35,16 @@ class SuggestionBar(
     private val loadingIndicator = ProgressBar(context, null, android.R.attr.progressBarStyleSmall).apply {
         isIndeterminate = true
         visibility = View.GONE
-        val params = LinearLayout.LayoutParams(dpToPx(24), dpToPx(24))
+        val params = LinearLayout.LayoutParams(dpToPx(20), dpToPx(20))
         params.gravity = Gravity.CENTER
         layoutParams = params
+        indeterminateDrawable?.setTint(ContextCompat.getColor(context, R.color.accent_violet))
     }
 
     private val emptyLabel = TextView(context).apply {
         text = "\uD83D\uDCAC DatingCopilot"
         textSize = 13f
-        setTextColor(0xFF818CF8.toInt())
+        setTextColor(ContextCompat.getColor(context, R.color.accent_violet))
         gravity = Gravity.CENTER
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -102,6 +103,7 @@ class SuggestionBar(
         suggestionsContainer.visibility = View.GONE
         loadingIndicator.visibility = View.GONE
         emptyLabel.text = "\u26A0\uFE0F Check backend connection"
+        emptyLabel.setTextColor(ContextCompat.getColor(context, R.color.error))
         emptyLabel.visibility = View.VISIBLE
     }
 
@@ -114,15 +116,15 @@ class SuggestionBar(
 
         val bg = GradientDrawable().apply {
             cornerRadius = dpToPx(12).toFloat()
-            setColor(0xFF1E2235.toInt())
-            setStroke(dpToPx(1), 0xFF2D3148.toInt())
+            setColor(ContextCompat.getColor(context, R.color.suggestion_card_bg))
+            setStroke(dpToPx(1), ContextCompat.getColor(context, R.color.glass_border))
         }
         card.background = bg
 
         val textView = TextView(context).apply {
             text = option.text
             textSize = 13f
-            setTextColor(0xFFF1F5F9.toInt())
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             maxLines = 3
             typeface = Typeface.DEFAULT
             layoutParams = LinearLayout.LayoutParams(
@@ -135,7 +137,7 @@ class SuggestionBar(
         val toneLabel = TextView(context).apply {
             text = "${option.persona.uppercase()} \u00B7 ${option.confidence}%"
             textSize = 10f
-            setTextColor(0xFF818CF8.toInt())
+            setTextColor(ContextCompat.getColor(context, R.color.accent_violet))
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -148,7 +150,7 @@ class SuggestionBar(
             onSuggestionTap(option.text)
             suggestionsContainer.visibility = View.GONE
             emptyLabel.text = "\u2713 Copied"
-            emptyLabel.setTextColor(0xFF34D399.toInt())
+            emptyLabel.setTextColor(ContextCompat.getColor(context, R.color.success))
             emptyLabel.visibility = View.VISIBLE
         }
 
@@ -163,5 +165,3 @@ class SuggestionBar(
         return (dp * context.resources.displayMetrics.density).toInt()
     }
 }
-
-// Note: SuggestionOption is now defined in com.datingcopilot.keyboard.chat package

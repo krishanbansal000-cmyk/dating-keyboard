@@ -3,6 +3,7 @@ package com.datingcopilot.keyboard
 import android.inputmethodservice.InputMethodService
 import android.inputmethodservice.Keyboard
 import android.inputmethodservice.KeyboardView
+import android.graphics.drawable.GradientDrawable
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -26,12 +27,15 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
                 apiClient.fetchCurrentMatchContext()
             }
         }
+        // Load saved persona from preferences
+        currentTone = getSharedPreferences("dating_copilot", MODE_PRIVATE)
+            .getString("persona", "playful") ?: "playful"
     }
 
     override fun onCreateInputView(): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xFF1A1D2E.toInt())
+            setBackgroundColor(resources.getColor(R.color.bg_dark, null))
         }
 
         suggestionBar = SuggestionBar(this) { text ->
@@ -43,19 +47,42 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
             fetchSuggestions()
         }
 
+        // Custom keyboard container with rounded top corners
+        val keyboardContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(0, dpToPx(4), 0, 0)
+            val bg = GradientDrawable().apply {
+                cornerRadii = floatArrayOf(
+                    dpToPx(12).toFloat(), dpToPx(12).toFloat(),
+                    dpToPx(12).toFloat(), dpToPx(12).toFloat(),
+                    0f, 0f,
+                    0f, 0f
+                )
+                setColor(resources.getColor(R.color.bg_card, null))
+            }
+            background = bg
+        }
+
         keyboardView = KeyboardView(this, null).apply {
             keyboard = Keyboard(this@DatingKeyboardService, R.xml.qwerty)
             setOnKeyboardActionListener(this@DatingKeyboardService)
             isPreviewEnabled = false
-            setBackgroundColor(0xFF1A1D2E.toInt())
+            setBackgroundColor(resources.getColor(R.color.bg_card, null))
+            setPadding(0, dpToPx(6), 0, dpToPx(6))
         }
 
-        root.addView(suggestionBar.rootView)
-        root.addView(toneSelector.rootView)
-        root.addView(keyboardView, LinearLayout.LayoutParams(
+        keyboardContainer.addView(keyboardView, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ))
+
+        root.addView(suggestionBar.rootView)
+        root.addView(toneSelector.rootView)
+        root.addView(keyboardContainer)
 
         return root
     }
@@ -121,5 +148,9 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
     override fun onDestroy() {
         super.onDestroy()
         scope.cancel()
+    }
+
+    private fun dpToPx(dp: Int): Int {
+        return (dp * resources.displayMetrics.density).toInt()
     }
 }

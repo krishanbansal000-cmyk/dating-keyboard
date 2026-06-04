@@ -11,8 +11,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DatingCopilotKeyboard">
 
-        <!-- KEYBOARD DISABLED for standalone mode. Code preserved for future hybrid. -->
-        <!--
+        <!-- Keyboard IME Service (enabled for hybrid mode - standalone + keyboard) -->
         <service
             android:name=".DatingKeyboardService"
             android:exported="true"
@@ -24,7 +23,6 @@
                 android:name="android.view.im"
                 android:resource="@xml/method" />
         </service>
-        -->
 
         <activity
             android:name=".onboarding.OnboardingActivity"
