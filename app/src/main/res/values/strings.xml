@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DatingCopilot</string>
+    <string name="settings_title">DatingCopilot Settings</string>
+    <string name="backend_url_label">Backend URL</string>
+    <string name="backend_url_default">http://10.0.2.2:8000</string>
+    <string name="tone_label">Default Reply Tone</string>
+    <string name="api_key_label">API Key</string>
+    <string name="save_label">Save</string>
+    <string name="saved_message">Settings saved</string>
+    <string name="loading_suggestions">AI is thinking...</string>
+    <string name="no_suggestions">Tap a message to get AI suggestions</string>
+    <string name="error_connecting">Could not connect. Check your backend URL.</string>
+</resources>

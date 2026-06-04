@@ -1,0 +1,7 @@
+flask==3.0.3
+flask-cors==4.0.0
+openai==1.35.3
+Pillow==10.3.0
+python-dotenv==1.0.1
+Werkzeug==3.0.3
+requests==2.32.3

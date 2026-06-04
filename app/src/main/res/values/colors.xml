@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Legacy Keyboard Colors (preserved for keyboard code) -->
+    <color name="indigo_500">#FF6366F1</color>
+    <color name="indigo_600">#FF4F46E5</color>
+    <color name="indigo_700">#FF4338CA</color>
+    <color name="indigo_50">#FFEEF2FF</color>
+    <color name="slate_50">#FFF8FAFC</color>
+    <color name="slate_100">#FFF1F5F9</color>
+    <color name="slate_200">#FFE2E8F0</color>
+    <color name="slate_600">#FF475569</color>
+    <color name="slate_800">#FF1E293B</color>
+    <color name="slate_900">#FF0F172A</color>
+    <color name="keyboard_bg">#FF1A1D2E</color>
+    <color name="key_bg">#FF2D3148</color>
+    <color name="key_bg_pressed">#FF3D4260</color>
+    <color name="key_text">#FFFFFFFF</color>
+    <color name="key_special_bg">#FF374151</color>
+    <color name="suggestion_card_bg">#FF1E2235</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="red_400">#FFF87171</color>
+    <color name="red_50">#FFFEF2F2</color>
+
+    <!-- Smoothspeak Purple Theme -->
+    <color name="bg_dark">#FF1A1025</color>
+    <color name="bg_card">#FF241636</color>
+    <color name="bg_surface">#FF2D1B4E</color>
+    <color name="bg_input">#FF1E122E</color>
+    <color name="accent_violet">#FF8B5CF6</color>
+    <color name="accent_purple">#FFA855F7</color>
+    <color name="accent_magenta">#FFD946EF</color>
+    <color name="accent_pink">#FFF472B6</color>
+    <color name="text_primary">#FFF3E8FF</color>
+    <color name="text_secondary">#FFC4B5FD</color>
+    <color name="text_muted">#FF9F8FD9</color>
+    <color name="glass_border">#FF4C2882</color>
+    <color name="glass_border_light">#FF6B3FA0</color>
+    <color name="bubble_them">#FF2D1B4E</color>
+    <color name="bubble_you">#FF8B5CF6</color>
+    <color name="chip_selected">#FF8B5CF6</color>
+    <color name="chip_selected_text">#FFFFFFFF</color>
+    <color name="chip_unselected_bg">#001A1025</color>
+    <color name="chip_unselected_border">#FF4C2882</color>
+    <color name="chip_unselected_text">#FFC4B5FD</color>
+    <color name="divider">#FF3D2566</color>
+    <color name="success">#FF34D399</color>
+    <color name="error">#FFF87171</color>
+    <color name="shimmer">#FF3D2566</color>
+</resources>

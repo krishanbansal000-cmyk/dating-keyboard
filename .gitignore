@@ -1,0 +1,55 @@
+# Gradle
+.gradle/
+build/
+*/build/
+local.properties
+*.iml
+.idea/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# Java/Kotlin
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+
+# Android
+app/release/
+app/debug/
+*.log
+*.hprof
+
+# Python backend
+backend/__pycache__/
+backend/*.pyc
+backend/.venv/
+backend/venv/
+backend/uploads/
+backend/backend.log
+backend/test_body.json
+
+# Environment
+.env
+*.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/
+*.iml
+out/
+.navigation/
+
+# Misc
+*.log
+*.tmp
