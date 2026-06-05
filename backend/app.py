@@ -225,6 +225,7 @@ def current_match():
 def analyze_screenshot():
     """Accept image + persona, return extracted conversation + suggestions."""
     try:
+        print(f"[ANALYZE] Received request. Files: {list(request.files.keys())}, Form: {dict(request.form)}")
         persona = request.form.get("persona", "playful")
         user_gender = request.form.get("user_gender", "male")
         hinglish = request.form.get("hinglish", "false").lower() == "true"
@@ -233,71 +234,151 @@ def analyze_screenshot():
         
         if "image" in request.files:
             image_file = request.files["image"]
+            print(f"[ANALYZE] Image received: {image_file.filename}, content_type: {image_file.content_type}")
             filename = secure_filename(image_file.filename)
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             image_file.save(filepath)
+            print(f"[ANALYZE] Image saved: {filepath}, size: {os.path.getsize(filepath)} bytes")
             
+            # Try AI Vision if not in mock mode (handles both OpenAI and Anthropic formats)
             have_client = openai_client is not None or anthropic_client is not None
             if have_client:
                 image_file.seek(0)
                 base64_image = encode_image(image_file)
                 
+                # Build messages - Anthropic uses different image format
                 is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
-                them = "her" if user_gender in ("male", "boy") else "his" if user_gender in ("female", "girl") else "their"
-                lang_hint = "Use Hinglish (Hindi+English mix). Keep it natural." if hinglish else "Use English only."
-                persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
                 
-                # Single combined prompt: extract text AND generate suggestions in one call
-                combined_prompt = f"""Look at this dating app screenshot. Write 3 copy-paste ready messages I can send right now. {persona_prompt} {lang_hint}
+                # Enhanced vision prompt: analyze both text AND visual content
+                vision_instruction = """Analyze this dating app screenshot comprehensively:
+1. Extract any conversation text, profile bio, prompts, or interests visible
+2. Describe the person's photos - what they're doing, their style, vibe, interests shown
+3. Note any hobbies, travel locations, pets, activities visible
+4. Identify the dating app if visible
 
-Rules:
-- Output ONLY 3 lines, each starting with >>>
-- Each line must be a complete message ready to send
-- No thinking, no explanation, no quotes, no commentary
-- Keep each line under 150 characters
+Return a structured summary:
+- TEXT: [any extracted conversation/bio text, or "none"]
+- VISUAL: [description of photos, interests, vibe - be specific about what you see]
+- CONTEXT: [profile or chat conversation]
 
->>> first message
->>> second message
->>> third message"""
+Be detailed about visual elements - these help craft personalized openers."""
                 
                 if is_anthropic:
                     messages = [
                         {"role": "user", "content": [
-                            {"type": "text", "text": combined_prompt},
+                            {"type": "text", "text": vision_instruction},
                             {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64_image}}
                         ]}
                     ]
                 else:
                     messages = [
                         {"role": "user", "content": [
-                            {"type": "text", "text": combined_prompt},
+                            {"type": "text", "text": vision_instruction},
                             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "low"}}
                         ]}
                     ]
                 
-                response = call_ai(messages, model=OPENAI_MODEL, max_tokens=200, temperature=0.95)
+                print(f"[PROMPT] Vision instruction: {vision_instruction[:100]}...")
+                vision_response = call_ai(messages, model=OPENAI_MODEL, max_tokens=1500, temperature=0.2)
                 
-                if response:
-                    if hasattr(response, 'choices'):
-                        msg = response.choices[0].message
-                        text = (msg.content or '').strip()
+                if vision_response:
+                    # Extract text from either Anthropic or OpenAI response
+                    if is_anthropic:
+                        vision_text = vision_response.content[0].text.strip()
                     else:
-                        text = response.content[0].text.strip()
+                        vision_text = vision_response.choices[0].message.content.strip()
                     
-                    first_arrow = text.find('>>>')
-                    if first_arrow > 0:
-                        text = text[first_arrow:]
+                    print(f"[DEBUG] AI raw vision response: {vision_text[:500]}", file=sys.stderr)
                     
-                    lines = [l.strip() for l in text.split('\n') if l.strip()]
-                    arrow_lines = [l for l in lines if l.startswith('>>>')]
+                    # Parse the structured response
+                    text_match = re.search(r'TEXT:\s*(.+?)(?=\n(?:VISUAL|CONTEXT):|$)', vision_text, re.IGNORECASE | re.DOTALL)
+                    visual_match = re.search(r'VISUAL:\s*(.+?)(?=\n(?:TEXT|CONTEXT):|$)', vision_text, re.IGNORECASE | re.DOTALL)
+                    context_match = re.search(r'CONTEXT:\s*(.+?)(?=\n(?:TEXT|VISUAL):|$)', vision_text, re.IGNORECASE | re.DOTALL)
                     
-                    if arrow_lines:
-                        suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in arrow_lines[:3]]
+                    extracted_text = text_match.group(1).strip() if text_match else ""
+                    visual_desc = visual_match.group(1).strip() if visual_match else ""
+                    context_type = context_match.group(1).strip().lower() if context_match else "profile"
+                    
+                    is_profile = "profile" in context_type or "chat" not in context_type
+                    has_text = extracted_text and extracted_text.lower() != "none" and len(extracted_text) > 5
+                    
+                    # Build context for suggestion generation
+                    them = "she" if user_gender in ("male", "boy") else "he" if user_gender in ("female", "girl") else "they"
+                    them_possessive = "her" if user_gender in ("male", "boy") else "his" if user_gender in ("female", "girl") else "their"
+                    
+                    lang_hint = "Use Hinglish (Hindi+English mix). Examples: 'Bhai tera taste top hai', 'That's lit yaar', 'Proper cute hai', 'Kya baat hai', 'Mast hai yeh'. Keep it natural and smooth." if hinglish else "Use English only. Keep it smooth and natural."
+                    
+                    persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
+                    
+                    # Build the prompt based on available context
+                    if has_text:
+                        # We have conversation/bio text
+                        conversation = [{"sender": "them", "text": extracted_text[:500]}]
+                        if is_profile:
+                            prompt = f"""Based on {them} profile:
+Bio/Text: "{extracted_text[:300]}"
+Photos show: {visual_desc[:200] if visual_desc else "interesting vibes"}
+
+{persona_prompt} Write 3 smooth openers. {lang_hint}
+Start each with >>>"""
+                        else:
+                            prompt = f"""{them.capitalize()} said: "{extracted_text[:300]}"
+Context from photos: {visual_desc[:150] if visual_desc else "dating app chat"}
+
+{persona_prompt} Write 3 replies. {lang_hint}
+Start each with >>>"""
+                    elif visual_desc:
+                        # No text but we have visual info - generate opener based on photos
+                        conversation = [{"sender": "them", "text": f"[Profile with: {visual_desc[:200]}]"}]
+                        prompt = f"""Based on {them} dating profile photos:
+{visual_desc[:400]}
+
+{persona_prompt} Write 3 smooth openers referencing what you see in {them} photos. {lang_hint}
+Start each with >>>"""
                     else:
-                        candidates = [l for l in lines if len(l) > 15 and len(l) < 200][:3]
-                        suggestions = [{"text": l, "confidence": random.randint(75, 90), "persona": persona} for l in candidates]
+                        # Nothing extracted - generic but high-rizz opener
+                        conversation = [{"sender": "them", "text": "[No info available]"}]
+                        prompt = f"""{persona_prompt} Write 3 generic but high-rizz openers that work on any dating profile. Make them stand out, be memorable, and spark curiosity. {lang_hint}
+Start each with >>>"""
                     
-                    conversation = [{"sender": "them", "text": "[screenshot]"}]
+                    print(f"[PROMPT] Generating suggestions: {prompt[:200]}...")
+                    
+                    try:
+                        sug_response = call_ai(
+                            [{"role": "user", "content": prompt}],
+                            max_tokens=400, temperature=0.9
+                        )
+                        
+                        if sug_response:
+                            if hasattr(sug_response, 'choices'):
+                                msg = sug_response.choices[0].message
+                                sug_text = (msg.content or getattr(msg, 'reasoning_content', '') or '').strip()
+                            else:
+                                sug_text = sug_response.content[0].text.strip() if sug_response.content else ''
+                            
+                            print(f"[DEBUG] AI raw suggestion text: {sug_text[:500]}", file=sys.stderr)
+                            
+                            # Parse >>> lines or fall back to clean lines
+                            lines = [l.strip() for l in sug_text.split('\n') if l.strip()]
+                            arrow_lines = [l for l in lines if l.startswith('>>>')]
+                            
+                            if arrow_lines:
+                                suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in arrow_lines[:3]]
+                            else:
+                                skip_prefixes = ('Context', 'Option', 'Note', 'Wait', 'Possible', 'Let me', 'I need', 'I think', 'Maybe', 'Here', 'Alright', 'So', 'First', 'Second', 'Third', 'Finally', 'The', 'This', 'That', 'Here are', 'She', 'He', 'They', 'Her profile', 'His profile', 'Looking at', 'Based on', 'Given', 'For', 'Romantic', 'Playful', 'Flirty', 'Direct', 'Chill', 'Witty', 'Bold', 'Friendly', 'Smooth', 'Cheeky', 'Confident', 'Teasing', 'Charming', 'Deconstruct', 'Analyze', 'Goal')
+                                candidates = [l for l in lines if len(l) > 20 and not l.startswith(skip_prefixes) and not any(w in l.lower() for w in ['option', 'note', 'context', 'possib', 'interpret', 'angle', 'approach', 'maybe:', 'deconstruct', 'analyze', 'goal', 'target', 'character'])]
+                                if not candidates:
+                                    candidates = [l for l in lines if len(l) > 15][-5:]
+                                suggestions = []
+                                for l in (candidates[-3:] if candidates else lines[-3:]):
+                                    l = re.sub(r'^[\d]+[\.\)\-\:\s]+', '', l).strip()
+                                    if l and len(l) > 10:
+                                        suggestions.append({"text": l, "confidence": random.randint(78, 98), "persona": persona})
+                            
+                            if suggestions:
+                                print(f"[DEBUG] Generated {len(suggestions)} suggestions")
+                    except Exception as e:
+                        print(f"[DEBUG] Suggestion generation failed: {e}", file=sys.stderr)
             
             try:
                 os.remove(filepath)
@@ -305,23 +386,27 @@ Rules:
                 pass
         
         if not suggestions:
-            persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
-            lang_hint = "Use Hinglish." if hinglish else "Use English only."
-            fallback_prompt = f"{persona_prompt} Write 3 copy-paste ready generic openers. {lang_hint}\n\nRules:\n- Output ONLY 3 lines, each starting with >>>\n- Each line must be a complete message ready to send\n- No thinking, no explanation, no quotes, no commentary\n- Keep each line under 150 characters\n\n>>> first opener\n>>> second opener\n>>> third opener"
-            fallback_response = call_ai([{"role": "user", "content": fallback_prompt}], max_tokens=200, temperature=0.95)
-            
-            if fallback_response:
-                if hasattr(fallback_response, 'choices'):
-                    fb_text = fallback_response.choices[0].message.content.strip()
-                else:
-                    fb_text = fallback_response.content[0].text.strip()
+            # Fallback: generate generic rizz if everything else failed
+            try:
+                persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
+                lang_hint = "Use Hinglish (Hindi+English mix)." if hinglish else "Use English only."
+                fallback_prompt = f"{persona_prompt} Write 3 smooth generic openers for dating apps. {lang_hint} Start each with >>>"
+                fallback_response = call_ai([{"role": "user", "content": fallback_prompt}], max_tokens=300, temperature=0.9)
                 
-                fb_lines = [l.strip() for l in fb_text.split('\n') if l.strip()]
-                fb_arrow = [l for l in fb_lines if l.startswith('>>>')]
-                if fb_arrow:
-                    suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(75, 90), "persona": persona} for l in fb_arrow[:3]]
-                else:
-                    suggestions = [{"text": l.strip(), "confidence": random.randint(75, 90), "persona": persona} for l in fb_lines[:3] if len(l) > 10]
+                if fallback_response:
+                    if hasattr(fallback_response, 'choices'):
+                        fb_text = fallback_response.choices[0].message.content.strip()
+                    else:
+                        fb_text = fallback_response.content[0].text.strip()
+                    
+                    fb_lines = [l.strip() for l in fb_text.split('\n') if l.strip()]
+                    fb_arrow = [l for l in fb_lines if l.startswith('>>>')]
+                    if fb_arrow:
+                        suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(75, 90), "persona": persona} for l in fb_arrow[:3]]
+                    else:
+                        suggestions = [{"text": l.strip(), "confidence": random.randint(75, 90), "persona": persona} for l in fb_lines[:3] if len(l) > 10]
+            except:
+                pass
         
         if not suggestions:
             return jsonify({"error": "AI failed to generate suggestions"}), 500
@@ -360,35 +445,32 @@ def chat_draft():
             them = "she" if user_gender in ("male", "boy") else "he" if user_gender in ("female", "girl") else "they"
             lang_hint = "Use Hinglish (Hindi+English mix). Examples: 'Bhai tera taste top hai', 'That's lit yaar', 'Proper cute hai', 'Kya baat hai', 'Mast hai yeh'. Keep it natural and smooth. Use some Hindi words naturally." if hinglish else "Use English only. Keep it smooth and natural."
             
-            prompt_text = f"{them.capitalize()} said: \"{convo_text[:500]}\". {persona_prompt} Write 3 copy-paste ready replies. {lang_hint}\n\nRules:\n- Output ONLY 3 lines, each starting with >>>\n- Each line must be a complete message ready to send\n- No thinking, no explanation, no quotes, no commentary\n- Keep each line under 150 characters\n\n>>> first reply\n>>> second reply\n>>> third reply"
+            prompt_text = f"{them.capitalize()} said: \"{convo_text[:500]}\". {persona_prompt} Write 3 replies. {lang_hint} Start each with >>>"
+            print(f"[PROMPT] Chat draft:\n{prompt_text}")
             response = call_ai(
                 [{"role": "user", "content": prompt_text}],
-                max_tokens=200, temperature=0.95
+                max_tokens=400, temperature=0.85
             )
             
             if response:
                 if hasattr(response, 'choices'):
-                    msg = response.choices[0].message
-                    text = (msg.content or '').strip()
-                    reasoning = getattr(msg, 'reasoning_content', '') or ''
-                    if reasoning and text.startswith(reasoning):
-                        text = text[len(reasoning):].strip()
+                    text = response.choices[0].message.content.strip()
                 else:
                     text = response.content[0].text.strip()
-                
-                first_arrow = text.find('>>>')
-                if first_arrow > 0:
-                    text = text[first_arrow:]
-                
                 lines = [l.strip() for l in text.split('\n') if l.strip()]
                 arrow_lines = [l for l in lines if l.startswith('>>>')]
-                
                 if arrow_lines:
                     options = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "tone": persona} for l in arrow_lines[:3]]
                 else:
-                    candidates = [l for l in lines if len(l) > 15 and len(l) < 200][:3]
-                    options = [{"text": l, "confidence": random.randint(75, 90), "tone": persona} for l in candidates]
-                
+                    skip_prefixes = ('Context', 'Option', 'Note', 'Wait', 'Possible', 'Let me', 'I need', 'I think', 'Maybe', 'Here', 'Alright', 'So', 'First', 'Second', 'Third', 'Finally', 'The', 'This', 'That', 'Here are', 'She', 'He', 'They', 'Her profile', 'His profile', 'Looking at', 'Based on', 'Given', 'For')
+                    candidates = [l for l in lines if len(l) > 15 and not l.startswith(skip_prefixes) and not any(w in l.lower() for w in ['option', 'note', 'context', 'possib', 'interpret'])]
+                    if not candidates:
+                        candidates = [l for l in lines if len(l) > 15][-5:]
+                    options = []
+                    for l in (candidates[-3:] if candidates else lines[-3:]):
+                        l = re.sub(r'^[\d]+[\.\)\-\:\s]+', '', l).strip()
+                        if l and len(l) > 10:
+                            options.append({"text": l, "confidence": random.randint(78, 98), "tone": persona})
                 if options:
                     return jsonify({"options": options})
         
