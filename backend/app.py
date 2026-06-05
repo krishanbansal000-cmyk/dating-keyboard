@@ -285,8 +285,12 @@ Rules:
                     lines = [l.strip() for l in text.split('\n') if l.strip()]
                     arrow_lines = [l for l in lines if l.startswith('>>>')]
                     
-                    if arrow_lines:
-                        suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in arrow_lines[:3]]
+                    # Filter out meta/instruction lines
+                    skip_words = ('explanation', 'thinking', 'labels', 'rules', 'output', 'no explanation', 'just the', 'copy-paste', 'characters', 'short, smooth')
+                    clean_lines = [l for l in arrow_lines if not any(w in l.lower() for w in skip_words)]
+                    
+                    if clean_lines:
+                        suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in clean_lines[:3]]
             
             try:
                 os.remove(filepath)
@@ -314,8 +318,13 @@ Rules:
                     
                     fb_lines = [l.strip() for l in text.split('\n') if l.strip()]
                     fb_arrow = [l for l in fb_lines if l.startswith('>>>')]
-                    if fb_arrow:
-                        suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(75, 90), "persona": persona} for l in fb_arrow[:3]]
+                    
+                    # Filter out meta/instruction lines
+                    skip_words = ('explanation', 'thinking', 'labels', 'rules', 'output', 'no explanation', 'just the', 'copy-paste', 'characters', 'short, smooth')
+                    clean_fb = [l for l in fb_arrow if not any(w in l.lower() for w in skip_words)]
+                    
+                    if clean_fb:
+                        suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(75, 90), "persona": persona} for l in clean_fb[:3]]
             except:
                 pass
         
@@ -371,8 +380,13 @@ def chat_draft():
                 
                 lines = [l.strip() for l in text.split('\n') if l.strip()]
                 arrow_lines = [l for l in lines if l.startswith('>>>')]
-                if arrow_lines:
-                    options = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "tone": persona} for l in arrow_lines[:3]]
+                
+                # Filter out meta/instruction lines
+                skip_words = ('explanation', 'thinking', 'labels', 'rules', 'output', 'no explanation', 'just the', 'copy-paste', 'characters', 'short, smooth')
+                clean_lines = [l for l in arrow_lines if not any(w in l.lower() for w in skip_words)]
+                
+                if clean_lines:
+                    options = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "tone": persona} for l in clean_lines[:3]]
                     return jsonify({"options": options})
         
         return jsonify({"error": "AI failed to generate suggestions"}), 500
