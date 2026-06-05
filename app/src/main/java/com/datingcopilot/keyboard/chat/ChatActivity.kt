@@ -77,6 +77,19 @@ class ChatActivity : AppCompatActivity() {
         currentPersona = prefs.getString("persona", "playful") ?: "playful"
 
         buildUI()
+        handleSendImage(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleSendImage(intent)
+    }
+
+    private fun handleSendImage(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("image/") == true) {
+            val imageUri = intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)
+            imageUri?.let { handleImageSelected(it) }
+        }
     }
 
     private fun buildUI() {
