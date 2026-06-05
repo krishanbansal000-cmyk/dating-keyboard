@@ -242,11 +242,11 @@ def analyze_screenshot():
                 persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
                 lang_hint = "Hinglish." if hinglish else "English."
                 
-                vision_prompt = f"""Look at this screenshot. Write 3 rizz lines based on what you see. {persona_prompt} {lang_hint}
+                vision_prompt = f"""Look at this screenshot. Write 3 short rizz lines (under 100 chars each) based on what you see. {persona_prompt} {lang_hint}
 
->>> first
->>> second
->>> third"""
+>>>
+>>>
+>>>"""
                 
                 if is_anthropic:
                     messages = [
@@ -298,7 +298,7 @@ def analyze_screenshot():
                 persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
                 lang_hint = "Hinglish." if hinglish else "English."
                 response = call_ai(
-                    [{"role": "user", "content": f"{persona_prompt} Write 3 generic openers. {lang_hint} Output 3 lines starting with >>>"}],
+                    [{"role": "user", "content": f"{persona_prompt} Write 3 short openers (under 100 chars). {lang_hint}\n\n>>>\n>>>\n>>>"}],
                     max_tokens=600, temperature=0.95
                 )
                 if response:
@@ -361,7 +361,7 @@ def chat_draft():
             lang_hint = "Hinglish." if hinglish else "English."
             
             response = call_ai(
-                [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 replies that reference what they said. Make it personal. {lang_hint}\n\nOutput 3 lines. Each starts with >>>. Do NOT write anything else."}],
+                [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 short replies (under 100 chars each) that reference what they said. {lang_hint}\n\n>>>\n>>>\n>>>"}],
                 max_tokens=600, temperature=0.95
             )
             
