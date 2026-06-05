@@ -11,7 +11,8 @@ import com.datingcopilot.keyboard.chat.SuggestionOption
 
 class SuggestionBar(
     private val context: Context,
-    private val onSuggestionTap: (String) -> Unit
+    private val onSuggestionTap: (String) -> Unit,
+    private val onGenerateTap: (() -> Unit)? = null
 ) {
 
     private val container = LinearLayout(context).apply {
@@ -25,7 +26,7 @@ class SuggestionBar(
 
     private val topRow = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
+        gravity = Gravity.CENTER
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -42,14 +43,24 @@ class SuggestionBar(
     }
 
     private val emptyLabel = TextView(context).apply {
-        text = "\u2728 RizzSe"
+        text = "\u2728 Tap to generate"
         textSize = 13f
         setTextColor(ContextCompat.getColor(context, R.color.accent_violet))
         gravity = Gravity.CENTER
+        isClickable = true
+        isFocusable = true
+        setPadding(dpToPx(16), dpToPx(8), dpToPx(16), dpToPx(8))
+        val bg = GradientDrawable().apply {
+            cornerRadius = dpToPx(20).toFloat()
+            setColor(ContextCompat.getColor(context, R.color.bg_dark))
+            setStroke(dpToPx(1), ContextCompat.getColor(context, R.color.accent_violet))
+        }
+        background = bg
         layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
-        )
+        ).apply { gravity = Gravity.CENTER }
+        setOnClickListener { onGenerateTap?.invoke() }
     }
 
     private val suggestionsContainer = HorizontalScrollView(context).apply {
@@ -102,7 +113,7 @@ class SuggestionBar(
     fun showError() {
         suggestionsContainer.visibility = View.GONE
         loadingIndicator.visibility = View.GONE
-        emptyLabel.text = "\u26A0\uFE0F Check backend connection"
+        emptyLabel.text = "\u26A0\uFE0F Tap to retry"
         emptyLabel.setTextColor(ContextCompat.getColor(context, R.color.error))
         emptyLabel.visibility = View.VISIBLE
     }

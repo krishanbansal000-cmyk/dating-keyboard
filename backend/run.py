@@ -1,8 +1,8 @@
 import sys
-sys.path.insert(0, r'C:\Users\Krishan\repos\dating-keyboard\backend')
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app import app
-import os
 
 if __name__ == "__main__":
     import sys, os

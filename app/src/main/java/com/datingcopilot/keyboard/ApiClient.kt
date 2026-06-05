@@ -85,7 +85,7 @@ class ApiClient(context: Context) {
 
     // ── Auth ──
     private fun getBaseUrl(): String =
-        prefs.getString("backend_url", "http://10.0.2.2:8000") ?: "http://10.0.2.2:8000"
+        prefs.getString("backend_url", "http://164.68.103.130:8000") ?: "http://164.68.103.130:8000"
 
     private fun getAuthToken(): String? = prefs.getString("auth_token", null)
     fun setAuthToken(token: String) { prefs.edit().putString("auth_token", token).apply() }

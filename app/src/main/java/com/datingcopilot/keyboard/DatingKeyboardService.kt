@@ -38,9 +38,14 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
             setBackgroundColor(resources.getColor(R.color.bg_dark, null))
         }
 
-        suggestionBar = SuggestionBar(this) { text ->
-            currentInputConnection?.commitText(text, 1)
-        }
+        suggestionBar = SuggestionBar(this,
+            onSuggestionTap = { text ->
+                currentInputConnection?.commitText(text, 1)
+            },
+            onGenerateTap = {
+                fetchSuggestions()
+            }
+        )
 
         toneSelector = ToneSelector(this) { tone ->
             currentTone = tone
@@ -90,10 +95,6 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         toneSelector.setSelectedTone(currentTone)
-        val text = currentInputConnection?.getTextBeforeCursor(500, 0)?.toString()
-        if (!text.isNullOrBlank()) {
-            fetchSuggestions()
-        }
     }
 
     private fun fetchSuggestions() {
@@ -134,7 +135,6 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
             -1 -> {}
             else -> ic.commitText(primaryCode.toChar().toString(), 1)
         }
-        fetchSuggestions()
     }
 
     override fun onPress(code: Int) {}
