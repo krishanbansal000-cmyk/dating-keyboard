@@ -294,7 +294,7 @@ Rules:
                     if arrow_lines:
                         suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in arrow_lines[:3]]
                     else:
-                        candidates = [l for l in lines if len(l) > 15][:3]
+                        candidates = [l for l in lines if len(l) > 15 and len(l) < 200][:3]
                         suggestions = [{"text": l, "confidence": random.randint(75, 90), "persona": persona} for l in candidates]
                     
                     conversation = [{"sender": "them", "text": "[screenshot]"}]
@@ -368,23 +368,27 @@ def chat_draft():
             
             if response:
                 if hasattr(response, 'choices'):
-                    text = response.choices[0].message.content.strip()
+                    msg = response.choices[0].message
+                    text = (msg.content or '').strip()
+                    reasoning = getattr(msg, 'reasoning_content', '') or ''
+                    if reasoning and text.startswith(reasoning):
+                        text = text[len(reasoning):].strip()
                 else:
                     text = response.content[0].text.strip()
+                
+                first_arrow = text.find('>>>')
+                if first_arrow > 0:
+                    text = text[first_arrow:]
+                
                 lines = [l.strip() for l in text.split('\n') if l.strip()]
                 arrow_lines = [l for l in lines if l.startswith('>>>')]
+                
                 if arrow_lines:
                     options = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "tone": persona} for l in arrow_lines[:3]]
                 else:
-                    skip_prefixes = ('Context', 'Option', 'Note', 'Wait', 'Possible', 'Let me', 'I need', 'I think', 'Maybe', 'Here', 'Alright', 'So', 'First', 'Second', 'Third', 'Finally', 'The', 'This', 'That', 'Here are', 'She', 'He', 'They', 'Her profile', 'His profile', 'Looking at', 'Based on', 'Given', 'For')
-                    candidates = [l for l in lines if len(l) > 15 and not l.startswith(skip_prefixes) and not any(w in l.lower() for w in ['option', 'note', 'context', 'possib', 'interpret'])]
-                    if not candidates:
-                        candidates = [l for l in lines if len(l) > 15][-5:]
-                    options = []
-                    for l in (candidates[-3:] if candidates else lines[-3:]):
-                        l = re.sub(r'^[\d]+[\.\)\-\:\s]+', '', l).strip()
-                        if l and len(l) > 10:
-                            options.append({"text": l, "confidence": random.randint(78, 98), "tone": persona})
+                    candidates = [l for l in lines if len(l) > 15 and len(l) < 200][:3]
+                    options = [{"text": l, "confidence": random.randint(75, 90), "tone": persona} for l in candidates]
+                
                 if options:
                     return jsonify({"options": options})
         
