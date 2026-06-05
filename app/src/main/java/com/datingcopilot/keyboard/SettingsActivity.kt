@@ -124,8 +124,8 @@ class SettingsActivity : AppCompatActivity() {
         content.addView(fieldLabel("Backend URL"))
         backendUrlInput = styledEditText(
             getSharedPreferences("dating_copilot", MODE_PRIVATE)
-                .getString("backend_url", "http://10.0.2.2:8000") ?: "",
-            "http://10.0.2.2:8000"
+                .getString("backend_url", "http://164.68.103.130:8000") ?: "",
+            "http://164.68.103.130:8000"
         )
         content.addView(backendUrlInput)
         content.addView(spacer(12))
