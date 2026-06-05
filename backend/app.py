@@ -240,13 +240,16 @@ def analyze_screenshot():
                 persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
                 lang_hint = "Hinglish." if hinglish else "English."
                 
-                vision_prompt = f"""Look at this dating screenshot. Is it a profile (needs opener) or a chat (needs reply)? Write 3 rizz lines. {persona_prompt} {lang_hint}
+                vision_prompt = f"""Look at this dating app screenshot. Is it a profile page (write openers to start chat) or a chat conversation (write replies)? Write 3 concise rizz lines that impress the boy/girl. {persona_prompt} {lang_hint}
 
-Only output 3 lines starting with >>>. No extra text.
+Rules:
+- Short, smooth, copy-paste ready messages
+- Max 120 characters each
+- No explanation, no quotes, no labels
 
->>> first line
->>> second line
->>> third line"""
+>>> first rizz line
+>>> second rizz line
+>>> third rizz line"""
                 
                 if is_anthropic:
                     messages = [
@@ -341,7 +344,7 @@ def chat_draft():
             lang_hint = "Hinglish." if hinglish else "English."
             
             response = call_ai(
-                [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 replies. {lang_hint} Only output 3 lines starting with >>>"}],
+                [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 concise rizz replies that impress. {lang_hint}\n\nRules:\n- Short, smooth, copy-paste ready\n- Max 120 characters each\n- No explanation, no quotes, no labels\n\n>>> first rizz reply\n>>> second rizz reply\n>>> third rizz reply"}],
                 max_tokens=150, temperature=0.95
             )
             
