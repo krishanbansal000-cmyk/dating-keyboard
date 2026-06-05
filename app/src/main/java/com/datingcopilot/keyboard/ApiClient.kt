@@ -83,43 +83,22 @@ class ApiClient(context: Context) {
             .apply()
     }
 
-    // ── Auth ──
+    // ── Auth (optional, not required) ──
     private fun getBaseUrl(): String =
         prefs.getString("backend_url", "http://164.68.103.130:8000") ?: "http://164.68.103.130:8000"
 
     private fun getAuthToken(): String? = prefs.getString("auth_token", null)
     fun setAuthToken(token: String) { prefs.edit().putString("auth_token", token).apply() }
 
-    fun hasCredentials(): Boolean = getAuthToken() != null
+    fun hasCredentials(): Boolean = false
 
-    fun loginSync(email: String, password: String): Boolean {
-        return try {
-            val json = gson.toJson(mapOf("email" to email, "password" to password))
-            val request = Request.Builder()
-                .url("${getBaseUrl()}/api/v1/auth/login")
-                .post(json.toRequestBody(JSON))
-                .build()
-            val response = client.newCall(request).execute()
-            if (response.isSuccessful) {
-                val body = response.body?.string() ?: return false
-                val result = gson.fromJson(body, Map::class.java)
-                val token = result["access_token"] as? String
-                if (token != null) {
-                    setAuthToken(token)
-                    prefs.edit().putString("email", email).apply()
-                    return true
-                }
-            }
-            false
-        } catch (_: Exception) { false }
-    }
+    fun loginSync(email: String, password: String): Boolean = true
 
     // ── Fetch current match context from backend ──
     fun fetchCurrentMatchContext(): MatchContext? {
         return try {
             val request = Request.Builder()
                 .url("${getBaseUrl()}/api/v1/chat/current-match")
-                .addHeader("Authorization", "Bearer ${getAuthToken()}")
                 .build()
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) return null
@@ -177,7 +156,6 @@ class ApiClient(context: Context) {
                 .url("${getBaseUrl()}/api/v1/chat/draft")
                 .post(json.toRequestBody(JSON))
                 .addHeader("Content-Type", "application/json")
-            getAuthToken()?.let { reqBuilder.addHeader("Authorization", "Bearer $it") }
 
             val response = client.newCall(reqBuilder.build()).execute()
             if (!response.isSuccessful) return null
@@ -333,7 +311,6 @@ class ApiClient(context: Context) {
                 .url("${getBaseUrl()}/api/v1/chat/draft")
                 .post(json.toRequestBody(JSON))
                 .addHeader("Content-Type", "application/json")
-            getAuthToken()?.let { reqBuilder.addHeader("Authorization", "Bearer $it") }
 
             android.util.Log.d("ApiClient", "Sending text request to ${getBaseUrl()}/api/v1/chat/draft with body: ${json.take(200)}")
             

@@ -64,47 +64,13 @@ class ProfileActivity : AppCompatActivity() {
         bioInput.minLines = 3
         root.addView(bioInput)
 
-        // GitHub Authentication
-        val authLabel = sectionLabel("Authentication")
-        root.addView(authLabel)
-
-        val prefs = getSharedPreferences("dating_copilot", MODE_PRIVATE)
-        val githubToken = prefs.getString("github_token", null)
-
-        if (githubToken != null) {
-            val githubStatus = TextView(this).apply {
-                text = "✓ Connected to GitHub"
-                textSize = 14f
-                setTextColor(resources.getColor(R.color.success, null))
-                setPadding(0, 0, 0, (12 * resources.displayMetrics.density).toInt())
-            }
-            root.addView(githubStatus)
-
-            val logoutBtn = styledButton("Disconnect GitHub", R.color.red_400)
-            logoutBtn.setOnClickListener {
-                prefs.edit().remove("github_token").apply()
-                Toast.makeText(this, "GitHub disconnected", Toast.LENGTH_SHORT).show()
-                recreate()
-            }
-            root.addView(logoutBtn)
-        } else {
-            val githubLoginBtn = styledButton("Login with GitHub", R.color.accent_violet).apply {
-                setOnClickListener {
-                    val backendUrl = prefs.getString("backend_url", "http://10.0.2.2:8000") ?: "http://10.0.2.2:8000"
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$backendUrl/api/v1/auth/github/login"))
-                    startActivity(intent)
-                }
-            }
-            root.addView(githubLoginBtn)
-        }
-
         // Backend URL
         val urlLabel = sectionLabel("Backend URL")
         root.addView(urlLabel)
         val urlInput = styledInput(
             getSharedPreferences("dating_copilot", MODE_PRIVATE)
-                .getString("backend_url", "http://10.0.2.2:8000") ?: "http://10.0.2.2:8000",
-            "http://10.0.2.2:8000"
+                .getString("backend_url", "http://164.68.103.130:8000") ?: "http://164.68.103.130:8000",
+            "http://164.68.103.130:8000"
         )
         root.addView(urlInput)
 

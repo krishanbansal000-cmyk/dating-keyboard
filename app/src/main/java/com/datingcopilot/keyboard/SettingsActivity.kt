@@ -13,10 +13,6 @@ import kotlinx.coroutines.*
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var backendUrlInput: EditText
-    private lateinit var emailInput: EditText
-    private lateinit var passwordInput: EditText
-    private lateinit var statusText: TextView
-    private lateinit var loginBtn: Button
 
     private lateinit var userNameInput: EditText
     private lateinit var userAgeInput: EditText
@@ -128,39 +124,6 @@ class SettingsActivity : AppCompatActivity() {
             "http://164.68.103.130:8000"
         )
         content.addView(backendUrlInput)
-        content.addView(spacer(12))
-
-        content.addView(fieldLabel("Email"))
-        emailInput = styledEditText(
-            "",
-            "your@email.com",
-            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
-        )
-        content.addView(emailInput)
-        content.addView(spacer(12))
-
-        content.addView(fieldLabel("Password"))
-        passwordInput = styledEditText(
-            "",
-            "password",
-            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-        )
-        content.addView(passwordInput)
-        content.addView(spacer(16))
-
-        loginBtn = styledButton("Login", 0xFF6366F1.toInt()) {
-            loginBtn.setTextColor(0xFFFFFFFF.toInt())
-            doLogin()
-        }
-        content.addView(loginBtn)
-
-        statusText = TextView(this).apply {
-            text = ""
-            textSize = 13f
-            gravity = Gravity.CENTER
-            setPadding(0, dp(8), 0, 0)
-        }
-        content.addView(statusText)
         content.addView(spacer(20))
 
         content.addView(styledButton("Save All Settings", 0xFF6366F1.toInt()) {
@@ -169,10 +132,10 @@ class SettingsActivity : AppCompatActivity() {
         content.addView(spacer(16))
 
         content.addView(TextView(this).apply {
-            text = if (apiClient.hasCredentials()) "\u2713 Connected to server" else "\u25CB Not logged in"
+            text = "\u2713 No login required"
             textSize = 13f
             gravity = Gravity.CENTER
-            setTextColor(if (apiClient.hasCredentials()) 0xFF22C55E.toInt() else 0xFF94A3B8.toInt())
+            setTextColor(0xFF22C55E.toInt())
         })
 
         scrollView.addView(content)
@@ -254,30 +217,6 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun dp(v: Int): Int {
         return (v * resources.displayMetrics.density).toInt()
-    }
-
-    private fun doLogin() {
-        val email = emailInput.text.toString().trim()
-        val password = passwordInput.text.toString().trim()
-        if (email.isEmpty() || password.isEmpty()) {
-            statusText.text = "Enter email and password"
-            statusText.setTextColor(0xFFEF4444.toInt())
-            return
-        }
-        loginBtn.isEnabled = false
-        statusText.text = "Logging in..."
-        statusText.setTextColor(0xFF64748B.toInt())
-        scope.launch {
-            val success = withContext(Dispatchers.IO) { apiClient.loginSync(email, password) }
-            loginBtn.isEnabled = true
-            if (success) {
-                statusText.text = "\u2713 Login successful!"
-                statusText.setTextColor(0xFF22C55E.toInt())
-            } else {
-                statusText.text = "\u2717 Login failed. Check backend URL."
-                statusText.setTextColor(0xFFEF4444.toInt())
-            }
-        }
     }
 
     private fun saveAllSettings() {
