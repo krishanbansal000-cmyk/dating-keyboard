@@ -58,3 +58,7 @@ ui*.xml
 # Misc
 *.log
 *.tmp
+
+# Temp test scripts
+test_*.py
+debug_*.py

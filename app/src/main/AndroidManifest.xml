@@ -50,6 +50,11 @@ android:label="RizzSe"
             android:label="Profile" />
 
         <activity
+            android:name=".image.ImageBrowserActivity"
+            android:exported="false"
+            android:label="Select Image" />
+
+        <activity
             android:name=".chat.AuthCallbackActivity"
             android:exported="true"
             android:launchMode="singleTask">

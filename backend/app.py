@@ -21,30 +21,49 @@ CORS(app, supports_credentials=True)
 
 USE_MOCK = os.getenv("USE_MOCK", "true").lower() == "true"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "qwen3.6-plus")
+
+# Anthropic-compatible models (use Messages API endpoint)
+ANTHROPIC_MODELS = {"qwen3.7-plus", "qwen3.7-max", "qwen3.6-plus", "minimax-m3", "minimax-m2.7", "minimax-m2.5"}
+API_ENDPOINT = os.getenv("OPENAI_BASE_URL", "")
 
 # GitHub OAuth config
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
 GITHUB_REDIRECT_URI = os.getenv("GITHUB_REDIRECT_URI", "http://localhost:8000/api/v1/auth/github/callback")
 
-# Only initialize OpenAI client if we have a key and mock is disabled
+# Only initialize clients if we have a key and mock is disabled
 openai_client = None
+anthropic_client = None
 if not USE_MOCK and OPENAI_API_KEY:
-    from openai import OpenAI
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    if OPENAI_MODEL in ANTHROPIC_MODELS:
+        # Use Anthropic Messages API for Qwen/MiniMax models
+        import anthropic
+        anthropic_client = anthropic.Anthropic(
+            api_key=OPENAI_API_KEY,
+            base_url=API_ENDPOINT  # https://opencode.ai/zen/go/v1
+        )
+    else:
+        # Use OpenAI-compatible API
+        from openai import OpenAI
+        client_kwargs = {"api_key": OPENAI_API_KEY}
+        if API_ENDPOINT:
+            client_kwargs["base_url"] = API_ENDPOINT
+        openai_client = OpenAI(**client_kwargs)
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB max
 
 PERSONA_PROMPTS = {
-    "friendly": "You are a friendly, warm, and approachable dating coach. Generate replies that are kind, easy-going, and make the other person feel comfortable.",
-    "romantic": "You are a romantic dating coach. Generate replies that are sweet, charming, and show genuine interest. Use warmth and a touch of poetic flair.",
-    "bold": "You are a bold, confident dating coach. Generate replies that are direct, assertive, and show high value. Take the lead in the conversation.",
-    "witty": "You are a witty, clever dating coach. Generate replies that are funny, sharp, and playful. Use humor, wordplay, and teasing in a lighthearted way.",
+    "friendly": "You are a friendly, warm, and approachable dating coach. Generate replies that are kind, easy-going, and make the other person feel comfortable. Match the energy of the conversation.",
+    "romantic": "You are a romantic dating coach. Generate replies that are sweet, charming, and show genuine interest. Use warmth and a touch of poetic flair. Good for deeper connections.",
+    "bold": "You are a bold, confident dating coach. Generate replies that are direct, assertive, and show high value. Take the lead in the conversation. Move things forward decisively.",
+    "witty": "You are a witty, clever dating coach. Generate replies that are funny, sharp, and playful. Use humor, wordplay, and teasing in a lighthearted way. Break the ice with charm.",
     "playful": "You are a playful, fun dating coach. Generate replies that are light, teasing, and energetic. Use emojis, banter, and keep the vibe flirty but not too serious.",
-    "chill": "You are a chill, laid-back dating coach. Generate replies that are relaxed, effortless, and cool. Don't try too hard. Keep it simple and confident.",
-    "direct": "You are a direct, honest dating coach. Generate replies that are straightforward, no games, and get to the point. Good for setting up dates.",
+    "chill": "You are a chill, laid-back dating coach. Generate replies that are relaxed, effortless, and cool. Don't try too hard. Keep it simple and confident. Low pressure.",
+    "direct": "You are a direct, honest dating coach. Generate replies that are straightforward, no games, and get to the point. Good for setting up dates quickly.",
     "flirty": "You are a flirty, sensual dating coach. Generate replies that are suggestive, sexy, and build sexual tension. Use innuendo and confidence. Be bold but not creepy."
 }
 
@@ -91,11 +110,24 @@ MOCK_SUGGESTIONS = {
     ]
 }
 
-MOCK_CONVERSATIONS = [
-    {"sender": "them", "text": "Hey! How's your week going?"},
-    {"sender": "them", "text": "I've been thinking we should grab coffee sometime"},
-    {"sender": "you", "text": "That sounds nice! When are you free?"}
-]
+MOCK_CONVERSATIONS = {
+    "bumble": [
+        {"sender": "them", "text": "Hey! I love your profile — especially that travel photo. Where was that taken?"},
+        {"sender": "you", "text": "Thanks! That was in Bali last summer. Best sunset I've ever seen."},
+        {"sender": "them", "text": "Bali is on my bucket list! What's your favorite thing you did there?"},
+        {"sender": "them", "text": "Also — you seem like someone who actually reads profiles, so respect ✊"}
+    ],
+    "hinge": [
+        {"sender": "them", "text": "Your prompt about 'simple pleasures' got me — mine is definitely fresh coffee on a rainy morning."},
+        {"sender": "you", "text": "Okay that's actually perfect. Rain + coffee + a good book = unbeatable combo."},
+        {"sender": "them", "text": "We might need to test this theory together sometime. Do you have a go-to coffee spot?"}
+    ],
+    "tinder": [
+        {"sender": "them", "text": "Hey! How's your week going?"},
+        {"sender": "them", "text": "I've been thinking we should grab coffee sometime"},
+        {"sender": "you", "text": "That sounds nice! When are you free?"}
+    ]
+}
 
 
 def encode_image(image_file):
@@ -119,20 +151,39 @@ def get_mock_suggestions(persona, count=3):
     return result
 
 
-def call_openai_safely(messages, model="gpt-4o-mini", max_tokens=800, temperature=0.85):
-    """Call OpenAI with fallback to mock."""
-    if USE_MOCK or openai_client is None:
+def call_openai_safely(messages, model=None, max_tokens=800, temperature=0.85):
+    """Call AI model with fallback to mock. Handles both OpenAI and Anthropic clients."""
+    model_name = model or OPENAI_MODEL
+    if USE_MOCK:
         return None
-    try:
-        return openai_client.chat.completions.create(
-            model=model,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature
-        )
-    except Exception as e:
-        print(f"[WARN] OpenAI call failed, falling back to mock: {e}")
-        return None
+    
+    # Try Anthropic client first if this is an Anthropic-compatible model
+    if model_name in ANTHROPIC_MODELS and anthropic_client is not None:
+        try:
+            return anthropic_client.messages.create(
+                model=model_name,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                messages=messages
+            )
+        except Exception as e:
+            print(f"[WARN] Anthropic call failed, falling back to mock: {e}")
+            return None
+    
+    # Fallback to OpenAI-compatible client
+    if openai_client is not None:
+        try:
+            return openai_client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
+        except Exception as e:
+            print(f"[WARN] OpenAI call failed, falling back to mock: {e}")
+            return None
+    
+    return None
 
 
 @app.route("/health", methods=["GET"])
@@ -182,21 +233,42 @@ def analyze_screenshot():
             image_file.save(filepath)
             print(f"[ANALYZE] Image saved: {filepath}, size: {os.path.getsize(filepath)} bytes")
             
-            # Try OpenAI Vision if not in mock mode
-            if not USE_MOCK and openai_client:
+            # Try AI Vision if not in mock mode (handles both OpenAI and Anthropic formats)
+            have_client = openai_client is not None or anthropic_client is not None
+            if not USE_MOCK and have_client:
                 image_file.seek(0)
                 base64_image = encode_image(image_file)
                 
-                vision_response = call_openai_safely([
-                    {"role": "system", "content": "Extract conversation from this screenshot. Return JSON array: [{\"sender\": \"them\"/\"you\", \"text\": \"...\"}]"},
-                    {"role": "user", "content": [
-                        {"type": "text", "text": "Extract the conversation."},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "low"}}
-                    ]}
-                ], model="gpt-4o-mini", max_tokens=1500, temperature=0.1)
+                # Build messages - Anthropic uses different image format
+                is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
+                if is_anthropic:
+                    messages = [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": "Extract conversation from this screenshot. Return JSON array: [{\"sender\": \"them\"/\"you\", \"text\": \"...\"}]"},
+                                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64_image}}
+                            ]
+                        }
+                    ]
+                else:
+                    messages = [
+                        {"role": "system", "content": "Extract conversation from this screenshot. Return JSON array: [{\"sender\": \"them\"/\"you\", \"text\": \"...\"}]"},
+                        {"role": "user", "content": [
+                            {"type": "text", "text": "Extract the conversation."},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "low"}}
+                        ]}
+                    ]
+                
+                vision_response = call_openai_safely(messages, model=OPENAI_MODEL, max_tokens=1500, temperature=0.1)
                 
                 if vision_response:
-                    vision_text = vision_response.choices[0].message.content.strip()
+                    # Extract text from either Anthropic or OpenAI response
+                    if is_anthropic:
+                        vision_text = vision_response.content[0].text.strip()
+                    else:
+                        vision_text = vision_response.choices[0].message.content.strip()
+                    
                     vision_text = re.sub(r'^```json\s*', '', vision_text)
                     vision_text = re.sub(r'```\s*$', '', vision_text)
                     try:
@@ -234,8 +306,9 @@ def chat_draft():
         persona = data.get("tone", data.get("persona", "playful"))
         conversation = data.get("conversation", [])
         
-        # Try OpenAI if not mock
-        if not USE_MOCK and openai_client:
+        # Try AI if not mock (handles both OpenAI and Anthropic formats)
+        have_client = openai_client is not None or anthropic_client is not None
+        if not USE_MOCK and have_client:
             persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
             convo_text = "\n".join([
                 f"{'You' if msg.get('sender') == 'you' else 'Them'}: {msg.get('text', '')}"
@@ -244,13 +317,27 @@ def chat_draft():
             my_profile = data.get("my_profile", {})
             their_profile = data.get("their_profile", {})
             
-            response = call_openai_safely([
-                {"role": "system", "content": f"{persona_prompt}\n\nReturn exactly 3 reply options as JSON: [{{\"text\": \"...\", \"confidence\": 95, \"tone\": \"{persona}\"}}, ...]"},
-                {"role": "user", "content": f"My profile: {my_profile}\nTheir: {their_profile}\n\nConversation:\n{convo_text}\n\nSuggest 3 replies."}
-            ], max_tokens=800, temperature=0.85)
+            is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
+            if is_anthropic:
+                messages = [
+                    {
+                        "role": "user",
+                        "content": f"System: {persona_prompt}\n\nMy profile: {my_profile}\nTheir: {their_profile}\n\nConversation:\n{convo_text}\n\nReturn exactly 3 reply options as JSON: [{{\"text\": \"...\", \"confidence\": 95, \"tone\": \"{persona}\"}}, ...]"
+                    }
+                ]
+            else:
+                messages = [
+                    {"role": "system", "content": f"{persona_prompt}\n\nReturn exactly 3 reply options as JSON: [{{\"text\": \"...\", \"confidence\": 95, \"tone\": \"{persona}\"}}, ...]"},
+                    {"role": "user", "content": f"My profile: {my_profile}\nTheir: {their_profile}\n\nConversation:\n{convo_text}\n\nSuggest 3 replies."}
+                ]
+            
+            response = call_openai_safely(messages, max_tokens=800, temperature=0.85)
             
             if response:
-                text = response.choices[0].message.content.strip()
+                if is_anthropic:
+                    text = response.content[0].text.strip()
+                else:
+                    text = response.choices[0].message.content.strip()
                 text = re.sub(r'^```json\s*', '', text)
                 text = re.sub(r'```\s*$', '', text)
                 try:

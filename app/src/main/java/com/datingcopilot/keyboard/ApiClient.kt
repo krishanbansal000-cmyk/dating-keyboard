@@ -263,13 +263,16 @@ class ApiClient(context: Context) {
             }
 
             // Parse suggestions
-            val suggestionsRaw = result["suggestions"] as? List<Map<String, Any>> ?: emptyList()
-            val suggestions = suggestionsRaw.mapNotNull { sug ->
+            val suggestionsRaw = result["suggestions"] as? List<Map<String, Any>>
+            android.util.Log.d("ApiClient", "suggestionsRaw type=${suggestionsRaw?.javaClass?.name}, size=${suggestionsRaw?.size}")
+            val suggestions = suggestionsRaw?.mapNotNull { sug ->
                 val text = sug["text"] as? String ?: return@mapNotNull null
                 val confidence = (sug["confidence"] as? Number)?.toInt() ?: 90
                 val sugPersona = sug["persona"] as? String ?: persona
+                android.util.Log.d("ApiClient", "Parsed suggestion: text=${text.take(30)}, conf=$confidence")
                 SuggestionOption(text, confidence, sugPersona)
-            }
+            } ?: emptyList()
+            android.util.Log.d("ApiClient", "Final suggestions count: ${suggestions.size}")
 
             AnalyzeResponse(
                 conversation = conversation,

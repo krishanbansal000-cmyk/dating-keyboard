@@ -14,6 +14,7 @@ class ImagePickerBottomSheet : BottomSheetDialogFragment() {
     interface ImagePickerListener {
         fun onCameraSelected()
         fun onGallerySelected()
+        fun onBrowseDeviceSelected()
         fun onPasteTextSelected()
     }
 
@@ -48,6 +49,10 @@ class ImagePickerBottomSheet : BottomSheetDialogFragment() {
             }),
             Triple("🖼️", "Choose from Gallery", View.OnClickListener {
                 listener?.onGallerySelected()
+                dismiss()
+            }),
+            Triple("📁", "Browse Device Images", View.OnClickListener {
+                listener?.onBrowseDeviceSelected()
                 dismiss()
             }),
             Triple("📋", "Paste Text", View.OnClickListener {

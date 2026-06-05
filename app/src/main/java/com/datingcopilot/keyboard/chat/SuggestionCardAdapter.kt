@@ -26,7 +26,7 @@ class SuggestionCardAdapter(
             orientation = LinearLayout.VERTICAL
             layoutParams = ViewGroup.MarginLayoutParams(
                 (280 * resources.displayMetrics.density).toInt(),
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                (200 * resources.displayMetrics.density).toInt()
             ).apply {
                 marginStart = (8 * resources.displayMetrics.density).toInt()
                 marginEnd = (8 * resources.displayMetrics.density).toInt()

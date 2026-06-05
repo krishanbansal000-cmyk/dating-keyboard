@@ -38,6 +38,7 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var chatAdapter: ChatAdapter
     private lateinit var suggestionsRecyclerView: RecyclerView
     private lateinit var suggestionAdapter: SuggestionCardAdapter
+    private lateinit var suggestionsLabel: TextView
     private lateinit var personaBar: LinearLayout
     private lateinit var loadingView: FrameLayout
     private lateinit var emptyStateView: LinearLayout
@@ -51,6 +52,14 @@ class ChatActivity : AppCompatActivity() {
 
     private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let { handleImageSelected(it) }
+    }
+
+    private val browseDevice = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            result.data?.data?.let { handleImageSelected(it) }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -310,7 +319,7 @@ class ChatActivity : AppCompatActivity() {
         mainLayout.addView(loadingView)
 
         // Suggestions carousel
-        val suggestionsLabel = TextView(this).apply {
+        suggestionsLabel = TextView(this).apply {
             text = "AI Suggestions"
             textSize = 14f
             setTypeface(null, android.graphics.Typeface.BOLD)
@@ -324,7 +333,6 @@ class ChatActivity : AppCompatActivity() {
             visibility = View.GONE
         }
         mainLayout.addView(suggestionsLabel)
-        suggestionsLabel.tag = "suggestions_label"
 
         suggestionsRecyclerView = RecyclerView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -441,12 +449,16 @@ class ChatActivity : AppCompatActivity() {
         val bottomSheet = ImagePickerBottomSheet()
         bottomSheet.listener = object : ImagePickerBottomSheet.ImagePickerListener {
             override fun onCameraSelected() {
-                // For camera, we'll just use gallery for simplicity
                 pickImage.launch("image/*")
             }
 
             override fun onGallerySelected() {
                 pickImage.launch("image/*")
+            }
+
+            override fun onBrowseDeviceSelected() {
+                val intent = Intent(this@ChatActivity, com.datingcopilot.keyboard.image.ImageBrowserActivity::class.java)
+                browseDevice.launch(intent)
             }
 
             override fun onPasteTextSelected() {
@@ -600,6 +612,7 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun handleAnalyzeResponse(response: AnalyzeResponse) {
+        android.util.Log.d("ChatActivity", "handleAnalyzeResponse: conversation=${response.conversation?.size}, suggestions=${response.suggestions?.size}")
         response.conversation?.let { convo ->
             messages.clear()
             messages.addAll(convo)
@@ -624,7 +637,8 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun showSuggestions(suggestions: List<SuggestionOption>) {
-        findViewByIdWithTag<LinearLayout>("suggestions_label")?.visibility = View.VISIBLE
+        android.util.Log.d("ChatActivity", "showSuggestions: count=${suggestions.size}")
+        suggestionsLabel.visibility = View.VISIBLE
         suggestionsRecyclerView.visibility = View.VISIBLE
         suggestionAdapter.updateSuggestions(suggestions)
     }
