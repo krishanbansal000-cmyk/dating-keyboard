@@ -179,8 +179,7 @@ def call_ai(messages, model=None, max_tokens=800, temperature=0.85):
     if openai_client is not None:
         return openai_client.chat.completions.create(
             model=model_name, messages=full_messages,
-            max_tokens=max_tokens, temperature=temperature,
-            extra_body={"reasoning_effort": "low"}
+            max_tokens=max_tokens, temperature=temperature
         )
     
     raise RuntimeError("No AI client configured. Check OPENAI_API_KEY in .env")
