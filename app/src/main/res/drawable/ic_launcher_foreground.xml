@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Chat bubble -->
+    <path
+        android:fillColor="#8B5CF6"
+        android:pathData="M30,22 L78,22 C82,22 85,25 85,29 L85,55 C85,59 82,62 78,62 L54,62 L40,73 L40,62 L30,62 C26,62 23,59 23,55 L23,29 C23,25 26,22 30,22 Z" />
+    
+    <!-- R -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M31,45L31,33L40,33L40,36L35,36L35,37L39,37L39,40L35,40L35,45ZM35,38L35,42L38,42C39,42 40,41 40,40C40,39 39,38 38,38Z" />
+    <!-- i -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M42,45L42,33L46,33L46,45Z" />
+    <!-- z -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M49,45L49,33L59,33L59,36L53,36L53,37L58,37L58,45Z" />
+    <!-- z -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M61,45L61,33L71,33L71,36L65,36L65,37L70,37L70,45Z" />
+    <!-- S -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M73,45L73,33L82,33L82,36L77,36L77,38L81,38L81,45Z" />
+    <!-- e -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M84,45L84,33L88,33L88,36L86,36L86,37L89,37L89,43C89,44 88,45 87,45Z" />
+    
+    <!-- Sparkle accent -->
+    <path
+        android:fillColor="#F472B6"
+        android:pathData="M52,28 L54,31 L57,32 L54,33 L52,36 L50,33 L47,32 L50,31 Z" />
+</vector>
