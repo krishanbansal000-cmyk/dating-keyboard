@@ -275,6 +275,10 @@ Only output 3 lines starting with >>>. No extra text.
                     
                     if arrow_lines:
                         suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in arrow_lines[:3]]
+                    else:
+                        clean = [l for l in lines if 10 < len(l) < 200 and not l.lower().startswith(('here', 'the', 'this', 'that', 'context', 'note'))][:3]
+                        if clean:
+                            suggestions = [{"text": l, "confidence": random.randint(75, 90), "persona": persona} for l in clean]
             
             try:
                 os.remove(filepath)
@@ -340,16 +344,22 @@ def chat_draft():
                 max_tokens=150, temperature=0.95
             )
             
-            if response:
-                if hasattr(response, 'choices'):
-                    text = response.choices[0].message.content.strip()
-                else:
-                    text = response.content[0].text.strip()
-                lines = [l.strip() for l in text.split('\n') if l.strip()]
-                arrow_lines = [l for l in lines if l.startswith('>>>')]
-                if arrow_lines:
-                    options = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "tone": persona} for l in arrow_lines[:3]]
-                    return jsonify({"options": options})
+                if response:
+                    if hasattr(response, 'choices'):
+                        text = response.choices[0].message.content.strip()
+                    else:
+                        text = response.content[0].text.strip()
+                    lines = [l.strip() for l in text.split('\n') if l.strip()]
+                    arrow_lines = [l for l in lines if l.startswith('>>>')]
+                    if arrow_lines:
+                        options = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "tone": persona} for l in arrow_lines[:3]]
+                        return jsonify({"options": options})
+                    else:
+                        # Fallback: take any clean line between 10-200 chars
+                        clean = [l for l in lines if 10 < len(l) < 200 and not l.lower().startswith(('here', 'the', 'this', 'that', 'context', 'note'))][:3]
+                        if clean:
+                            options = [{"text": l, "confidence": random.randint(75, 90), "tone": persona} for l in clean]
+                            return jsonify({"options": options})
         
         return jsonify({"error": "AI failed to generate suggestions"}), 500
         
