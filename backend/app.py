@@ -246,10 +246,11 @@ def analyze_screenshot():
                 
                 vision_prompt = f"""Look at this dating app screenshot (Hinge/Bumble). Read any prompt text visible. Then write 3 rizz lines that reference what you see - the photo, the prompt, or the conversation. Make them personal, not generic. {persona_prompt} {lang_hint}
 
-Only output 3 lines starting with >>>:
->>> first line
->>> second line
->>> third line"""
+Output 3 lines. Each line must start with >>>. Do NOT number them. Do NOT write anything else.
+
+>>>
+>>>
+>>>"""
                 
                 if is_anthropic:
                     messages = [
@@ -274,12 +275,13 @@ Only output 3 lines starting with >>>:
                     else:
                         text = response.content[0].text.strip()
                     
-                    # Strip everything before first >>> (thinking/analysis)
-                    first_arrow = text.find('>>>')
+                    # Strip numbering and find first >>> line
+                    clean_text = re.sub(r'^\d+[\.\)]\s*', '', text, flags=re.MULTILINE)
+                    first_arrow = clean_text.find('>>>')
                     if first_arrow > 0:
-                        text = text[first_arrow:]
+                        clean_text = clean_text[first_arrow:]
                     
-                    lines = [l.strip() for l in text.split('\n') if l.strip()]
+                    lines = [l.strip() for l in clean_text.split('\n') if l.strip()]
                     arrow_lines = [l for l in lines if l.startswith('>>>')]
                     
                     # Filter out meta/instruction lines
@@ -309,12 +311,13 @@ Only output 3 lines starting with >>>:
                     else:
                         text = response.content[0].text.strip()
                     
-                    # Strip everything before first >>> (thinking/analysis)
-                    first_arrow = text.find('>>>')
+                    # Strip numbering and find first >>> line
+                    clean_text = re.sub(r'^\d+[\.\)]\s*', '', text, flags=re.MULTILINE)
+                    first_arrow = clean_text.find('>>>')
                     if first_arrow > 0:
-                        text = text[first_arrow:]
+                        clean_text = clean_text[first_arrow:]
                     
-                    fb_lines = [l.strip() for l in text.split('\n') if l.strip()]
+                    fb_lines = [l.strip() for l in clean_text.split('\n') if l.strip()]
                     fb_arrow = [l for l in fb_lines if l.startswith('>>>')]
                     
                     # Filter out meta/instruction lines
@@ -362,7 +365,7 @@ def chat_draft():
             lang_hint = "Hinglish." if hinglish else "English."
             
             response = call_ai(
-                [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 replies that reference what they said. Make it personal, not generic. {lang_hint}\n\nOnly output 3 lines starting with >>>:\n>>> first reply\n>>> second reply\n>>> third reply"}],
+                [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 replies that reference what they said. Make it personal, not generic. {lang_hint}\n\nDo NOT number them. Each line starts with >>>:\n>>>\n>>>\n>>>"}],
                 max_tokens=600, temperature=0.95
             )
             
@@ -372,12 +375,13 @@ def chat_draft():
                 else:
                     text = response.content[0].text.strip()
                 
-                # Strip everything before first >>> (thinking/analysis)
-                first_arrow = text.find('>>>')
+                # Strip numbering and find first >>> line
+                clean_text = re.sub(r'^\d+[\.\)]\s*', '', text, flags=re.MULTILINE)
+                first_arrow = clean_text.find('>>>')
                 if first_arrow > 0:
-                    text = text[first_arrow:]
+                    clean_text = clean_text[first_arrow:]
                 
-                lines = [l.strip() for l in text.split('\n') if l.strip()]
+                lines = [l.strip() for l in clean_text.split('\n') if l.strip()]
                 arrow_lines = [l for l in lines if l.startswith('>>>')]
                 
                 # Filter out meta/instruction lines
