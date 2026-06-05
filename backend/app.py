@@ -52,7 +52,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB max
 
 SYSTEM_PROMPT = (
-    "You write 3 lines starting with >>>. Nothing else."
+    "Output 3 lines. Each starts with >>>."
 )
 
 PERSONA_PROMPTS = {
@@ -180,7 +180,7 @@ def call_ai(messages, model=None, max_tokens=800, temperature=0.85):
         return openai_client.chat.completions.create(
             model=model_name, messages=full_messages,
             max_tokens=max_tokens, temperature=temperature,
-            extra_body={"reasoning_effort": "minimal"}
+            extra_body={"reasoning_effort": "low"}
         )
     
     raise RuntimeError("No AI client configured. Check OPENAI_API_KEY in .env")
