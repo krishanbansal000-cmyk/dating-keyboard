@@ -244,16 +244,12 @@ def analyze_screenshot():
                 persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
                 lang_hint = "Hinglish." if hinglish else "English."
                 
-                vision_prompt = f"""Look at this dating app screenshot. Is it a profile page (write openers to start chat) or a chat conversation (write replies)? Write 3 concise rizz lines that impress the boy/girl. {persona_prompt} {lang_hint}
+                vision_prompt = f"""Look at this dating app screenshot (Hinge/Bumble). Read any prompt text visible. Then write 3 rizz lines that reference what you see - the photo, the prompt, or the conversation. Make them personal, not generic. {persona_prompt} {lang_hint}
 
-Rules:
-- Short, smooth, copy-paste ready messages
-- Max 120 characters each
-- No explanation, no quotes, no labels
-
->>> first rizz line
->>> second rizz line
->>> third rizz line"""
+Only output 3 lines starting with >>>:
+>>> first line
+>>> second line
+>>> third line"""
                 
                 if is_anthropic:
                     messages = [
@@ -288,6 +284,10 @@ Rules:
                     
                     # Filter out meta/instruction lines
                     skip_words = ('explanation', 'thinking', 'labels', 'rules', 'output', 'no explanation', 'just the', 'copy-paste', 'characters', 'short, smooth', 'for each', 'each line', 'line must start', 'first rizz', 'second rizz', 'third rizz')
+                    clean_lines = [l for l in arrow_lines if not any(w in l.lower() for w in skip_words)]
+                    
+                    if clean_lines:
+                        suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in clean_lines[:3]]
             
             try:
                 os.remove(filepath)
@@ -360,7 +360,7 @@ def chat_draft():
             lang_hint = "Hinglish." if hinglish else "English."
             
             response = call_ai(
-                [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 concise rizz replies that impress. {lang_hint}\n\nRules:\n- Short, smooth, copy-paste ready\n- Max 120 characters each\n- No explanation, no quotes, no labels\n\n>>> first rizz reply\n>>> second rizz reply\n>>> third rizz reply"}],
+                [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 replies that reference what they said. Make it personal, not generic. {lang_hint}\n\nOnly output 3 lines starting with >>>:\n>>> first reply\n>>> second reply\n>>> third reply"}],
                 max_tokens=600, temperature=0.95
             )
             
