@@ -180,7 +180,8 @@ def call_ai(messages, model=None, max_tokens=800, temperature=0.85):
     if openai_client is not None:
         return openai_client.chat.completions.create(
             model=model_name, messages=full_messages,
-            max_tokens=max_tokens, temperature=temperature
+            max_tokens=max_tokens, temperature=temperature,
+            extra_body={"reasoning_effort": "low"}
         )
     
     raise RuntimeError("No AI client configured. Check OPENAI_API_KEY in .env")
@@ -269,7 +270,7 @@ Rules:
                         ]}
                     ]
                 
-                response = call_ai(messages, model=OPENAI_MODEL, max_tokens=1200, temperature=0.95)
+                response = call_ai(messages, model=OPENAI_MODEL, max_tokens=600, temperature=0.95)
                 
                 if response:
                     if hasattr(response, 'choices'):
@@ -303,7 +304,7 @@ Rules:
                 lang_hint = "Hinglish." if hinglish else "English."
                 response = call_ai(
                     [{"role": "user", "content": f"{persona_prompt} Write 3 generic openers. {lang_hint} Only output 3 lines starting with >>>"}],
-                    max_tokens=1200, temperature=0.95
+                    max_tokens=600, temperature=0.95
                 )
                 if response:
                     if hasattr(response, 'choices'):
@@ -364,7 +365,7 @@ def chat_draft():
             
             response = call_ai(
                 [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 concise rizz replies that impress. {lang_hint}\n\nRules:\n- Short, smooth, copy-paste ready\n- Max 120 characters each\n- No explanation, no quotes, no labels\n\n>>> first rizz reply\n>>> second rizz reply\n>>> third rizz reply"}],
-                max_tokens=1200, temperature=0.95
+                max_tokens=600, temperature=0.95
             )
             
             if response:
