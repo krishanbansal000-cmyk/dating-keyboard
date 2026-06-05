@@ -166,17 +166,20 @@ def call_ai(messages, model=None, max_tokens=800, temperature=0.85):
     """Call AI model. Raises on failure — no mock fallback."""
     model_name = model or OPENAI_MODEL
     
+    # Inject system prompt to enforce format
+    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
+    
     # Try Anthropic client first if this is an Anthropic-compatible model
     if model_name in ANTHROPIC_MODELS and anthropic_client is not None:
         return anthropic_client.messages.create(
             model=model_name, max_tokens=max_tokens,
-            temperature=temperature, messages=messages
+            temperature=temperature, messages=full_messages
         )
     
     # OpenAI-compatible client
     if openai_client is not None:
         return openai_client.chat.completions.create(
-            model=model_name, messages=messages,
+            model=model_name, messages=full_messages,
             max_tokens=max_tokens, temperature=temperature
         )
     
@@ -274,15 +277,16 @@ Rules:
                     else:
                         text = response.content[0].text.strip()
                     
+                    # Strip everything before first >>> (thinking/analysis)
+                    first_arrow = text.find('>>>')
+                    if first_arrow > 0:
+                        text = text[first_arrow:]
+                    
                     lines = [l.strip() for l in text.split('\n') if l.strip()]
                     arrow_lines = [l for l in lines if l.startswith('>>>')]
                     
                     if arrow_lines:
                         suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in arrow_lines[:3]]
-                    else:
-                        clean = [l for l in lines if 10 < len(l) < 200 and not l.lower().startswith(('here', 'the', 'this', 'that', 'context', 'note'))][:3]
-                        if clean:
-                            suggestions = [{"text": l, "confidence": random.randint(75, 90), "persona": persona} for l in clean]
             
             try:
                 os.remove(filepath)
@@ -302,6 +306,12 @@ Rules:
                         text = response.choices[0].message.content.strip()
                     else:
                         text = response.content[0].text.strip()
+                    
+                    # Strip everything before first >>> (thinking/analysis)
+                    first_arrow = text.find('>>>')
+                    if first_arrow > 0:
+                        text = text[first_arrow:]
+                    
                     fb_lines = [l.strip() for l in text.split('\n') if l.strip()]
                     fb_arrow = [l for l in fb_lines if l.startswith('>>>')]
                     if fb_arrow:
@@ -353,17 +363,17 @@ def chat_draft():
                     text = response.choices[0].message.content.strip()
                 else:
                     text = response.content[0].text.strip()
+                
+                # Strip everything before first >>> (thinking/analysis)
+                first_arrow = text.find('>>>')
+                if first_arrow > 0:
+                    text = text[first_arrow:]
+                
                 lines = [l.strip() for l in text.split('\n') if l.strip()]
                 arrow_lines = [l for l in lines if l.startswith('>>>')]
                 if arrow_lines:
                     options = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "tone": persona} for l in arrow_lines[:3]]
                     return jsonify({"options": options})
-                else:
-                    # Fallback: take any clean line between 10-200 chars
-                    clean = [l for l in lines if 10 < len(l) < 200 and not l.lower().startswith(('here', 'the', 'this', 'that', 'context', 'note'))][:3]
-                    if clean:
-                        options = [{"text": l, "confidence": random.randint(75, 90), "tone": persona} for l in clean]
-                        return jsonify({"options": options})
         
         return jsonify({"error": "AI failed to generate suggestions"}), 500
         
