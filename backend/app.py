@@ -263,7 +263,7 @@ def analyze_screenshot():
                         ]}
                     ]
                 
-                response = call_ai(messages, model=OPENAI_MODEL, max_tokens=1000, temperature=0.95)
+                response = call_ai(messages, model=OPENAI_MODEL, max_tokens=600, temperature=0.95)
                 
                 if response:
                     if hasattr(response, 'choices'):
@@ -281,7 +281,7 @@ def analyze_screenshot():
                     arrow_lines = [l for l in lines if l.startswith('>>>')]
                     
                     # Filter out meta/instruction lines
-                    skip_words = ('explanation', 'thinking', 'labels', 'rules', 'output', 'no explanation', 'just the', 'copy-paste', 'characters', 'short, smooth', 'for each', 'each line', 'line must start', 'first rizz', 'second rizz', 'third rizz')
+                    skip_words = ('explanation', 'thinking', 'labels', 'rules', 'output', 'no explanation', 'just the', 'copy-paste', 'characters', 'short, smooth', 'for each', 'each line', 'line must start', 'first rizz', 'second rizz', 'third rizz', 'nothing else', 'rizz line 1', 'rizz line 2', 'rizz line 3')
                     non_empty = [l for l in arrow_lines if len(re.sub(r'^>>>\s*', '', l).strip()) > 10]
                     clean_lines = [l for l in non_empty if not any(w in l.lower() for w in skip_words)]
                     
@@ -298,8 +298,8 @@ def analyze_screenshot():
                 persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
                 lang_hint = "Hinglish." if hinglish else "English."
                 response = call_ai(
-                    [{"role": "user", "content": f"{persona_prompt} Write 3 generic openers. {lang_hint} Only output 3 lines starting with >>>"}],
-                max_tokens=1000, temperature=0.95
+                    [{"role": "user", "content": f"{persona_prompt} Write 3 generic openers. {lang_hint} Output 3 lines starting with >>>"}],
+                    max_tokens=600, temperature=0.95
                 )
                 if response:
                     if hasattr(response, 'choices'):
@@ -361,8 +361,8 @@ def chat_draft():
             lang_hint = "Hinglish." if hinglish else "English."
             
             response = call_ai(
-                [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 replies that reference what they said. Make it personal, not generic. {lang_hint}\n\nDo NOT number them. Each line starts with >>>:\n>>>\n>>>\n>>>"}],
-                max_tokens=1000, temperature=0.95
+                [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 replies that reference what they said. Make it personal. {lang_hint}\n\nOutput 3 lines. Each starts with >>>. Do NOT write anything else."}],
+                max_tokens=600, temperature=0.95
             )
             
             if response:
