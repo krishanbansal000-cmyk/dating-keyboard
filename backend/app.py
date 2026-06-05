@@ -20,24 +20,22 @@ app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", secrets.token_hex(32))
 CORS(app, supports_credentials=True)
 
-USE_MOCK = os.getenv("USE_MOCK", "true").lower() == "true"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "qwen3.6-plus")
+API_ENDPOINT = os.getenv("OPENAI_BASE_URL", "https://opencode.ai/zen/go/v1")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "kimi-k2.5")
 
 # Anthropic-compatible models (use Messages API endpoint)
 ANTHROPIC_MODELS = {"qwen3.7-plus", "qwen3.7-max", "qwen3.6-plus", "minimax-m3", "minimax-m2.7", "minimax-m2.5"}
-API_ENDPOINT = os.getenv("OPENAI_BASE_URL", "")
 
 # GitHub OAuth config
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
 GITHUB_REDIRECT_URI = os.getenv("GITHUB_REDIRECT_URI", "http://localhost:8000/api/v1/auth/github/callback")
 
-# Only initialize clients if we have a key and mock is disabled
+# Initialize AI client
 openai_client = None
 anthropic_client = None
-if not USE_MOCK and OPENAI_API_KEY:
+if OPENAI_API_KEY:
     if OPENAI_MODEL in ANTHROPIC_MODELS:
         # Use Anthropic Messages API for Qwen/MiniMax models
         import anthropic
@@ -59,22 +57,43 @@ UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB max
 
+SYSTEM_PROMPT = (
+    "You are an AI that outputs ONLY 3 concise rizz lines, one per line, each starting with >>>. "
+    "NEVER explain, analyze, comment, or think out loud. NEVER include context, options, or notes. "
+    "NEVER write anything before or after the 3 lines. Output exactly:\n"
+    ">>> first rizz line\n"
+    ">>> second rizz line\n"
+    ">>> third rizz line\n"
+    "No greetings, no setup, no explanation. Just the rizz."
+)
+
 PERSONA_PROMPTS = {
-    "friendly": "You are a smooth, charismatic wingman. The user is texting someone on a dating app. Generate 3 short, confident replies with high rizz. Be charming, natural, and make them smile. Keep each reply under 15 words unless flirting.",
-    "romantic": "You are a smooth romantic wingman. The user is texting someone they really like. Generate 3 replies with genuine warmth and subtle charm. Sweet but not over-the-top. Make them feel special without trying too hard.",
-    "bold": "You are a bold, confident wingman. The user needs replies that show high value and take the lead. Direct, assertive, and knows what they want. Perfect for moving things toward a date. Be cool, not aggressive.",
-    "witty": "You are a witty, clever wingman. Generate 3 replies with sharp humor, wordplay, and playful teasing. Make them laugh and think. The kind of replies that get a 'lol' and a screenshot sent to friends.",
-    "playful": "You are a playful, flirty wingman with max rizz. Generate 3 replies that are teasing, cheeky, and fun. Use light banter, emojis sparingly, and keep the vibe electric. The user wants to stand out — make it happen.",
-    "chill": "You are a chill, laid-back wingman. Generate 3 replies that are effortless and cool. Low pressure, high confidence. No try-hard energy. Simple, smooth, and makes them want to keep talking.",
-    "direct": "You are a direct, no-games wingman. Generate 3 replies that cut through the small talk and get to the point. Great for setting up dates. Confident, clear, and effective. The user knows what they want.",
-    "flirty": "You are a smooth, sensual wingman. Generate 3 replies with subtle sexual tension and confident charm. Use innuendo, cheeky comments, and build attraction. Be bold but classy — never creepy."
+    "friendly": "Friendly smooth vibe. Short, warm, natural. Smile-inducing.",
+    "romantic": "Sweet romantic. Warm charm, genuine interest. A hint of poetry, not overdone.",
+    "bold": "Bold and direct. Take the lead, show high value. Cool confidence, never aggressive.",
+    "witty": "Witty tease. Sharp humor, wordplay, light teasing. Screenshot-worthy.",
+    "playful": "Playful flirt. Teasing, cheeky, electric banter. Max rizz energy.",
+    "chill": "Laid-back cool. Low pressure, effortless vibe. Simple confidence.",
+    "direct": "Direct mover. Cut small talk, set up the date. Confident and clear.",
+    "flirty": "Smooth seducer. Subtle tension, confident charm. Bold but classy."
+}
+
+OPENER_PROMPTS = {
+    "friendly": "Smooth and approachable. Warm opener that feels natural.",
+    "romantic": "Soft sweet charm. Shows genuine interest from the start.",
+    "bold": "Confident and direct. Stands out, shows swagger, takes the lead.",
+    "witty": "Clever and funny. Wordplay or teasing angle that makes them smile.",
+    "playful": "Bursting with rizz. Cheeky, flirty, fun. Gets attention immediately.",
+    "chill": "Cool and effortless. Low-pressure, smooth without trying hard.",
+    "direct": "No-nonsense. Gets to the point, sets up a date with confidence.",
+    "flirty": "Seductive and smooth. Subtle tension and classy charm."
 }
 
 MOCK_SUGGESTIONS = {
     "friendly": [
-        "Hey! That sounds really fun — I'd love to join you! 😊",
-        "That's so sweet of you to say! I'm really enjoying our conversation too.",
-        "Thanks for sharing that with me. I appreciate how open you are!"
+        "That travel pic is fire — which country stole your heart? 🌍",
+        "Your vibe is immaculate. What's your go-to comfort food?",
+        "Honestly? You look like someone who'd win at karaoke. Prove me right."
     ],
     "romantic": [
         "You have a way of making my heart skip a beat. Just saying 😘",
@@ -154,50 +173,33 @@ def get_mock_suggestions(persona, count=3):
     return result
 
 
-def call_openai_safely(messages, model=None, max_tokens=800, temperature=0.85):
-    """Call AI model with fallback to mock. Handles both OpenAI and Anthropic clients."""
+def call_ai(messages, model=None, max_tokens=800, temperature=0.85):
+    """Call AI model. Raises on failure — no mock fallback."""
     model_name = model or OPENAI_MODEL
-    if USE_MOCK:
-        return None
     
-    import sys
     # Try Anthropic client first if this is an Anthropic-compatible model
     if model_name in ANTHROPIC_MODELS and anthropic_client is not None:
-        try:
-            return anthropic_client.messages.create(
-                model=model_name,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                messages=messages
-            )
-        except Exception as e:
-            msg = f"[WARN] Anthropic call failed: {e}"
-            print(msg, file=sys.stderr)
-            return None
+        return anthropic_client.messages.create(
+            model=model_name, max_tokens=max_tokens,
+            temperature=temperature, messages=messages
+        )
     
-    # Fallback to OpenAI-compatible client
+    # OpenAI-compatible client
     if openai_client is not None:
-        try:
-            return openai_client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature
-            )
-        except Exception as e:
-            msg = f"[WARN] OpenAI call failed: {e}"
-            print(msg, file=sys.stderr)
-            return None
+        return openai_client.chat.completions.create(
+            model=model_name, messages=messages,
+            max_tokens=max_tokens, temperature=temperature
+        )
     
-    return None
+    raise RuntimeError("No AI client configured. Check OPENAI_API_KEY in .env")
 
 
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({
         "status": "ok",
-        "service": "DatingCopilot AI Backend",
-        "mode": "mock" if USE_MOCK else "openai",
+        "service": "RizzSe AI Backend",
+        "mode": "ai",
         "model": OPENAI_MODEL,
         "client_ready": openai_client is not None or anthropic_client is not None
     })
@@ -231,7 +233,9 @@ def analyze_screenshot():
     try:
         print(f"[ANALYZE] Received request. Files: {list(request.files.keys())}, Form: {dict(request.form)}")
         persona = request.form.get("persona", "playful")
-        conversation = MOCK_CONVERSATIONS.copy()
+        user_gender = request.form.get("user_gender", "male")
+        hinglish = request.form.get("hinglish", "false").lower() == "true"
+        conversation = []
         suggestions = None
         
         if "image" in request.files:
@@ -244,7 +248,7 @@ def analyze_screenshot():
             
             # Try AI Vision if not in mock mode (handles both OpenAI and Anthropic formats)
             have_client = openai_client is not None or anthropic_client is not None
-            if not USE_MOCK and have_client:
+            if have_client:
                 image_file.seek(0)
                 base64_image = encode_image(image_file)
                 
@@ -252,23 +256,22 @@ def analyze_screenshot():
                 is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
                 if is_anthropic:
                     messages = [
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": "Transcribe ONLY the visible text from this dating app screenshot. No explanations. Just the raw text."},
-                                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64_image}}
-                            ]
-                        }
+                        {"role": "user", "content": [
+                            {"type": "text", "text": "Extract ONLY the meaningful conversation or profile text from this dating app screenshot. Ignore UI elements like timestamps, nav bars, buttons (Discover, Liked You, Chats, etc.), and app names. Just give me the actual bio/prompts/messages. No explanations."},
+                            {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64_image}}
+                        ]}
                     ]
                 else:
                     messages = [
                         {"role": "user", "content": [
-                            {"type": "text", "text": "Transcribe ONLY the visible text from this dating app screenshot. No explanations. Just the raw text."},
+                            {"type": "text", "text": "Extract ONLY the meaningful conversation or profile text from this dating app screenshot. Ignore UI elements like timestamps, nav bars, buttons (Discover, Liked You, Chats, etc.), and app names. Just give me the actual bio/prompts/messages. No explanations."},
                             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "low"}}
                         ]}
                     ]
                 
-                vision_response = call_openai_safely(messages, model=OPENAI_MODEL, max_tokens=1500, temperature=0.1)
+                text_instruction = messages[0]["content"][0]["text"]
+                print(f"[PROMPT] Vision instruction: {text_instruction}")
+                vision_response = call_ai(messages, model=OPENAI_MODEL, max_tokens=1500, temperature=0.1)
                 
                 if vision_response:
                     # Extract text from either Anthropic or OpenAI response
@@ -292,27 +295,56 @@ def analyze_screenshot():
                     
                     # Generate suggestions from extracted text
                     try:
-                        sug_response = call_openai_safely(
-                            [{"role": "user", "content": f"She wrote: \"{all_text[:300]}\"\n\nWrite 3 rizz replies. Be smooth and concise. Start each line with >>>"}],
-                            max_tokens=400, temperature=0.85
+                        # Determine if this is a profile (needs opener) or chat (needs reply)
+                        is_profile = any(w in clean_text.lower() for w in ['profile', 'bio', 'photos', 'prompts', 'about me', 'interests', 'located in', 'lives in', 'works at'])
+                        is_chat = any(w in clean_text.lower() for w in ['them:', 'you:', 'hey', 'message', 'chat', 'sent', 'typing', 'read'])
+                        
+                        # Reference the other person based on user's gender
+                        them = "she" if user_gender in ("male", "boy") else "he" if user_gender in ("female", "girl") else "them"
+                        them_possessive = "her" if user_gender in ("male", "boy") else "his" if user_gender in ("female", "girl") else "their"
+                        
+                        lang_hint = "Use Hinglish (Hindi+English mix). Examples: 'Bhai tera taste top hai', 'That's lit yaar', 'Proper cute hai', 'Kya baat hai', 'Mast hai yeh'. Keep it natural and smooth. Use some Hindi words naturally." if hinglish else "Use English only. Keep it smooth and natural."
+                        
+                        # Generate openers or replies
+                        their_text = clean_text[:250]
+                        hinglish_prompt = " (Hinglish me batao)" if hinglish else ""
+                        prompt = f"Her: \"{their_text}\"{hinglish_prompt}\nMe: "
+                        print(f"[PROMPT] {prompt[:200]}", file=sys.stderr)
+                        sug_response = call_ai(
+                            [{"role": "user", "content": prompt}],
+                            max_tokens=200, temperature=0.9
                         )
+                        print(f"[PROMPT] {prompt[:300]}", file=sys.stderr)
+                        sug_response = call_ai(
+                            [{"role": "user", "content": prompt}],
+                            max_tokens=300, temperature=0.85
+                        )
+                        
                         if sug_response:
                             if hasattr(sug_response, 'choices'):
-                                sug_text = sug_response.choices[0].message.content.strip()
+                                msg = sug_response.choices[0].message
+                                sug_text = (msg.content or getattr(msg, 'reasoning_content', '') or '').strip()
                             else:
-                                sug_text = sug_response.content[0].text.strip()
-                            # Take last 3 lines starting with >>> or last 3 meaningful lines
+                                sug_text = sug_response.content[0].text.strip() if sug_response.content else ''
+                            print(f"[DEBUG] AI raw suggestion text: {sug_text[:500]}", file=sys.stderr)
+                            # Parse >>> lines or fall back to numbered/cleanest lines
                             lines = [l.strip() for l in sug_text.split('\n') if l.strip()]
                             arrow_lines = [l for l in lines if l.startswith('>>>')]
                             if arrow_lines:
                                 parsed_sugs = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in arrow_lines[:3]]
                             else:
-                                # Fallback: take last 3 non-trivial lines as suggestions
-                                candidates = [l for l in lines if len(l) > 10 and not l.startswith(('Context', 'Option', 'Note', 'Wait', 'Possible', 'Let me', 'The user', 'Interpret', 'I need', 'I think', 'Maybe'))]
-                                parsed_sugs = [{"text": re.sub(r'^[\d]+[\.\)]\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in candidates[-3:]] if candidates else [{"text": l, "confidence": 85, "persona": persona} for l in lines[-3:]]
+                                skip_prefixes = ('Context', 'Option', 'Note', 'Wait', 'Possible', 'Let me', 'I need', 'I think', 'Maybe', 'Here', 'Alright', 'So', 'First', 'Second', 'Third', 'Finally', 'The', 'This', 'That', 'Here are', 'She', 'He', 'They', 'Her profile', 'His profile', 'Looking at', 'Based on', 'Given', 'For', 'Romantic', 'Playful', 'Flirty', 'Direct', 'Chill', 'Witty', 'Bold', 'Friendly', 'Smooth', 'Cheeky', 'Confident', 'Teasing', 'Charming', 'Deconstruct', 'Analyze', 'Goal')
+                                candidates = [l for l in lines if len(l) > 20 and not l.startswith(skip_prefixes) and not any(w in l.lower() for w in ['option', 'note', 'context', 'possib', 'interpret', 'angle', 'approach', 'maybe:', 'deconstruct', 'analyze', 'goal', 'target', 'character'])]
+                                if not candidates:
+                                    candidates = [l for l in lines if len(l) > 15][-5:]
+                                parsed_sugs = []
+                                for l in (candidates[-3:] if candidates else lines[-3:]):
+                                    l = re.sub(r'^[\d]+[\.\)\-\:\s]+', '', l).strip()
+                                    if l and len(l) > 10:
+                                        parsed_sugs.append({"text": l, "confidence": random.randint(78, 98), "persona": persona})
                             if parsed_sugs:
                                 suggestions = parsed_sugs[:3]
-                                print(f"[DEBUG] AI generated {len(suggestions)} suggestions", file=sys.stderr)
+                                print(f"[DEBUG] AI generated {len(suggestions)} {'openers' if is_profile else 'replies'}", file=sys.stderr)
                             else:
                                 print(f"[DEBUG] No suggestions parsed", file=sys.stderr)
                     except Exception as e:
@@ -324,7 +356,7 @@ def analyze_screenshot():
                 pass
         
         if not suggestions:
-            suggestions = get_mock_suggestions(persona)
+            return jsonify({"error": "AI failed to generate suggestions"}), 500
         
         return jsonify({
             "conversation": conversation,
@@ -345,61 +377,51 @@ def chat_draft():
     try:
         data = request.get_json() or {}
         persona = data.get("tone", data.get("persona", "playful"))
+        user_gender = data.get("user_gender", "male")
+        hinglish = data.get("hinglish", "false").lower() == "true"
         conversation = data.get("conversation", [])
         
-        # Try AI if not mock (handles both OpenAI and Anthropic formats)
+        # Try AI if not mock
         have_client = openai_client is not None or anthropic_client is not None
-        if not USE_MOCK and have_client:
+        if have_client:
             persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
             convo_text = "\n".join([
                 f"{'You' if msg.get('sender') == 'you' else 'Them'}: {msg.get('text', '')}"
                 for msg in conversation
             ])
-            my_profile = data.get("my_profile", {})
-            their_profile = data.get("their_profile", {})
+            them = "she" if user_gender in ("male", "boy") else "he" if user_gender in ("female", "girl") else "they"
+            lang_hint = "Use Hinglish (Hindi+English mix). Examples: 'Bhai tera taste top hai', 'That's lit yaar', 'Proper cute hai', 'Kya baat hai', 'Mast hai yeh'. Keep it natural and smooth. Use some Hindi words naturally." if hinglish else "Use English only. Keep it smooth and natural."
             
-            is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
-            if is_anthropic:
-                messages = [
-                    {
-                        "role": "user",
-                        "content": f"System: {persona_prompt}\n\nMy profile: {my_profile}\nTheir: {their_profile}\n\nConversation:\n{convo_text}\n\nReturn exactly 3 reply options as JSON: [{{\"text\": \"...\", \"confidence\": 95, \"tone\": \"{persona}\"}}, ...]"
-                    }
-                ]
-            else:
-                messages = [
-                    {"role": "system", "content": f"{persona_prompt}\n\nReturn exactly 3 reply options as JSON: [{{\"text\": \"...\", \"confidence\": 95, \"tone\": \"{persona}\"}}, ...]"},
-                    {"role": "user", "content": f"My profile: {my_profile}\nTheir: {their_profile}\n\nConversation:\n{convo_text}\n\nSuggest 3 replies."}
-                ]
-            
-            response = call_openai_safely(messages, max_tokens=800, temperature=0.85)
+            prompt_text = f"{them.capitalize()} said: \"{convo_text[:500]}\". {persona_prompt} Write 3 replies. {lang_hint} Start each with >>>"
+            print(f"[PROMPT] Chat draft:\n{prompt_text}")
+            response = call_ai(
+                [{"role": "user", "content": prompt_text}],
+                max_tokens=400, temperature=0.85
+            )
             
             if response:
-                if is_anthropic:
-                    text = response.content[0].text.strip()
-                else:
+                if hasattr(response, 'choices'):
                     text = response.choices[0].message.content.strip()
-                text = re.sub(r'^```json\s*', '', text)
-                text = re.sub(r'```\s*$', '', text)
-                try:
-                    options = json.loads(text)
-                    if isinstance(options, list):
-                        for opt in options:
-                            opt["tone"] = opt.get("tone", persona)
-                        return jsonify({"options": options})
-                except:
-                    pass
+                else:
+                    text = response.content[0].text.strip()
+                lines = [l.strip() for l in text.split('\n') if l.strip()]
+                arrow_lines = [l for l in lines if l.startswith('>>>')]
+                if arrow_lines:
+                    options = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "tone": persona} for l in arrow_lines[:3]]
+                else:
+                    skip_prefixes = ('Context', 'Option', 'Note', 'Wait', 'Possible', 'Let me', 'I need', 'I think', 'Maybe', 'Here', 'Alright', 'So', 'First', 'Second', 'Third', 'Finally', 'The', 'This', 'That', 'Here are', 'She', 'He', 'They', 'Her profile', 'His profile', 'Looking at', 'Based on', 'Given', 'For')
+                    candidates = [l for l in lines if len(l) > 15 and not l.startswith(skip_prefixes) and not any(w in l.lower() for w in ['option', 'note', 'context', 'possib', 'interpret'])]
+                    if not candidates:
+                        candidates = [l for l in lines if len(l) > 15][-5:]
+                    options = []
+                    for l in (candidates[-3:] if candidates else lines[-3:]):
+                        l = re.sub(r'^[\d]+[\.\)\-\:\s]+', '', l).strip()
+                        if l and len(l) > 10:
+                            options.append({"text": l, "confidence": random.randint(78, 98), "tone": persona})
+                if options:
+                    return jsonify({"options": options})
         
-        # Fallback to mock
-        suggestions = get_mock_suggestions(persona)
-        options = []
-        for s in suggestions:
-            options.append({
-                "text": s["text"],
-                "confidence": s["confidence"],
-                "tone": persona
-            })
-        return jsonify({"options": options})
+        return jsonify({"error": "AI failed to generate suggestions"}), 500
         
     except Exception as e:
         import traceback

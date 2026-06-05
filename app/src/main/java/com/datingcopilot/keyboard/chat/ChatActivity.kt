@@ -18,6 +18,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -133,6 +134,24 @@ class ChatActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         topBar.addView(titleText)
+
+        val hinglishSwitch = Switch(this).apply {
+            text = "Hinglish"
+            textSize = 11f
+            setTextColor(resources.getColor(R.color.text_secondary, null))
+            val sp = this@ChatActivity.getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+            isChecked = sp.getBoolean("hinglish_mode", false)
+            setOnCheckedChangeListener { _, isChecked ->
+                sp.edit().putBoolean("hinglish_mode", isChecked).apply()
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginEnd = (8 * resources.displayMetrics.density).toInt()
+            }
+        }
+        topBar.addView(hinglishSwitch)
 
         val profileBtn = TextView(this).apply {
             text = "⚙️"

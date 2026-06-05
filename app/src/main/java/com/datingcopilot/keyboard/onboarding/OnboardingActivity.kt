@@ -16,7 +16,7 @@ import com.datingcopilot.keyboard.chat.ChatActivity
 class OnboardingActivity : AppCompatActivity() {
 
     private var currentPage = 0
-    private val totalPages = 4
+    private val totalPages = 5
     private val answers = mutableMapOf<Int, Int>()
 
     private val questions = listOf(
@@ -34,6 +34,11 @@ class OnboardingActivity : AppCompatActivity() {
             emoji = "😏",
             title = "How flirty do you want to be?",
             options = listOf("Keep it chill", "Playful banter", "Flirty vibes", "Full rizz mode")
+        ),
+        QuestionData(
+            emoji = "👤",
+            title = "What's your gender?",
+            options = listOf("Male", "Female", "Non-binary / Other")
         )
     )
 
@@ -302,7 +307,7 @@ class OnboardingActivity : AppCompatActivity() {
             
             when (currentPage) {
                 0 -> showWelcomePage()
-                in 1..3 -> showQuestionPage(currentPage)
+                in 1..4 -> showQuestionPage(currentPage)
                 else -> showResultPage()
             }
             
@@ -323,6 +328,10 @@ class OnboardingActivity : AppCompatActivity() {
                 val prefs = getSharedPreferences("dating_copilot", MODE_PRIVATE)
                 prefs.edit().putString("persona", calculatePersona()).apply()
                 prefs.edit().putBoolean("onboarding_complete", true).apply()
+                val genderOptions = listOf("male", "female", "non_binary")
+                val genderAnswer = answers[4]
+                val userGender = if (genderAnswer != null && genderAnswer < genderOptions.size) genderOptions[genderAnswer] else "male"
+                prefs.edit().putString("user_gender", userGender).apply()
                 startActivity(Intent(this, ChatActivity::class.java))
                 finish()
             }

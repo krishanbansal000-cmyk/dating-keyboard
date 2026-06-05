@@ -226,6 +226,8 @@ class ApiClient(context: Context) {
                 .setType(MultipartBody.FORM)
                 .addPart(imagePart)
                 .addFormDataPart("persona", persona)
+                .addFormDataPart("user_gender", prefs.getString("user_gender", "male") ?: "male")
+                .addFormDataPart("hinglish", if (prefs.getBoolean("hinglish_mode", false)) "true" else "false")
                 .addFormDataPart("user_id", "user_001")
                 .build()
 
@@ -312,6 +314,8 @@ class ApiClient(context: Context) {
                 "platform" to matchCtx.platform,
                 "conversation" to conversation,
                 "tone" to persona,
+                "user_gender" to (prefs.getString("user_gender", "male") ?: "male"),
+                "hinglish" to if (prefs.getBoolean("hinglish_mode", false)) "true" else "false",
                 "my_profile" to mapOf(
                     "name" to myProfile.name,
                     "age" to myProfile.age,
