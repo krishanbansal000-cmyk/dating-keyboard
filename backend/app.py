@@ -1,4 +1,5 @@
 import secrets
+import sys
 from flask import Flask, request, jsonify, redirect, session
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -47,7 +48,9 @@ if not USE_MOCK and OPENAI_API_KEY:
     else:
         # Use OpenAI-compatible API
         from openai import OpenAI
-        client_kwargs = {"api_key": OPENAI_API_KEY}
+        import httpx
+        http_client = httpx.Client(timeout=httpx.Timeout(120.0, connect=30.0))
+        client_kwargs = {"api_key": OPENAI_API_KEY, "http_client": http_client}
         if API_ENDPOINT:
             client_kwargs["base_url"] = API_ENDPOINT
         openai_client = OpenAI(**client_kwargs)
@@ -57,14 +60,14 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB max
 
 PERSONA_PROMPTS = {
-    "friendly": "You are a friendly, warm, and approachable dating coach. Generate replies that are kind, easy-going, and make the other person feel comfortable. Match the energy of the conversation.",
-    "romantic": "You are a romantic dating coach. Generate replies that are sweet, charming, and show genuine interest. Use warmth and a touch of poetic flair. Good for deeper connections.",
-    "bold": "You are a bold, confident dating coach. Generate replies that are direct, assertive, and show high value. Take the lead in the conversation. Move things forward decisively.",
-    "witty": "You are a witty, clever dating coach. Generate replies that are funny, sharp, and playful. Use humor, wordplay, and teasing in a lighthearted way. Break the ice with charm.",
-    "playful": "You are a playful, fun dating coach. Generate replies that are light, teasing, and energetic. Use emojis, banter, and keep the vibe flirty but not too serious.",
-    "chill": "You are a chill, laid-back dating coach. Generate replies that are relaxed, effortless, and cool. Don't try too hard. Keep it simple and confident. Low pressure.",
-    "direct": "You are a direct, honest dating coach. Generate replies that are straightforward, no games, and get to the point. Good for setting up dates quickly.",
-    "flirty": "You are a flirty, sensual dating coach. Generate replies that are suggestive, sexy, and build sexual tension. Use innuendo and confidence. Be bold but not creepy."
+    "friendly": "You are a smooth, charismatic wingman. The user is texting someone on a dating app. Generate 3 short, confident replies with high rizz. Be charming, natural, and make them smile. Keep each reply under 15 words unless flirting.",
+    "romantic": "You are a smooth romantic wingman. The user is texting someone they really like. Generate 3 replies with genuine warmth and subtle charm. Sweet but not over-the-top. Make them feel special without trying too hard.",
+    "bold": "You are a bold, confident wingman. The user needs replies that show high value and take the lead. Direct, assertive, and knows what they want. Perfect for moving things toward a date. Be cool, not aggressive.",
+    "witty": "You are a witty, clever wingman. Generate 3 replies with sharp humor, wordplay, and playful teasing. Make them laugh and think. The kind of replies that get a 'lol' and a screenshot sent to friends.",
+    "playful": "You are a playful, flirty wingman with max rizz. Generate 3 replies that are teasing, cheeky, and fun. Use light banter, emojis sparingly, and keep the vibe electric. The user wants to stand out — make it happen.",
+    "chill": "You are a chill, laid-back wingman. Generate 3 replies that are effortless and cool. Low pressure, high confidence. No try-hard energy. Simple, smooth, and makes them want to keep talking.",
+    "direct": "You are a direct, no-games wingman. Generate 3 replies that cut through the small talk and get to the point. Great for setting up dates. Confident, clear, and effective. The user knows what they want.",
+    "flirty": "You are a smooth, sensual wingman. Generate 3 replies with subtle sexual tension and confident charm. Use innuendo, cheeky comments, and build attraction. Be bold but classy — never creepy."
 }
 
 MOCK_SUGGESTIONS = {
@@ -157,6 +160,7 @@ def call_openai_safely(messages, model=None, max_tokens=800, temperature=0.85):
     if USE_MOCK:
         return None
     
+    import sys
     # Try Anthropic client first if this is an Anthropic-compatible model
     if model_name in ANTHROPIC_MODELS and anthropic_client is not None:
         try:
@@ -167,7 +171,8 @@ def call_openai_safely(messages, model=None, max_tokens=800, temperature=0.85):
                 messages=messages
             )
         except Exception as e:
-            print(f"[WARN] Anthropic call failed, falling back to mock: {e}")
+            msg = f"[WARN] Anthropic call failed: {e}"
+            print(msg, file=sys.stderr)
             return None
     
     # Fallback to OpenAI-compatible client
@@ -180,7 +185,8 @@ def call_openai_safely(messages, model=None, max_tokens=800, temperature=0.85):
                 temperature=temperature
             )
         except Exception as e:
-            print(f"[WARN] OpenAI call failed, falling back to mock: {e}")
+            msg = f"[WARN] OpenAI call failed: {e}"
+            print(msg, file=sys.stderr)
             return None
     
     return None
@@ -191,7 +197,9 @@ def health():
     return jsonify({
         "status": "ok",
         "service": "DatingCopilot AI Backend",
-        "mode": "mock" if USE_MOCK else "openai"
+        "mode": "mock" if USE_MOCK else "openai",
+        "model": OPENAI_MODEL,
+        "client_ready": openai_client is not None or anthropic_client is not None
     })
 
 
@@ -224,6 +232,7 @@ def analyze_screenshot():
         print(f"[ANALYZE] Received request. Files: {list(request.files.keys())}, Form: {dict(request.form)}")
         persona = request.form.get("persona", "playful")
         conversation = MOCK_CONVERSATIONS.copy()
+        suggestions = None
         
         if "image" in request.files:
             image_file = request.files["image"]
@@ -246,16 +255,15 @@ def analyze_screenshot():
                         {
                             "role": "user",
                             "content": [
-                                {"type": "text", "text": "Extract conversation from this screenshot. Return JSON array: [{\"sender\": \"them\"/\"you\", \"text\": \"...\"}]"},
+                                {"type": "text", "text": "Transcribe ONLY the visible text from this dating app screenshot. No explanations. Just the raw text."},
                                 {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": base64_image}}
                             ]
                         }
                     ]
                 else:
                     messages = [
-                        {"role": "system", "content": "Extract conversation from this screenshot. Return JSON array: [{\"sender\": \"them\"/\"you\", \"text\": \"...\"}]"},
                         {"role": "user", "content": [
-                            {"type": "text", "text": "Extract the conversation."},
+                            {"type": "text", "text": "Transcribe ONLY the visible text from this dating app screenshot. No explanations. Just the raw text."},
                             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "low"}}
                         ]}
                     ]
@@ -269,21 +277,54 @@ def analyze_screenshot():
                     else:
                         vision_text = vision_response.choices[0].message.content.strip()
                     
-                    vision_text = re.sub(r'^```json\s*', '', vision_text)
-                    vision_text = re.sub(r'```\s*$', '', vision_text)
+                    print(f"[DEBUG] AI raw response: {vision_text[:400]}", file=sys.stderr)
+                    
+                    # Remove quoted text (AI often puts extracted text in quotes)
+                    clean_text = re.sub(r'^["\']+|["\']+$', '', vision_text.strip())
+                    
+                    # Build conversation from the extracted text
+                    # Split into lines and take unique text as messages
+                    lines = [l.strip().rstrip(',.') for l in clean_text.split('\n') if l.strip()]
+                    all_text = ' '.join(lines)
+                    
+                    # Use the extracted text as a single "them" message
+                    conversation = [{"sender": "them", "text": all_text[:500]}]
+                    
+                    # Generate suggestions from extracted text
                     try:
-                        parsed = json.loads(vision_text)
-                        if isinstance(parsed, list) and len(parsed) > 0:
-                            conversation = parsed
-                    except:
-                        pass
+                        sug_response = call_openai_safely(
+                            [{"role": "user", "content": f"She wrote: \"{all_text[:300]}\"\n\nWrite 3 rizz replies. Be smooth and concise. Start each line with >>>"}],
+                            max_tokens=400, temperature=0.85
+                        )
+                        if sug_response:
+                            if hasattr(sug_response, 'choices'):
+                                sug_text = sug_response.choices[0].message.content.strip()
+                            else:
+                                sug_text = sug_response.content[0].text.strip()
+                            # Take last 3 lines starting with >>> or last 3 meaningful lines
+                            lines = [l.strip() for l in sug_text.split('\n') if l.strip()]
+                            arrow_lines = [l for l in lines if l.startswith('>>>')]
+                            if arrow_lines:
+                                parsed_sugs = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in arrow_lines[:3]]
+                            else:
+                                # Fallback: take last 3 non-trivial lines as suggestions
+                                candidates = [l for l in lines if len(l) > 10 and not l.startswith(('Context', 'Option', 'Note', 'Wait', 'Possible', 'Let me', 'The user', 'Interpret', 'I need', 'I think', 'Maybe'))]
+                                parsed_sugs = [{"text": re.sub(r'^[\d]+[\.\)]\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in candidates[-3:]] if candidates else [{"text": l, "confidence": 85, "persona": persona} for l in lines[-3:]]
+                            if parsed_sugs:
+                                suggestions = parsed_sugs[:3]
+                                print(f"[DEBUG] AI generated {len(suggestions)} suggestions", file=sys.stderr)
+                            else:
+                                print(f"[DEBUG] No suggestions parsed", file=sys.stderr)
+                    except Exception as e:
+                        print(f"[DEBUG] Suggestion call failed: {e}", file=sys.stderr)
             
             try:
                 os.remove(filepath)
             except:
                 pass
         
-        suggestions = get_mock_suggestions(persona)
+        if not suggestions:
+            suggestions = get_mock_suggestions(persona)
         
         return jsonify({
             "conversation": conversation,
