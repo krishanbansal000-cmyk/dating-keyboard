@@ -269,7 +269,7 @@ Rules:
                         ]}
                     ]
                 
-                response = call_ai(messages, model=OPENAI_MODEL, max_tokens=400, temperature=0.95)
+                response = call_ai(messages, model=OPENAI_MODEL, max_tokens=1200, temperature=0.95)
                 
                 if response:
                     if hasattr(response, 'choices'):
@@ -303,7 +303,7 @@ Rules:
                 lang_hint = "Hinglish." if hinglish else "English."
                 response = call_ai(
                     [{"role": "user", "content": f"{persona_prompt} Write 3 generic openers. {lang_hint} Only output 3 lines starting with >>>"}],
-                    max_tokens=400, temperature=0.95
+                    max_tokens=1200, temperature=0.95
                 )
                 if response:
                     if hasattr(response, 'choices'):
@@ -364,7 +364,7 @@ def chat_draft():
             
             response = call_ai(
                 [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 concise rizz replies that impress. {lang_hint}\n\nRules:\n- Short, smooth, copy-paste ready\n- Max 120 characters each\n- No explanation, no quotes, no labels\n\n>>> first rizz reply\n>>> second rizz reply\n>>> third rizz reply"}],
-                max_tokens=400, temperature=0.95
+                max_tokens=1200, temperature=0.95
             )
             
             if response:
