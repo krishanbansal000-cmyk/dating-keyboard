@@ -52,8 +52,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB max
 
 SYSTEM_PROMPT = (
-    "You are a dating assistant. Your job is to write 3 smooth pickup lines or replies. "
-    "Each line MUST start with >>>. Do not write anything else."
+    "You write 3 lines starting with >>>. Nothing else."
 )
 
 PERSONA_PROMPTS = {
@@ -244,13 +243,11 @@ def analyze_screenshot():
                 persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
                 lang_hint = "Hinglish." if hinglish else "English."
                 
-                vision_prompt = f"""Look at this dating app screenshot (Hinge/Bumble). Read any prompt text visible. Then write 3 rizz lines that reference what you see - the photo, the prompt, or the conversation. Make them personal, not generic. {persona_prompt} {lang_hint}
+                vision_prompt = f"""Look at this screenshot. Write 3 rizz lines based on what you see. {persona_prompt} {lang_hint}
 
-Output 3 lines. Each line must start with >>>. Do NOT number them. Do NOT write anything else.
-
->>>
->>>
->>>"""
+>>> first
+>>> second
+>>> third"""
                 
                 if is_anthropic:
                     messages = [
@@ -267,7 +264,7 @@ Output 3 lines. Each line must start with >>>. Do NOT number them. Do NOT write 
                         ]}
                     ]
                 
-                response = call_ai(messages, model=OPENAI_MODEL, max_tokens=600, temperature=0.95)
+                response = call_ai(messages, model=OPENAI_MODEL, max_tokens=1000, temperature=0.95)
                 
                 if response:
                     if hasattr(response, 'choices'):
@@ -303,7 +300,7 @@ Output 3 lines. Each line must start with >>>. Do NOT number them. Do NOT write 
                 lang_hint = "Hinglish." if hinglish else "English."
                 response = call_ai(
                     [{"role": "user", "content": f"{persona_prompt} Write 3 generic openers. {lang_hint} Only output 3 lines starting with >>>"}],
-                    max_tokens=600, temperature=0.95
+                max_tokens=1000, temperature=0.95
                 )
                 if response:
                     if hasattr(response, 'choices'):
@@ -366,7 +363,7 @@ def chat_draft():
             
             response = call_ai(
                 [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 replies that reference what they said. Make it personal, not generic. {lang_hint}\n\nDo NOT number them. Each line starts with >>>:\n>>>\n>>>\n>>>"}],
-                max_tokens=600, temperature=0.95
+                max_tokens=1000, temperature=0.95
             )
             
             if response:
