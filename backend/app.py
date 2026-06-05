@@ -284,7 +284,8 @@ Only output 3 lines starting with >>>:
                     
                     # Filter out meta/instruction lines
                     skip_words = ('explanation', 'thinking', 'labels', 'rules', 'output', 'no explanation', 'just the', 'copy-paste', 'characters', 'short, smooth', 'for each', 'each line', 'line must start', 'first rizz', 'second rizz', 'third rizz')
-                    clean_lines = [l for l in arrow_lines if not any(w in l.lower() for w in skip_words)]
+                    non_empty = [l for l in arrow_lines if len(re.sub(r'^>>>\s*', '', l).strip()) > 10]
+                    clean_lines = [l for l in non_empty if not any(w in l.lower() for w in skip_words)]
                     
                     if clean_lines:
                         suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in clean_lines[:3]]
@@ -318,7 +319,8 @@ Only output 3 lines starting with >>>:
                     
                     # Filter out meta/instruction lines
                     skip_words = ('explanation', 'thinking', 'labels', 'rules', 'output', 'no explanation', 'just the', 'copy-paste', 'characters', 'short, smooth', 'for each', 'each line', 'line must start', 'first rizz', 'second rizz', 'third rizz')
-                    clean_fb = [l for l in fb_arrow if not any(w in l.lower() for w in skip_words)]
+                    non_empty = [l for l in fb_arrow if len(re.sub(r'^>>>\s*', '', l).strip()) > 10]
+                    clean_fb = [l for l in non_empty if not any(w in l.lower() for w in skip_words)]
                     
                     if clean_fb:
                         suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(75, 90), "persona": persona} for l in clean_fb[:3]]
@@ -380,7 +382,8 @@ def chat_draft():
                 
                 # Filter out meta/instruction lines
                 skip_words = ('explanation', 'thinking', 'labels', 'rules', 'output', 'no explanation', 'just the', 'copy-paste', 'characters', 'short, smooth', 'for each', 'each line', 'line must start', 'first rizz', 'second rizz', 'third rizz')
-                clean_lines = [l for l in arrow_lines if not any(w in l.lower() for w in skip_words)]
+                non_empty = [l for l in arrow_lines if len(re.sub(r'^>>>\s*', '', l).strip()) > 10]
+                clean_lines = [l for l in non_empty if not any(w in l.lower() for w in skip_words)]
                 
                 if clean_lines:
                     options = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "tone": persona} for l in clean_lines[:3]]
