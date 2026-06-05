@@ -222,6 +222,7 @@ def analyze_screenshot():
     try:
         persona = request.form.get("persona", "playful")
         hinglish = request.form.get("hinglish", "false").lower() == "true"
+        conversation = []
         suggestions = None
         
         if "image" in request.files:
