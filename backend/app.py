@@ -1,6 +1,6 @@
 import secrets
 import sys
-from flask import Flask, request, jsonify, redirect, session
+from flask import Flask, request, jsonify, redirect
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from PIL import Image
@@ -12,7 +12,6 @@ import re
 import random
 import requests as http_requests
 from dotenv import load_dotenv
-from urllib.parse import urlencode
 
 load_dotenv()
 
@@ -26,11 +25,6 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "kimi-k2.5")
 
 # Anthropic-compatible models (use Messages API endpoint)
 ANTHROPIC_MODELS = {"qwen3.7-plus", "qwen3.7-max", "qwen3.6-plus", "minimax-m3", "minimax-m2.7", "minimax-m2.5"}
-
-# GitHub OAuth config
-GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
-GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
-GITHUB_REDIRECT_URI = os.getenv("GITHUB_REDIRECT_URI", "http://localhost:8000/api/v1/auth/github/callback")
 
 # Initialize AI client
 openai_client = None
@@ -429,157 +423,10 @@ def chat_draft():
         return jsonify({"error": str(e)}), 500
 
 
-# ── GitHub OAuth ──
-@app.route("/api/v1/auth/github/login", methods=["GET"])
-def github_login():
-    """Redirect user to GitHub for OAuth authorization."""
-    if not GITHUB_CLIENT_ID:
-        return jsonify({"error": "GitHub OAuth not configured. Set GITHUB_CLIENT_ID in .env"}), 501
-    
-    params = {
-        "client_id": GITHUB_CLIENT_ID,
-        "redirect_uri": GITHUB_REDIRECT_URI,
-        "scope": "read:user user:email",
-        "state": secrets.token_hex(16)
-    }
-    session["oauth_state"] = params["state"]
-    github_url = f"https://github.com/login/oauth/authorize?{urlencode(params)}"
-    return jsonify({"redirect_url": github_url})
-
-
-@app.route("/api/v1/auth/github/callback", methods=["GET"])
-def github_callback():
-    """Handle GitHub OAuth callback and return user info + token."""
-    code = request.args.get("code")
-    state = request.args.get("state")
-    
-    if not code:
-        return jsonify({"error": "No authorization code provided"}), 400
-    
-    # Verify state to prevent CSRF
-    stored_state = session.get("oauth_state")
-    if stored_state and state != stored_state:
-        return jsonify({"error": "State mismatch"}), 400
-    
-    # Exchange code for access token
-    token_response = http_requests.post(
-        "https://github.com/login/oauth/access_token",
-        data={
-            "client_id": GITHUB_CLIENT_ID,
-            "client_secret": GITHUB_CLIENT_SECRET,
-            "code": code,
-            "redirect_uri": GITHUB_REDIRECT_URI
-        },
-        headers={"Accept": "application/json"}
-    )
-    
-    if token_response.status_code != 200:
-        return jsonify({"error": "Failed to get access token"}), 400
-    
-    access_token = token_response.json().get("access_token")
-    if not access_token:
-        return jsonify({"error": "No access token in response"}), 400
-    
-    # Get user info from GitHub
-    user_response = http_requests.get(
-        "https://api.github.com/user",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json"
-        }
-    )
-    
-    if user_response.status_code != 200:
-        return jsonify({"error": "Failed to get user info"}), 400
-    
-    user_data = user_response.json()
-    
-    # Get user email
-    email_response = http_requests.get(
-        "https://api.github.com/user/emails",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json"
-        }
-    )
-    
-    email = ""
-    if email_response.status_code == 200:
-        emails = email_response.json()
-        primary = [e for e in emails if e.get("primary")]
-        if primary:
-            email = primary[0].get("email", "")
-        elif emails:
-            email = emails[0].get("email", "")
-    
-    # Create user profile
-    github_user = {
-        "id": user_data.get("id"),
-        "login": user_data.get("login"),
-        "name": user_data.get("name", user_data.get("login")),
-        "email": email,
-        "avatar_url": user_data.get("avatar_url"),
-        "bio": user_data.get("bio", ""),
-        "github_url": user_data.get("html_url")
-    }
-    
-    # Generate a simple token for the Android app
-    import hashlib
-    import time
-    app_token = hashlib.sha256(f"{user_data['id']}:{access_token}:{time.time()}".encode()).hexdigest()
-    
-    # Store user in memory (in production use a database)
-    import threading
-    if not hasattr(app, "github_users"):
-        app.github_users = {}
-        app.github_users_lock = threading.Lock()
-    with app.github_users_lock:
-        app.github_users[app_token] = github_user
-    
-    # Return token and user info (as JSON for app, or HTML page for browser)
-    accept = request.headers.get("Accept", "")
-    if "text/html" in accept:
-        return f"""
-        <html><body><script>
-        localStorage.setItem('github_token', '{app_token}');
-        localStorage.setItem('github_user', '{json.dumps(github_user)}');
-        window.location.href = 'datingcopilot://auth?token={app_token}';
-        setTimeout(() => {{ window.close(); }}, 1000);
-        </script><p>Logged in! You can close this window.</p></body></html>
-        """, 200, {"Content-Type": "text/html"}
-    
-    return jsonify({
-        "access_token": app_token,
-        "user": github_user
-    })
-
-
+# ── Simple token auth (no GitHub OAuth) ──
 @app.route("/api/v1/auth/me", methods=["GET"])
 def auth_me():
-    """Get current user from token."""
-    auth = request.headers.get("Authorization", "")
-    token = auth.replace("Bearer ", "").strip()
-    
-    if not token or not hasattr(app, "github_users"):
-        return jsonify({"error": "Not authenticated"}), 401
-    
-    user = app.github_users.get(token)
-    if not user:
-        return jsonify({"error": "Invalid token"}), 401
-    
-    return jsonify({"user": user})
-
-
-@app.route("/api/v1/auth/logout", methods=["POST"])
-def auth_logout():
-    """Logout and invalidate token."""
-    auth = request.headers.get("Authorization", "")
-    token = auth.replace("Bearer ", "").strip()
-    
-    if token and hasattr(app, "github_users"):
-        app.github_users.pop(token, None)
-    
-    return jsonify({"status": "logged_out"})
+    return jsonify({"user": {"name": "RizzSe User"}})
 
 
 if __name__ == "__main__":

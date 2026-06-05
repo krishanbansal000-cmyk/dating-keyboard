@@ -60,19 +60,6 @@
             android:label="Select Image" />
 
         <activity
-            android:name=".chat.AuthCallbackActivity"
-            android:exported="true"
-            android:launchMode="singleTask">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="datingcopilot" android:host="auth" />
-            </intent-filter>
-        </activity>
-
-        <!-- Keep SettingsActivity accessible for now -->
-        <activity
             android:name=".SettingsActivity"
             android:exported="true"
             android:label="Legacy Settings" />
