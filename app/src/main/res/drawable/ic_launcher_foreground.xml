@@ -5,32 +5,43 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     
-    <!-- Chat bubble -->
+    <!-- Rounded square background -->
+    <path
+        android:fillColor="#1A1025"
+        android:pathData="M14,14 L94,14 C98,14 108,18 108,28 L108,80 C108,90 98,94 94,94 L14,94 C10,94 0,90 0,80 L0,28 C0,18 10,14 14,14 Z" />
+    
+    <!-- Gradient-like overlay band -->
+    <path
+        android:fillColor="#2D1B4E"
+        android:pathData="M0,40 L108,40 L108,94 L0,94 Z" />
+    
+    <!-- Accent bar -->
     <path
         android:fillColor="#8B5CF6"
-        android:pathData="M30,22 L78,22 C82,22 85,25 85,29 L85,55 C85,59 82,62 78,62 L54,62 L40,73 L40,62 L30,62 C26,62 23,59 23,55 L23,29 C23,25 26,22 30,22 Z" />
+        android:pathData="M0,38 L108,38 L108,42 L0,42 Z" />
     
     <!-- R -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M31,45L31,33L40,33L40,36L35,36L35,37L39,37L39,40L35,40L35,45ZM35,38L35,42L38,42C39,42 40,41 40,40C40,39 39,38 38,38Z" />
+        android:pathData="M12,66L12,52L24,52L24,56L17,56L17,57L22,57L22,61L17,61L17,62L25,62L25,66ZM17,57L17,62L20,62C22,62 23,61 23,59.5C23,58 22,57 20,57Z" />
     <!-- i -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M42,45L42,33L46,33L46,45Z" />
+        android:pathData="M28,66L28,52L33,66L33,52Z" />
     <!-- z -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M49,45L49,33L59,33L59,36L53,36L53,37L58,37L58,45Z" />
+        android:pathData="M37,66L37,52L50,52L50,56L42,56L42,57L49,57L49,66Z" />
     <!-- z -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M61,45L61,33L71,33L71,36L65,36L65,37L70,37L70,45Z" />
+        android:pathData="M53,66L53,52L66,52L66,56L58,56L58,57L65,57L65,66Z" />
     <!-- S -->
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M73,45L73,33L82,33L82,36L77,36L77,38L81,38L81,45Z" />
+    <path android:fillColor="#A855F7"
+        android:pathData="M69,66L69,52L81,52L81,56L74,56L74,58L80,58L80,66ZM74,62L80,62L74,62Z" />
     <!-- e -->
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M84,45L84,33L88,33L88,36L86,36L86,37L89,37L89,43C89,44 88,45 87,45Z" />
+    <path android:fillColor="#A855F7"
+        android:pathData="M84,66L84,52L89,52L89,56L87,56L87,57L91,57L91,63C91,65 90,66 88,66ZM87,57L87,62L89,62C90,62 90,61 90,59.5C90,58 90,57 89,57Z" />
     
-    <!-- Sparkle accent -->
-    <path
-        android:fillColor="#F472B6"
-        android:pathData="M52,28 L54,31 L57,32 L54,33 L52,36 L50,33 L47,32 L50,31 Z" />
+    <!-- Small sparkle dots -->
+    <path android:fillColor="#F472B6"
+        android:pathData="M93,20 L95,24 L99,25 L95,26 L93,30 L91,26 L87,25 L91,24 Z" />
+    <path android:fillColor="#D946EF"
+        android:pathData="M78,24 L79,26 L81,26.5 L79,27 L78,29 L77,27 L75,26.5 L77,26 Z" />
 </vector>
