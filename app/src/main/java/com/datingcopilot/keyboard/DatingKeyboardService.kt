@@ -85,10 +85,18 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
         val text = currentInputConnection?.getTextBeforeCursor(500, 0)?.toString() ?: return
         if (text.isBlank()) return
 
+        // Include chat context from accessibility service if available
+        val chatCtx = ChatContextService.getChatContext(this)
+        val fullText = if (chatCtx.isNotBlank()) {
+            chatCtx.takeLast(1500) + "\n" + text
+        } else {
+            text
+        }
+
         scope.launch {
             suggestionBar.showLoading(true)
             val result = withContext(Dispatchers.IO) {
-                apiClient.getSuggestions(text, currentTone)
+                apiClient.getSuggestions(fullText, currentTone)
             }
             suggestionBar.showLoading(false)
             if (result != null) {
