@@ -21,46 +21,7 @@ class SuggestionBar(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         )
-        setPadding(dpToPx(8), dpToPx(6), dpToPx(8), dpToPx(2))
-    }
-
-    private val topRow = LinearLayout(context).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        )
-    }
-
-    private val loadingIndicator = ProgressBar(context, null, android.R.attr.progressBarStyleSmall).apply {
-        isIndeterminate = true
-        visibility = View.GONE
-        val params = LinearLayout.LayoutParams(dpToPx(20), dpToPx(20))
-        params.gravity = Gravity.CENTER
-        layoutParams = params
-        indeterminateDrawable?.setTint(ContextCompat.getColor(context, R.color.accent_violet))
-    }
-
-    private val emptyLabel = TextView(context).apply {
-        text = "\u2728 Tap to generate"
-        textSize = 13f
-        setTextColor(ContextCompat.getColor(context, R.color.accent_violet))
-        gravity = Gravity.CENTER
-        isClickable = true
-        isFocusable = true
-        setPadding(dpToPx(16), dpToPx(8), dpToPx(16), dpToPx(8))
-        val bg = GradientDrawable().apply {
-            cornerRadius = dpToPx(20).toFloat()
-            setColor(ContextCompat.getColor(context, R.color.bg_dark))
-            setStroke(dpToPx(1), ContextCompat.getColor(context, R.color.accent_violet))
-        }
-        background = bg
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { gravity = Gravity.CENTER }
-        setOnClickListener { onGenerateTap?.invoke() }
+        setPadding(dpToPx(6), dpToPx(4), dpToPx(6), dpToPx(2))
     }
 
     private val suggestionsContainer = HorizontalScrollView(context).apply {
@@ -79,11 +40,55 @@ class SuggestionBar(
         )
     }
 
+    // Generate button - shown when no suggestions are visible
+    private val generateBtn = TextView(context).apply {
+        text = "\u2728 Generate"
+        textSize = 12f
+        setTextColor(ContextCompat.getColor(context, R.color.accent_violet))
+        gravity = Gravity.CENTER
+        isClickable = true
+        isFocusable = true
+        setPadding(dpToPx(14), dpToPx(6), dpToPx(14), dpToPx(6))
+        val bg = GradientDrawable().apply {
+            cornerRadius = dpToPx(16).toFloat()
+            setColor(ContextCompat.getColor(context, R.color.bg_card))
+            setStroke(dpToPx(1), ContextCompat.getColor(context, R.color.accent_violet))
+        }
+        background = bg
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        setOnClickListener { onGenerateTap?.invoke() }
+    }
+
+    // Loading dots shown while generating
+    private val loadingDots = TextView(context).apply {
+        text = ". . ."
+        textSize = 14f
+        setTextColor(ContextCompat.getColor(context, R.color.text_muted))
+        visibility = View.GONE
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+    }
+
+    // Top row: generate btn | loading | [suggestions scroll]
+    private val row = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+    }
+
     init {
         suggestionsContainer.addView(suggestionsInner)
-        topRow.addView(loadingIndicator)
-        topRow.addView(emptyLabel)
-        container.addView(topRow)
+        row.addView(generateBtn)
+        row.addView(loadingDots)
+        container.addView(row)
         container.addView(suggestionsContainer)
         suggestionsContainer.visibility = View.GONE
     }
@@ -91,18 +96,20 @@ class SuggestionBar(
     val rootView: LinearLayout get() = container
 
     fun showLoading(loading: Boolean) {
-        loadingIndicator.visibility = if (loading) View.VISIBLE else View.GONE
         if (loading) {
+            generateBtn.visibility = View.GONE
             suggestionsContainer.visibility = View.GONE
-            emptyLabel.visibility = View.GONE
+            loadingDots.visibility = View.VISIBLE
+        } else {
+            loadingDots.visibility = View.GONE
         }
     }
 
     fun showSuggestions(options: List<SuggestionOption>) {
         suggestionsInner.removeAllViews()
+        loadingDots.visibility = View.GONE
+        generateBtn.visibility = View.GONE
         suggestionsContainer.visibility = View.VISIBLE
-        loadingIndicator.visibility = View.GONE
-        emptyLabel.visibility = View.GONE
 
         for (opt in options) {
             val card = createSuggestionCard(opt)
@@ -112,61 +119,63 @@ class SuggestionBar(
 
     fun showError() {
         suggestionsContainer.visibility = View.GONE
-        loadingIndicator.visibility = View.GONE
-        emptyLabel.text = "\u26A0\uFE0F Tap to retry"
-        emptyLabel.setTextColor(ContextCompat.getColor(context, R.color.error))
-        emptyLabel.visibility = View.VISIBLE
+        loadingDots.visibility = View.GONE
+        generateBtn.text = "\u26A0\uFE0F Retry"
+        generateBtn.visibility = View.VISIBLE
+    }
+
+    fun reset() {
+        suggestionsContainer.visibility = View.GONE
+        loadingDots.visibility = View.GONE
+        generateBtn.text = "\u2728 Generate"
+        generateBtn.visibility = View.VISIBLE
     }
 
     private fun createSuggestionCard(option: SuggestionOption): View {
         val card = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(dpToPx(220), LinearLayout.LayoutParams.WRAP_CONTENT)
-            setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(8))
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dpToPx(36)
+            )
+            setPadding(dpToPx(12), 0, dpToPx(12), 0)
         }
 
         val bg = GradientDrawable().apply {
-            cornerRadius = dpToPx(12).toFloat()
-            setColor(ContextCompat.getColor(context, R.color.suggestion_card_bg))
+            cornerRadius = dpToPx(18).toFloat()
+            setColor(ContextCompat.getColor(context, R.color.bg_card))
             setStroke(dpToPx(1), ContextCompat.getColor(context, R.color.glass_border))
         }
         card.background = bg
 
         val textView = TextView(context).apply {
             text = option.text
-            textSize = 13f
+            textSize = 12f
             setTextColor(ContextCompat.getColor(context, R.color.text_primary))
-            maxLines = 3
-            typeface = Typeface.DEFAULT
+            maxLines = 1
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
             )
         }
         card.addView(textView)
 
-        val toneLabel = TextView(context).apply {
-            text = "${option.persona.uppercase()} \u00B7 ${option.confidence}%"
+        val confLabel = TextView(context).apply {
+            text = "${option.confidence}%"
             textSize = 10f
             setTextColor(ContextCompat.getColor(context, R.color.accent_violet))
             typeface = Typeface.DEFAULT_BOLD
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dpToPx(4) }
+            setPadding(dpToPx(6), 0, 0, 0)
         }
-        card.addView(toneLabel)
+        card.addView(confLabel)
 
         card.setOnClickListener {
             onSuggestionTap(option.text)
-            suggestionsContainer.visibility = View.GONE
-            emptyLabel.text = "\u2713 Copied"
-            emptyLabel.setTextColor(ContextCompat.getColor(context, R.color.success))
-            emptyLabel.visibility = View.VISIBLE
+            reset()
         }
 
         val marginParams = card.layoutParams as LinearLayout.LayoutParams
-        marginParams.setMargins(0, 0, dpToPx(8), 0)
+        marginParams.setMargins(0, 0, dpToPx(6), 0)
         card.layoutParams = marginParams
 
         return card

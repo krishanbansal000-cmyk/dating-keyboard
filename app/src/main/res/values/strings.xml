@@ -9,4 +9,5 @@
     <string name="thinking">AI is thinking...</string>
     <string name="tap_hint">Tap a message to get AI suggestions</string>
     <string name="connection_error">Could not connect. Check your backend URL.</string>
+    <string name="accessibility_desc">RizzSe reads chat text from dating apps to provide AI reply suggestions. No data is stored or shared.</string>
 </resources>

@@ -40,7 +40,11 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
 
         suggestionBar = SuggestionBar(this,
             onSuggestionTap = { text ->
-                currentInputConnection?.commitText(text, 1)
+                // Replace entire input field content with the suggestion
+                val ic = currentInputConnection
+                val existing = ic?.getTextBeforeCursor(1000, 0)?.toString() ?: ""
+                ic?.deleteSurroundingText(existing.length, 0)
+                ic?.commitText(text, 1)
             },
             onGenerateTap = {
                 fetchSuggestions()
@@ -101,7 +105,15 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
         val text = currentInputConnection?.getTextBeforeCursor(500, 0)?.toString() ?: return
         if (text.isBlank()) return
 
-        val latestMessage = text.lines().lastOrNull { it.isNotBlank() } ?: text
+        // Combine current input text with accessibility chat context
+        val chatCtx = ChatContextService.getChatContext(this)
+        val fullContext = if (chatCtx.isNotBlank()) {
+            chatCtx.takeLast(1500) + "\n" + text
+        } else {
+            text
+        }
+
+        val latestMessage = fullContext.lines().lastOrNull { it.isNotBlank() } ?: fullContext
 
         scope.launch {
             suggestionBar.showLoading(true)
