@@ -436,7 +436,6 @@ class ChatActivity : AppCompatActivity() {
         messageInput = android.widget.EditText(this).apply {
             hint = "Paste chat or leave empty"
             textSize = 14f
-            singleLine = false
             maxLines = 3
             setTextColor(resources.getColor(R.color.text_primary, null))
             setHintTextColor(resources.getColor(R.color.text_muted, null))
