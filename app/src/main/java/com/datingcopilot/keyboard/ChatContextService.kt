@@ -58,12 +58,29 @@ class ChatContextService : AccessibilityService() {
 
     private fun extractText(node: AccessibilityNodeInfo): String {
         val sb = StringBuilder()
-        if (node.text != null) sb.append(node.text).append('\n')
+        if (node.text != null) {
+            val t = node.text.toString().trim()
+            // Skip noise: timestamps, read receipts, UI labels
+            if (t.isNotEmpty() && !isNoise(t)) {
+                sb.append(t).append('\n')
+            }
+        }
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
             sb.append(extractText(child))
         }
         return sb.toString()
+    }
+
+    private fun isNoise(text: String): Boolean {
+        if (text.length < 3) return true
+        if (text.startsWith("Today") || text.startsWith("Yesterday")) return true
+        if (text.matches(Regex("^\\d{1,2}:\\d{2}.*"))) return true
+        if (text.matches(Regex("^[A-Z][a-z]{2,8},?\\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec).*"))) return true
+        if (text in setOf("Online", "Typing...", "typing...", "Seen", "Delivered", "Read", "Sent")) return true
+        if (text.matches(Regex("^✓✓?.*"))) return true
+        if (text.matches(Regex("^Read \\d"))) return true
+        return false
     }
 
     override fun onInterrupt() {}

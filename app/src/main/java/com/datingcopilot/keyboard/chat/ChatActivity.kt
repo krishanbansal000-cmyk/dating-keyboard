@@ -318,14 +318,14 @@ class ChatActivity : AppCompatActivity() {
 
         mainLayout.addView(chatContainer)
 
-        // Loading overlay
+        // Loading overlay with skeleton cards
         loadingView = FrameLayout(this).apply {
             setBackgroundColor(resources.getColor(R.color.bg_dark, null))
             alpha = 0.95f
             visibility = View.GONE
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (120 * resources.displayMetrics.density).toInt()
+                (180 * resources.displayMetrics.density).toInt()
             )
 
             val loadingContent = LinearLayout(this@ChatActivity).apply {
@@ -335,23 +335,48 @@ class ChatActivity : AppCompatActivity() {
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT
                 )
-            }
-
-            val shimmer = ProgressBar(this@ChatActivity, null, android.R.attr.progressBarStyleSmall).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    (48 * resources.displayMetrics.density).toInt(),
-                    (48 * resources.displayMetrics.density).toInt()
+                setPadding(
+                    (16 * resources.displayMetrics.density).toInt(),
+                    (12 * resources.displayMetrics.density).toInt(),
+                    (16 * resources.displayMetrics.density).toInt(),
+                    (12 * resources.displayMetrics.density).toInt()
                 )
             }
-            loadingContent.addView(shimmer)
 
             val loadingText = TextView(this@ChatActivity).apply {
-                text = "Analyzing conversation..."
-                textSize = 14f
-                setTextColor(resources.getColor(R.color.text_secondary, null))
-                setPadding(0, (12 * resources.displayMetrics.density).toInt(), 0, 0)
+                text = "Generating replies..."
+                textSize = 13f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(resources.getColor(R.color.accent_violet, null))
+                setPadding(0, 0, 0, (12 * resources.displayMetrics.density).toInt())
             }
             loadingContent.addView(loadingText)
+
+            // Skeleton cards row
+            val skeletonRow = LinearLayout(this@ChatActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+
+            for (i in 0..2) {
+                val skeletonCard = View(this@ChatActivity).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        (100 * resources.displayMetrics.density).toInt(),
+                        (140 * resources.displayMetrics.density).toInt()
+                    ).apply {
+                        marginStart = if (i > 0) (8 * resources.displayMetrics.density).toInt() else 0
+                    }
+                    val bg = GradientDrawable()
+                    bg.cornerRadius = 18 * resources.displayMetrics.density
+                    bg.setColor(resources.getColor(R.color.bg_surface, null))
+                    background = bg
+                }
+                skeletonRow.addView(skeletonCard)
+            }
+            loadingContent.addView(skeletonRow)
 
             addView(loadingContent)
         }
@@ -723,21 +748,55 @@ class ChatActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val requestIntent = if (text.isBlank()) "first_message" else currentIntent
-                val response = withContext(Dispatchers.IO) {
-                    apiClient.getSuggestionsFromText(text, currentPersona, requestIntent, currentPlatform)
+                
+                withContext(Dispatchers.IO) {
+                    apiClient.getSuggestionsFromTextStreaming(
+                        text,
+                        currentPersona,
+                        requestIntent,
+                        currentPlatform,
+                        onPartial = { partialText ->
+                            // Update loading text with partial response
+                            runOnUiThread {
+                                updateLoadingText(partialText)
+                            }
+                        },
+                        onComplete = { options ->
+                            runOnUiThread {
+                                showLoading(false)
+                                if (options != null && options.isNotEmpty()) {
+                                    messages.clear()
+                                    messages.addAll(conversation)
+                                    updateChatUI()
+                                    showSuggestions(options)
+                                } else {
+                                    Toast.makeText(this@ChatActivity, "Failed to get suggestions", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    )
                 }
-                showLoading(false)
-                response?.let {
-                    messages.clear()
-                    messages.addAll(conversation)
-                    updateChatUI()
-                    showSuggestions(it)
-                } ?: Toast.makeText(this@ChatActivity, "Failed to get suggestions", Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
                 showLoading(false)
                 Toast.makeText(this@ChatActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
+    }
+    
+    private fun updateLoadingText(partialText: String) {
+        // Extract the last line being typed for display
+        val lines = partialText.split("\n").filter { it.isNotBlank() }
+        val displayText = if (lines.isNotEmpty()) {
+            val lastLine = lines.last().removePrefix(">>> ").take(40)
+            "Generating: $lastLine..."
+        } else {
+            "Generating replies..."
+        }
+        
+        // Find and update the loading text view
+        val loadingContent = loadingView.getChildAt(0) as? LinearLayout
+        val loadingTextView = loadingContent?.getChildAt(0) as? TextView
+        loadingTextView?.text = displayText
     }
 
     private fun handleAnalyzeResponse(response: AnalyzeResponse) {

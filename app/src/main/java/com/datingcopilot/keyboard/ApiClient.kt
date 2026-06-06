@@ -184,6 +184,65 @@ class ApiClient(context: Context) {
         } catch (_: Exception) { null }
     }
 
+    // ── AI Suggestions with chat context (for keyboard) ──
+    fun getSuggestionsWithContext(
+        userText: String,
+        chatContext: String,
+        tone: String,
+        intent: String = "keep_going",
+        platform: String = "whatsapp"
+    ): List<SuggestionOption>? {
+        return try {
+            val myProfile = loadProfile()
+            val matchCtx = loadMatchContext()
+
+            val conversation = if (userText.isNotBlank()) {
+                listOf(mapOf("sender" to "them", "text" to userText))
+            } else emptyList()
+
+            val requestBody = mapOf(
+                "match_id" to UUID.randomUUID().toString().substring(0, 8),
+                "match_name" to matchCtx.name.ifEmpty { "Match" },
+                "conversation" to conversation,
+                "chat_context" to chatContext,
+                "tone" to tone,
+                "intent" to intent,
+                "platform" to platform,
+                "hinglish" to if (prefs.getBoolean("hinglish_mode", false)) "true" else "false",
+                "my_profile" to mapOf(
+                    "name" to myProfile.name,
+                    "age" to myProfile.age,
+                    "bio" to myProfile.bio
+                ),
+                "their_profile" to mapOf(
+                    "name" to matchCtx.name,
+                    "age" to matchCtx.age,
+                    "bio" to matchCtx.bio
+                )
+            )
+
+            val json = gson.toJson(requestBody)
+            val reqBuilder = Request.Builder()
+                .url("${getBaseUrl()}/api/v1/chat/draft")
+                .post(json.toRequestBody(JSON))
+                .addHeader("Content-Type", "application/json")
+
+            val response = client.newCall(reqBuilder.build()).execute()
+            if (!response.isSuccessful) return null
+
+            val responseBody = response.body?.string() ?: return null
+            val result = gson.fromJson(responseBody, Map::class.java)
+            val optionsRaw = result["options"] as? List<Map<String, Any>> ?: return null
+
+            optionsRaw.mapNotNull { opt ->
+                val text = opt["text"] as? String ?: return@mapNotNull null
+                val optTone = opt["tone"] as? String ?: tone
+                val confidence = (opt["confidence"] as? Number)?.toInt() ?: 90
+                SuggestionOption(text, confidence, optTone)
+            }
+        } catch (_: Exception) { null }
+    }
+
     // ── NEW: Upload screenshot for analysis ──
     fun uploadScreenshot(
         uri: Uri,
@@ -362,6 +421,121 @@ class ApiClient(context: Context) {
         } catch (e: Exception) {
             android.util.Log.e("ApiClient", "Text draft exception: ${e.message}", e)
             null
+        }
+    }
+
+    // ── Streaming suggestions ──
+    fun getSuggestionsFromTextStreaming(
+        text: String,
+        persona: String,
+        intent: String = "keep_going",
+        platform: String = "whatsapp",
+        onPartial: (String) -> Unit,
+        onComplete: (List<SuggestionOption>?) -> Unit
+    ) {
+        try {
+            val myProfile = loadProfile()
+            val matchCtx = loadMatchContext()
+
+            val lines = text.lines().filter { it.isNotBlank() }
+            val conversation = lines.map { line ->
+                val trimmed = line.trim()
+                if (trimmed.startsWith("You:", ignoreCase = true) ||
+                    trimmed.startsWith("Me:", ignoreCase = true)) {
+                    mapOf("sender" to "you", "text" to trimmed.substringAfter(":").trim())
+                } else if (trimmed.startsWith("Them:", ignoreCase = true)) {
+                    mapOf("sender" to "them", "text" to trimmed.substringAfter(":").trim())
+                } else {
+                    mapOf("sender" to "them", "text" to trimmed)
+                }
+            }
+
+            val requestBody = mapOf(
+                "match_id" to UUID.randomUUID().toString().substring(0, 8),
+                "match_name" to matchCtx.name.ifEmpty { "Match" },
+                "conversation" to conversation,
+                "tone" to persona,
+                "intent" to intent,
+                "platform" to platform,
+                "user_gender" to (prefs.getString("user_gender", "male") ?: "male"),
+                "hinglish" to if (prefs.getBoolean("hinglish_mode", false)) "true" else "false",
+                "my_profile" to mapOf(
+                    "name" to myProfile.name,
+                    "age" to myProfile.age,
+                    "bio" to myProfile.bio
+                ),
+                "their_profile" to mapOf(
+                    "name" to matchCtx.name,
+                    "age" to matchCtx.age,
+                    "bio" to matchCtx.bio
+                )
+            )
+
+            val json = gson.toJson(requestBody)
+            val reqBuilder = Request.Builder()
+                .url("${getBaseUrl()}/api/v1/chat/draft/stream")
+                .post(json.toRequestBody(JSON))
+                .addHeader("Content-Type", "application/json")
+                .addHeader("Accept", "text/event-stream")
+
+            val response = client.newCall(reqBuilder.build()).execute()
+            
+            if (!response.isSuccessful) {
+                android.util.Log.e("ApiClient", "Stream failed: HTTP ${response.code}")
+                onComplete(null)
+                return
+            }
+
+            val body = response.body ?: run {
+                onComplete(null)
+                return
+            }
+
+            val source = body.source()
+            val buffer = StringBuilder()
+            
+            while (!source.exhausted()) {
+                val line = source.readUtf8Line() ?: break
+                
+                if (line.startsWith("data: ")) {
+                    val data = line.substring(6)
+                    
+                    if (data == "[DONE]") {
+                        break
+                    }
+                    
+                    try {
+                        val parsed = gson.fromJson(data, Map::class.java)
+                        
+                        // Check for partial text
+                        val partial = parsed["partial"] as? String
+                        if (partial != null) {
+                            onPartial(partial)
+                        }
+                        
+                        // Check for final options
+                        val optionsRaw = parsed["options"] as? List<Map<String, Any>>
+                        if (optionsRaw != null) {
+                            val options = optionsRaw.mapNotNull { opt ->
+                                val optText = opt["text"] as? String ?: return@mapNotNull null
+                                val optTone = opt["tone"] as? String ?: persona
+                                val confidence = (opt["confidence"] as? Number)?.toInt() ?: 90
+                                SuggestionOption(optText, confidence, optTone)
+                            }
+                            onComplete(options)
+                            return
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("ApiClient", "Failed to parse SSE: $data")
+                    }
+                }
+            }
+            
+            // If we get here without final options, try to parse partial as final
+            onComplete(null)
+        } catch (e: Exception) {
+            android.util.Log.e("ApiClient", "Stream exception: ${e.message}", e)
+            onComplete(null)
         }
     }
 }

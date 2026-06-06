@@ -88,19 +88,17 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
     private fun fetchSuggestions() {
         val text = currentInputConnection?.getTextBeforeCursor(500, 0)?.toString() ?: ""
 
-        // Include chat context from accessibility service if available
+        // Get chat context from accessibility service
         val chatCtx = ChatContextService.getChatContext(this)
-        val fullText = if (chatCtx.isNotBlank()) {
-            chatCtx.takeLast(1500) + "\n" + text
-        } else {
-            text
-        }
-        if (fullText.isBlank()) return
+        
+        // Do NOT merge chat context with user text into one blob.
+        // Instead, send chat context separately so backend can handle it properly.
+        if (text.isBlank() && chatCtx.isBlank()) return
 
         scope.launch {
             suggestionBar.showLoading(true)
             val result = withContext(Dispatchers.IO) {
-                apiClient.getSuggestions(fullText, currentTone, currentIntent, currentPlatform)
+                apiClient.getSuggestionsWithContext(text, chatCtx, currentTone, currentIntent, currentPlatform)
             }
             suggestionBar.showLoading(false)
             if (result != null) {
