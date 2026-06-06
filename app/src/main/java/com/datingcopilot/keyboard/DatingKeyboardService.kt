@@ -16,12 +16,16 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
     private lateinit var apiClient: ApiClient
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var currentTone = "playful"
+    private var currentIntent = "keep_going"
+    private var currentPlatform = "whatsapp"
 
     override fun onCreate() {
         super.onCreate()
         apiClient = ApiClient(this)
-        currentTone = getSharedPreferences("dating_copilot", MODE_PRIVATE)
-            .getString("persona", "playful") ?: "playful"
+        val prefs = getSharedPreferences("dating_copilot", MODE_PRIVATE)
+        currentTone = prefs.getString("persona", "playful") ?: "playful"
+        currentIntent = prefs.getString("intent", "keep_going") ?: "keep_going"
+        currentPlatform = prefs.getString("platform", "whatsapp") ?: "whatsapp"
     }
 
     override fun onCreateInputView(): View {
@@ -82,8 +86,7 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
     }
 
     private fun fetchSuggestions() {
-        val text = currentInputConnection?.getTextBeforeCursor(500, 0)?.toString() ?: return
-        if (text.isBlank()) return
+        val text = currentInputConnection?.getTextBeforeCursor(500, 0)?.toString() ?: ""
 
         // Include chat context from accessibility service if available
         val chatCtx = ChatContextService.getChatContext(this)
@@ -92,11 +95,12 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
         } else {
             text
         }
+        if (fullText.isBlank()) return
 
         scope.launch {
             suggestionBar.showLoading(true)
             val result = withContext(Dispatchers.IO) {
-                apiClient.getSuggestions(fullText, currentTone)
+                apiClient.getSuggestions(fullText, currentTone, currentIntent, currentPlatform)
             }
             suggestionBar.showLoading(false)
             if (result != null) {

@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="RizzSe"
@@ -43,13 +43,13 @@
 
         <activity
             android:name=".onboarding.OnboardingActivity"
-            android:exported="true"
+            android:exported="false"
             android:theme="@style/Theme.DatingCopilotKeyboard" />
 
         <activity
             android:name=".chat.ChatActivity"
             android:exported="true"
- android:label="RizzSe"
+            android:label="RizzSe"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

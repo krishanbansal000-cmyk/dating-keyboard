@@ -39,7 +39,7 @@ class SettingsSheet : BottomSheetDialogFragment() {
         // Backend URL
         root.addView(sectionLabel(context, "Backend URL"))
         val urlInput = EditText(context).apply {
-            setText(prefs.getString("backend_url", "http://164.68.103.130:8000"))
+            setText(prefs.getString("backend_url", ApiClient.DEFAULT_BACKEND_URL))
             setTextColor(resources.getColor(R.color.text_primary, null))
             setHintTextColor(resources.getColor(R.color.text_muted, null))
             setPadding(
@@ -106,9 +106,11 @@ class SettingsSheet : BottomSheetDialogFragment() {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { gravity = android.view.Gravity.END }
             setOnClickListener {
+                val backendUrl = urlInput.text.toString().trim().ifEmpty { ApiClient.DEFAULT_BACKEND_URL }
+                val gender = genderInput.text.toString().trim().lowercase().ifEmpty { "male" }
                 prefs.edit()
-                    .putString("backend_url", urlInput.text.toString().trim())
-                    .putString("user_gender", genderInput.text.toString().trim().lowercase())
+                    .putString("backend_url", backendUrl)
+                    .putString("user_gender", gender)
                     .apply()
                 dismiss()
             }

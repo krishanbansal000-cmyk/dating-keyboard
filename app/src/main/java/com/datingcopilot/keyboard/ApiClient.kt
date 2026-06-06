@@ -33,6 +33,10 @@ data class MatchContext(
 
 class ApiClient(context: Context) {
 
+    companion object {
+        const val DEFAULT_BACKEND_URL = "http://10.0.2.2:8000"
+    }
+
     private val appContext = context.applicationContext
     private val prefs: SharedPreferences = context.getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
     private val client = OkHttpClient.Builder()
@@ -85,7 +89,7 @@ class ApiClient(context: Context) {
 
     // ── Auth (optional, not required) ──
     private fun getBaseUrl(): String =
-        prefs.getString("backend_url", "http://164.68.103.130:8000") ?: "http://164.68.103.130:8000"
+        prefs.getString("backend_url", DEFAULT_BACKEND_URL)?.trim()?.ifEmpty { DEFAULT_BACKEND_URL } ?: DEFAULT_BACKEND_URL
 
     private fun getAuthToken(): String? = prefs.getString("auth_token", null)
     fun setAuthToken(token: String) { prefs.edit().putString("auth_token", token).apply() }
@@ -123,7 +127,12 @@ class ApiClient(context: Context) {
     }
 
     // ── AI Suggestions (legacy keyboard endpoint) ──
-    fun getSuggestions(conversationText: String, tone: String): List<SuggestionOption>? {
+    fun getSuggestions(
+        conversationText: String,
+        tone: String,
+        intent: String = "keep_going",
+        platform: String = "whatsapp"
+    ): List<SuggestionOption>? {
         return try {
             val matchId = UUID.randomUUID().toString().substring(0, 8)
             val myProfile = loadProfile()
@@ -136,9 +145,11 @@ class ApiClient(context: Context) {
             val requestBody = mapOf(
                 "match_id" to matchId,
                 "match_name" to matchCtx.name.ifEmpty { "Match" },
-                "platform" to matchCtx.platform,
                 "conversation" to conversation,
                 "tone" to tone,
+                "intent" to intent,
+                "platform" to platform,
+                "hinglish" to if (prefs.getBoolean("hinglish_mode", false)) "true" else "false",
                 "my_profile" to mapOf(
                     "name" to myProfile.name,
                     "age" to myProfile.age,
@@ -174,7 +185,13 @@ class ApiClient(context: Context) {
     }
 
     // ── NEW: Upload screenshot for analysis ──
-    fun uploadScreenshot(uri: Uri, persona: String, context: Context): AnalyzeResponse? {
+    fun uploadScreenshot(
+        uri: Uri,
+        persona: String,
+        context: Context,
+        intent: String = "keep_going",
+        platform: String = "whatsapp"
+    ): AnalyzeResponse? {
         return try {
             // Copy URI content to temp file - detect MIME type
             val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
@@ -204,6 +221,8 @@ class ApiClient(context: Context) {
                 .setType(MultipartBody.FORM)
                 .addPart(imagePart)
                 .addFormDataPart("persona", persona)
+                .addFormDataPart("intent", intent)
+                .addFormDataPart("platform", platform)
                 .addFormDataPart("user_gender", prefs.getString("user_gender", "male") ?: "male")
                 .addFormDataPart("hinglish", if (prefs.getBoolean("hinglish_mode", false)) "true" else "false")
                 .addFormDataPart("user_id", "user_001")
@@ -267,7 +286,12 @@ class ApiClient(context: Context) {
     }
 
     // ── NEW: Get suggestions from pasted text ──
-    fun getSuggestionsFromText(text: String, persona: String): List<SuggestionOption>? {
+    fun getSuggestionsFromText(
+        text: String,
+        persona: String,
+        intent: String = "keep_going",
+        platform: String = "whatsapp"
+    ): List<SuggestionOption>? {
         return try {
             val myProfile = loadProfile()
             val matchCtx = loadMatchContext()
@@ -289,9 +313,10 @@ class ApiClient(context: Context) {
             val requestBody = mapOf(
                 "match_id" to UUID.randomUUID().toString().substring(0, 8),
                 "match_name" to matchCtx.name.ifEmpty { "Match" },
-                "platform" to matchCtx.platform,
                 "conversation" to conversation,
                 "tone" to persona,
+                "intent" to intent,
+                "platform" to platform,
                 "user_gender" to (prefs.getString("user_gender", "male") ?: "male"),
                 "hinglish" to if (prefs.getBoolean("hinglish_mode", false)) "true" else "false",
                 "my_profile" to mapOf(

@@ -23,12 +23,12 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.datingcopilot.keyboard.R
 import com.datingcopilot.keyboard.image.ImagePickerBottomSheet
 import com.datingcopilot.keyboard.SettingsSheet
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -41,13 +41,43 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var suggestionAdapter: SuggestionCardAdapter
     private lateinit var suggestionsLabel: TextView
     private lateinit var personaBar: LinearLayout
+    private lateinit var intentBar: LinearLayout
+    private lateinit var platformBar: LinearLayout
     private lateinit var loadingView: FrameLayout
     private lateinit var emptyStateView: LinearLayout
     
     private val messages = mutableListOf<ChatMessage>()
-    private val personas = listOf("friendly", "romantic", "bold", "witty", "playful", "chill", "direct", "flirty")
+    private val personas = listOf(
+        "Sweet" to "friendly",
+        "Romantic" to "romantic",
+        "Confident" to "bold",
+        "Funny" to "witty",
+        "Playful" to "playful",
+        "Respectful" to "chill",
+        "Date Plan" to "direct",
+        "Flirty" to "flirty"
+    )
+    private val intents = listOf(
+        "Keep Going" to "keep_going",
+        "Flirt" to "flirt",
+        "Ask Date" to "ask_date",
+        "Dry Chat" to "recover_dry",
+        "First Msg" to "first_message",
+        "Compliment" to "reply_compliment"
+    )
+    private val platforms = listOf(
+        "WhatsApp" to "whatsapp",
+        "Instagram" to "instagram",
+        "Hinge" to "hinge",
+        "Bumble" to "bumble",
+        "Tinder" to "tinder"
+    )
     private var currentPersona = "playful"
+    private var currentIntent = "keep_going"
+    private var currentPlatform = "whatsapp"
     private var selectedPersonaChip: TextView? = null
+    private var selectedIntentChip: TextView? = null
+    private var selectedPlatformChip: TextView? = null
 
     private val apiClient by lazy { com.datingcopilot.keyboard.ApiClient(this) }
 
@@ -75,6 +105,8 @@ class ChatActivity : AppCompatActivity() {
         }
 
         currentPersona = prefs.getString("persona", "playful") ?: "playful"
+        currentIntent = prefs.getString("intent", "keep_going") ?: "keep_going"
+        currentPlatform = prefs.getString("platform", "whatsapp") ?: "whatsapp"
 
         buildUI()
         handleSendImage(intent)
@@ -255,7 +287,7 @@ class ChatActivity : AppCompatActivity() {
             addView(emptyTitle)
 
             val emptySubtitle = TextView(this@ChatActivity).apply {
-                text = "Upload a screenshot or paste a conversation to get AI-powered reply suggestions that match your vibe."
+                text = "Paste a chat, upload a screenshot, or generate from scratch with Indian-friendly reply styles."
                 textSize = 14f
                 setTextColor(resources.getColor(R.color.text_secondary, null))
                 textAlignment = TextView.TEXT_ALIGNMENT_CENTER
@@ -388,7 +420,63 @@ class ChatActivity : AppCompatActivity() {
         suggestionsRecyclerView.adapter = suggestionAdapter
         mainLayout.addView(suggestionsRecyclerView)
 
+        mainLayout.addView(sectionLabel("Where are you chatting?"))
+        val platformScroll = HorizontalScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            isHorizontalScrollBarEnabled = false
+        }
+        platformBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(
+                (12 * resources.displayMetrics.density).toInt(),
+                0,
+                (12 * resources.displayMetrics.density).toInt(),
+                (8 * resources.displayMetrics.density).toInt()
+            )
+        }
+        platforms.forEach { (label, value) ->
+            platformBar.addView(choiceChip(label, value == currentPlatform) {
+                currentPlatform = value
+                savePreference("platform", value)
+                selectedPlatformChip = updateSelectedChip(selectedPlatformChip, it as TextView)
+            }.also { if (value == currentPlatform) selectedPlatformChip = it })
+        }
+        platformScroll.addView(platformBar)
+        mainLayout.addView(platformScroll)
+
+        mainLayout.addView(sectionLabel("What do you want to do?"))
+        val intentScroll = HorizontalScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            isHorizontalScrollBarEnabled = false
+        }
+        intentBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(
+                (12 * resources.displayMetrics.density).toInt(),
+                0,
+                (12 * resources.displayMetrics.density).toInt(),
+                (8 * resources.displayMetrics.density).toInt()
+            )
+        }
+        intents.forEach { (label, value) ->
+            intentBar.addView(choiceChip(label, value == currentIntent) {
+                currentIntent = value
+                savePreference("intent", value)
+                selectedIntentChip = updateSelectedChip(selectedIntentChip, it as TextView)
+                if (messages.isNotEmpty()) regenerateSuggestions()
+            }.also { if (value == currentIntent) selectedIntentChip = it })
+        }
+        intentScroll.addView(intentBar)
+        mainLayout.addView(intentScroll)
+
         // Persona selector bar
+        mainLayout.addView(sectionLabel("Choose your vibe"))
         val personaScroll = HorizontalScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -407,67 +495,13 @@ class ChatActivity : AppCompatActivity() {
             )
         }
 
-        personas.forEach { persona ->
-            val chip = TextView(this).apply {
-                text = persona.replaceFirstChar { it.uppercase() }
-                textSize = 13f
-                setPadding(
-                    (16 * resources.displayMetrics.density).toInt(),
-                    (8 * resources.displayMetrics.density).toInt(),
-                    (16 * resources.displayMetrics.density).toInt(),
-                    (8 * resources.displayMetrics.density).toInt()
-                )
-                val bg = GradientDrawable()
-                bg.cornerRadius = 32 * resources.displayMetrics.density
-                
-                if (persona == currentPersona) {
-                    bg.setColor(resources.getColor(R.color.chip_selected, null))
-                    setTextColor(resources.getColor(R.color.chip_selected_text, null))
-                    setTypeface(null, android.graphics.Typeface.BOLD)
-                    selectedPersonaChip = this
-                } else {
-                    bg.setColor(resources.getColor(R.color.chip_unselected_bg, null))
-                    bg.setStroke(1, resources.getColor(R.color.chip_unselected_border, null))
-                    setTextColor(resources.getColor(R.color.chip_unselected_text, null))
-                }
-                background = bg
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    marginEnd = (8 * resources.displayMetrics.density).toInt()
-                }
-                isClickable = true
-                isFocusable = true
-
-                setOnClickListener {
-                    // Deselect previous
-                    selectedPersonaChip?.let { prev ->
-                        val prevBg = GradientDrawable()
-                        prevBg.cornerRadius = 32 * resources.displayMetrics.density
-                        prevBg.setColor(resources.getColor(R.color.chip_unselected_bg, null))
-                        prevBg.setStroke(1, resources.getColor(R.color.chip_unselected_border, null))
-                        prev.background = prevBg
-                        prev.setTextColor(resources.getColor(R.color.chip_unselected_text, null))
-                        prev.setTypeface(null, android.graphics.Typeface.NORMAL)
-                    }
-                    // Select new
-                    val newBg = GradientDrawable()
-                    newBg.cornerRadius = 32 * resources.displayMetrics.density
-                    newBg.setColor(resources.getColor(R.color.chip_selected, null))
-                    background = newBg
-                    setTextColor(resources.getColor(R.color.chip_selected_text, null))
-                    setTypeface(null, android.graphics.Typeface.BOLD)
-                    selectedPersonaChip = this
-                    currentPersona = persona
-                    
-                    // Regenerate suggestions if we have messages
-                    if (messages.isNotEmpty()) {
-                        regenerateSuggestions()
-                    }
-                }
-            }
-            personaBar.addView(chip)
+        personas.forEach { (label, value) ->
+            personaBar.addView(choiceChip(label, value == currentPersona) {
+                currentPersona = value
+                savePreference("persona", value)
+                selectedPersonaChip = updateSelectedChip(selectedPersonaChip, it as TextView)
+                if (messages.isNotEmpty()) regenerateSuggestions()
+            }.also { if (value == currentPersona) selectedPersonaChip = it })
         }
 
         personaScroll.addView(personaBar)
@@ -475,6 +509,71 @@ class ChatActivity : AppCompatActivity() {
 
         root.addView(mainLayout)
         setContentView(root)
+    }
+
+    private fun sectionLabel(text: String): TextView {
+        return TextView(this).apply {
+            this.text = text.uppercase()
+            textSize = 11f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.text_muted, null))
+            setPadding(
+                (16 * resources.displayMetrics.density).toInt(),
+                (10 * resources.displayMetrics.density).toInt(),
+                (16 * resources.displayMetrics.density).toInt(),
+                (6 * resources.displayMetrics.density).toInt()
+            )
+        }
+    }
+
+    private fun choiceChip(label: String, selected: Boolean, onClick: (View) -> Unit): TextView {
+        return TextView(this).apply {
+            text = label
+            textSize = 13f
+            setPadding(
+                (16 * resources.displayMetrics.density).toInt(),
+                (8 * resources.displayMetrics.density).toInt(),
+                (16 * resources.displayMetrics.density).toInt(),
+                (8 * resources.displayMetrics.density).toInt()
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = (8 * resources.displayMetrics.density).toInt() }
+            isClickable = true
+            isFocusable = true
+            applyChipStyle(this, selected)
+            setOnClickListener(onClick)
+        }
+    }
+
+    private fun updateSelectedChip(previous: TextView?, selected: TextView): TextView {
+        previous?.let { applyChipStyle(it, false) }
+        applyChipStyle(selected, true)
+        return selected
+    }
+
+    private fun applyChipStyle(chip: TextView, selected: Boolean) {
+        val bg = GradientDrawable()
+        bg.cornerRadius = 32 * resources.displayMetrics.density
+        if (selected) {
+            bg.setColor(resources.getColor(R.color.chip_selected, null))
+            chip.setTextColor(resources.getColor(R.color.chip_selected_text, null))
+            chip.setTypeface(null, android.graphics.Typeface.BOLD)
+        } else {
+            bg.setColor(resources.getColor(R.color.chip_unselected_bg, null))
+            bg.setStroke(1, resources.getColor(R.color.chip_unselected_border, null))
+            chip.setTextColor(resources.getColor(R.color.chip_unselected_text, null))
+            chip.setTypeface(null, android.graphics.Typeface.NORMAL)
+        }
+        chip.background = bg
+    }
+
+    private fun savePreference(key: String, value: String) {
+        getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+            .edit()
+            .putString(key, value)
+            .apply()
     }
 
     private fun showImagePicker() {
@@ -523,7 +622,7 @@ class ChatActivity : AppCompatActivity() {
         layout.addView(title)
 
         val editText = android.widget.EditText(this).apply {
-            hint = "Paste the conversation text here..."
+            hint = "Paste the conversation text here, or leave empty for first-message ideas..."
             setTextColor(resources.getColor(R.color.text_primary, null))
             setHintTextColor(resources.getColor(R.color.text_muted, null))
             setPadding(
@@ -562,7 +661,7 @@ class ChatActivity : AppCompatActivity() {
         btnLayout.addView(cancelBtn)
 
         val submitBtn = TextView(this).apply {
-            text = "Analyze"
+            text = "Generate"
             textSize = 14f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(resources.getColor(R.color.white, null))
@@ -573,10 +672,8 @@ class ChatActivity : AppCompatActivity() {
             background = bg
             setOnClickListener {
                 val text = editText.text.toString().trim()
-                if (text.isNotEmpty()) {
-                    dialog.dismiss()
-                    analyzeText(text)
-                }
+                dialog.dismiss()
+                analyzeText(text)
             }
         }
         btnLayout.addView(submitBtn)
@@ -589,19 +686,23 @@ class ChatActivity : AppCompatActivity() {
     private fun handleImageSelected(uri: Uri) {
         showLoading(true)
         
-        CoroutineScope(Dispatchers.IO).launch {
+        lifecycleScope.launch {
             try {
-                val response = apiClient.uploadScreenshot(uri, currentPersona, this@ChatActivity)
-                withContext(Dispatchers.Main) {
-                    showLoading(false)
-                    response?.let { handleAnalyzeResponse(it) }
-                        ?: Toast.makeText(this@ChatActivity, "Failed to analyze screenshot", Toast.LENGTH_LONG).show()
+                val response = withContext(Dispatchers.IO) {
+                    apiClient.uploadScreenshot(
+                        uri,
+                        currentPersona,
+                        this@ChatActivity,
+                        currentIntent,
+                        currentPlatform
+                    )
                 }
+                showLoading(false)
+                response?.let { handleAnalyzeResponse(it) }
+                    ?: Toast.makeText(this@ChatActivity, "Failed to analyze screenshot", Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    showLoading(false)
-                    Toast.makeText(this@ChatActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+                showLoading(false)
+                Toast.makeText(this@ChatActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -618,27 +719,25 @@ class ChatActivity : AppCompatActivity() {
                 ChatMessage("them", line.trim())
             }
         }
-        
+
         messages.clear()
         messages.addAll(conversation)
         
-        CoroutineScope(Dispatchers.IO).launch {
+        lifecycleScope.launch {
             try {
-                val response = apiClient.getSuggestionsFromText(text, currentPersona)
-                withContext(Dispatchers.Main) {
-                    showLoading(false)
-                    response?.let { 
-                        messages.clear()
-                        messages.addAll(conversation)
-                        updateChatUI()
-                        showSuggestions(it)
-                    } ?: Toast.makeText(this@ChatActivity, "Failed to get suggestions", Toast.LENGTH_LONG).show()
+                val response = withContext(Dispatchers.IO) {
+                    apiClient.getSuggestionsFromText(text, currentPersona, currentIntent, currentPlatform)
                 }
+                showLoading(false)
+                response?.let {
+                    messages.clear()
+                    messages.addAll(conversation)
+                    updateChatUI()
+                    showSuggestions(it)
+                } ?: Toast.makeText(this@ChatActivity, "Failed to get suggestions", Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    showLoading(false)
-                    Toast.makeText(this@ChatActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+                showLoading(false)
+                Toast.makeText(this@ChatActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -683,17 +782,15 @@ class ChatActivity : AppCompatActivity() {
             "${if (it.sender == "you") "You" else "Them"}: ${it.text}" 
         }
         
-        CoroutineScope(Dispatchers.IO).launch {
+        lifecycleScope.launch {
             try {
-                val response = apiClient.getSuggestionsFromText(convoText, currentPersona)
-                withContext(Dispatchers.Main) {
-                    showLoading(false)
-                    response?.let { showSuggestions(it) }
+                val response = withContext(Dispatchers.IO) {
+                    apiClient.getSuggestionsFromText(convoText, currentPersona, currentIntent, currentPlatform)
                 }
+                showLoading(false)
+                response?.let { showSuggestions(it) }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    showLoading(false)
-                }
+                showLoading(false)
             }
         }
     }

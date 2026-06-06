@@ -10,6 +10,7 @@ import base64
 import json
 import re
 import random
+import traceback
 import requests as http_requests
 from dotenv import load_dotenv
 
@@ -21,7 +22,8 @@ CORS(app, supports_credentials=True)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 API_ENDPOINT = os.getenv("OPENAI_BASE_URL", "https://opencode.ai/zen/go/v1")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "kimi-k2.5")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "mimo-v2.5")
+USE_MOCK = os.getenv("USE_MOCK", "false").lower() in {"1", "true", "yes", "on"}
 
 # Anthropic-compatible models (use Messages API endpoint)
 ANTHROPIC_MODELS = {"qwen3.7-plus", "qwen3.7-max", "qwen3.6-plus", "minimax-m3", "minimax-m2.7", "minimax-m2.5"}
@@ -65,6 +67,29 @@ PERSONA_PROMPTS = {
     "direct": "Direct mover. Cut small talk, set up the date. Confident and clear.",
     "flirty": "Smooth seducer. Subtle tension, confident charm. Bold but classy."
 }
+
+INTENT_PROMPTS = {
+    "keep_going": "Keep the conversation moving naturally. Ask or say something easy to reply to.",
+    "flirt": "Add light flirtation and chemistry. Avoid being vulgar or too intense.",
+    "ask_date": "Move toward a simple date plan like coffee, walk, food, or weekend plan.",
+    "recover_dry": "Recover a dry or low-effort chat with playful, low-pressure energy.",
+    "first_message": "Write a strong first message that feels personal and not generic.",
+    "reply_compliment": "Reply to a compliment with charm, confidence, and warmth."
+}
+
+PLATFORM_PROMPTS = {
+    "whatsapp": "WhatsApp style: natural, familiar, not too try-hard.",
+    "instagram": "Instagram style: casual, photo/story-friendly, playful.",
+    "hinge": "Hinge style: thoughtful, profile-aware, slightly witty.",
+    "bumble": "Bumble style: warm, respectful, confident.",
+    "tinder": "Tinder style: playful, crisp, a little bold."
+}
+
+INDIA_STYLE_PROMPT = (
+    "Audience is mostly Indian. Make replies natural for Indian dating/chat culture. "
+    "Hinglish is okay only when requested. Avoid cringe pickup lines, vulgarity, and overly western slang. "
+    "Prefer short, respectful, copy-pasteable replies."
+)
 
 OPENER_PROMPTS = {
     "friendly": "Smooth and approachable. Warm opener that feels natural.",
@@ -161,6 +186,64 @@ def get_mock_suggestions(persona, count=3):
     return result
 
 
+SKIP_WORDS = (
+    'explanation', 'thinking', 'labels', 'rules', 'output', 'no explanation',
+    'just the', 'copy-paste', 'characters', 'short, smooth', 'for each',
+    'each line', 'line must start', 'first rizz', 'second rizz', 'third rizz',
+    'nothing else', 'rizz line 1', 'rizz line 2', 'rizz line 3'
+)
+
+
+def get_response_text(response):
+    if hasattr(response, 'choices'):
+        return response.choices[0].message.content.strip()
+    return response.content[0].text.strip()
+
+
+def parse_suggestions(text, persona, key="persona", min_confidence=78, max_confidence=98):
+    """Parse model output into app-ready suggestion objects."""
+    clean_text = re.sub(r'^\d+[\.\)]\s*', '', text, flags=re.MULTILINE)
+    first_arrow = clean_text.find('>>>')
+    if first_arrow > 0:
+        clean_text = clean_text[first_arrow:]
+
+    suggestions = []
+    for raw_line in clean_text.split('\n'):
+        line = raw_line.strip()
+        if not line.startswith('>>>'):
+            continue
+        value = re.sub(r'^>>>\s*', '', line).strip()
+        if len(value) <= 10 or any(word in value.lower() for word in SKIP_WORDS):
+            continue
+        suggestions.append({
+            "text": value[:180],
+            "confidence": random.randint(min_confidence, max_confidence),
+            key: persona
+        })
+        if len(suggestions) == 3:
+            break
+    return suggestions
+
+
+def mock_options(persona, key="persona"):
+    return [
+        {"text": item["text"], "confidence": item["confidence"], key: persona}
+        for item in get_mock_suggestions(persona)
+    ]
+
+
+def build_context_prompt(persona, intent="keep_going", platform="whatsapp", hinglish=False):
+    persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
+    intent_prompt = INTENT_PROMPTS.get(intent, INTENT_PROMPTS["keep_going"])
+    platform_prompt = PLATFORM_PROMPTS.get(platform, PLATFORM_PROMPTS["whatsapp"])
+    lang_hint = "Use natural Hinglish." if hinglish else "Use English with Indian-friendly phrasing."
+    return f"{INDIA_STYLE_PROMPT} {platform_prompt} {intent_prompt} {persona_prompt} {lang_hint}"
+
+
+def truthy(value):
+    return str(value).lower() in {"1", "true", "yes", "on"}
+
+
 def call_ai(messages, model=None, max_tokens=800, temperature=0.85):
     """Call AI model. Raises on failure — no mock fallback."""
     model_name = model or OPENAI_MODEL
@@ -172,7 +255,8 @@ def call_ai(messages, model=None, max_tokens=800, temperature=0.85):
     if model_name in ANTHROPIC_MODELS and anthropic_client is not None:
         return anthropic_client.messages.create(
             model=model_name, max_tokens=max_tokens,
-            temperature=temperature, messages=full_messages
+            temperature=temperature, system=SYSTEM_PROMPT,
+            messages=messages
         )
     
     # OpenAI-compatible client
@@ -190,8 +274,9 @@ def health():
     return jsonify({
         "status": "ok",
         "service": "RizzSe AI Backend",
-        "mode": "ai",
+        "mode": "mock" if USE_MOCK else "ai",
         "model": OPENAI_MODEL,
+        "mock_enabled": USE_MOCK,
         "client_ready": openai_client is not None or anthropic_client is not None
     })
 
@@ -223,26 +308,27 @@ def analyze_screenshot():
     """Accept image + persona, return extracted conversation + suggestions."""
     try:
         persona = request.form.get("persona", "playful")
-        hinglish = request.form.get("hinglish", "false").lower() == "true"
+        intent = request.form.get("intent", "keep_going")
+        platform = request.form.get("platform", "whatsapp")
+        hinglish = truthy(request.form.get("hinglish", "false"))
         conversation = []
         suggestions = None
-        
+
         if "image" in request.files:
             image_file = request.files["image"]
             filename = secure_filename(image_file.filename)
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             image_file.save(filepath)
             
-            have_client = openai_client is not None or anthropic_client is not None
+            have_client = not USE_MOCK and (openai_client is not None or anthropic_client is not None)
             if have_client:
                 image_file.seek(0)
                 base64_image = encode_image(image_file)
                 
                 is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
-                persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
-                lang_hint = "Hinglish." if hinglish else "English."
+                context_prompt = build_context_prompt(persona, intent, platform, hinglish)
                 
-                vision_prompt = f"""Look at this screenshot. Write 3 short rizz lines (under 100 chars each) based on what you see. {persona_prompt} {lang_hint}
+                vision_prompt = f"""Look at this screenshot. Write 3 short replies (under 100 chars each) based on what you see. {context_prompt}
 
 >>>
 >>>
@@ -266,66 +352,29 @@ def analyze_screenshot():
                 response = call_ai(messages, model=OPENAI_MODEL, max_tokens=600, temperature=0.95)
                 
                 if response:
-                    if hasattr(response, 'choices'):
-                        text = response.choices[0].message.content.strip()
-                    else:
-                        text = response.content[0].text.strip()
-                    
-                    # Strip numbering and find first >>> line
-                    clean_text = re.sub(r'^\d+[\.\)]\s*', '', text, flags=re.MULTILINE)
-                    first_arrow = clean_text.find('>>>')
-                    if first_arrow > 0:
-                        clean_text = clean_text[first_arrow:]
-                    
-                    lines = [l.strip() for l in clean_text.split('\n') if l.strip()]
-                    arrow_lines = [l for l in lines if l.startswith('>>>')]
-                    
-                    # Filter out meta/instruction lines
-                    skip_words = ('explanation', 'thinking', 'labels', 'rules', 'output', 'no explanation', 'just the', 'copy-paste', 'characters', 'short, smooth', 'for each', 'each line', 'line must start', 'first rizz', 'second rizz', 'third rizz', 'nothing else', 'rizz line 1', 'rizz line 2', 'rizz line 3')
-                    non_empty = [l for l in arrow_lines if len(re.sub(r'^>>>\s*', '', l).strip()) > 10]
-                    clean_lines = [l for l in non_empty if not any(w in l.lower() for w in skip_words)]
-                    
-                    if clean_lines:
-                        suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "persona": persona} for l in clean_lines[:3]]
+                    suggestions = parse_suggestions(get_response_text(response), persona)
             
-            try:
+            if os.path.exists(filepath):
                 os.remove(filepath)
-            except:
-                pass
         
-        if not suggestions:
+        if not suggestions and not USE_MOCK:
             try:
-                persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
-                lang_hint = "Hinglish." if hinglish else "English."
+                context_prompt = build_context_prompt(persona, intent, platform, hinglish)
                 response = call_ai(
-                    [{"role": "user", "content": f"{persona_prompt} Write 3 short openers (under 100 chars). {lang_hint}\n\n>>>\n>>>\n>>>"}],
+                    [{"role": "user", "content": f"{context_prompt} Write 3 short openers or replies (under 100 chars).\n\n>>>\n>>>\n>>>"}],
                     max_tokens=600, temperature=0.95
                 )
                 if response:
-                    if hasattr(response, 'choices'):
-                        text = response.choices[0].message.content.strip()
-                    else:
-                        text = response.content[0].text.strip()
-                    
-                    # Strip numbering and find first >>> line
-                    clean_text = re.sub(r'^\d+[\.\)]\s*', '', text, flags=re.MULTILINE)
-                    first_arrow = clean_text.find('>>>')
-                    if first_arrow > 0:
-                        clean_text = clean_text[first_arrow:]
-                    
-                    fb_lines = [l.strip() for l in clean_text.split('\n') if l.strip()]
-                    fb_arrow = [l for l in fb_lines if l.startswith('>>>')]
-                    
-                    # Filter out meta/instruction lines
-                    skip_words = ('explanation', 'thinking', 'labels', 'rules', 'output', 'no explanation', 'just the', 'copy-paste', 'characters', 'short, smooth', 'for each', 'each line', 'line must start', 'first rizz', 'second rizz', 'third rizz')
-                    non_empty = [l for l in fb_arrow if len(re.sub(r'^>>>\s*', '', l).strip()) > 10]
-                    clean_fb = [l for l in non_empty if not any(w in l.lower() for w in skip_words)]
-                    
-                    if clean_fb:
-                        suggestions = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(75, 90), "persona": persona} for l in clean_fb[:3]]
-            except:
-                pass
-        
+                    suggestions = parse_suggestions(
+                        get_response_text(response), persona,
+                        min_confidence=75, max_confidence=90
+                    )
+            except Exception as e:
+                app.logger.warning("Fallback opener generation failed: %s", e)
+
+        if not suggestions and USE_MOCK:
+            suggestions = mock_options(persona)
+
         if not suggestions:
             return jsonify({"error": "AI failed to generate suggestions"}), 500
         
@@ -337,7 +386,6 @@ def analyze_screenshot():
         })
         
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -348,51 +396,35 @@ def chat_draft():
     try:
         data = request.get_json() or {}
         persona = data.get("tone", data.get("persona", "playful"))
-        hinglish = data.get("hinglish", "false").lower() == "true"
+        intent = data.get("intent", "keep_going")
+        platform = data.get("platform", "whatsapp")
+        hinglish = truthy(data.get("hinglish", "false"))
         conversation = data.get("conversation", [])
         
-        have_client = openai_client is not None or anthropic_client is not None
+        have_client = not USE_MOCK and (openai_client is not None or anthropic_client is not None)
         if have_client:
-            persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
+            context_prompt = build_context_prompt(persona, intent, platform, hinglish)
             convo_text = "\n".join([
                 f"{'You' if msg.get('sender') == 'you' else 'Them'}: {msg.get('text', '')}"
                 for msg in conversation
             ])
-            lang_hint = "Hinglish." if hinglish else "English."
+            input_hint = convo_text[:700] if convo_text else "No message provided yet. Generate useful first-message options."
             
             response = call_ai(
-                [{"role": "user", "content": f"{convo_text[:500]}\n\n{persona_prompt} Write 3 short replies (under 100 chars each) that reference what they said. {lang_hint}\n\n>>>\n>>>\n>>>"}],
+                [{"role": "user", "content": f"{input_hint}\n\n{context_prompt} Write 3 short replies (under 100 chars each).\n\n>>>\n>>>\n>>>"}],
                 max_tokens=600, temperature=0.95
             )
             
             if response:
-                if hasattr(response, 'choices'):
-                    text = response.choices[0].message.content.strip()
-                else:
-                    text = response.content[0].text.strip()
-                
-                # Strip numbering and find first >>> line
-                clean_text = re.sub(r'^\d+[\.\)]\s*', '', text, flags=re.MULTILINE)
-                first_arrow = clean_text.find('>>>')
-                if first_arrow > 0:
-                    clean_text = clean_text[first_arrow:]
-                
-                lines = [l.strip() for l in clean_text.split('\n') if l.strip()]
-                arrow_lines = [l for l in lines if l.startswith('>>>')]
-                
-                # Filter out meta/instruction lines
-                skip_words = ('explanation', 'thinking', 'labels', 'rules', 'output', 'no explanation', 'just the', 'copy-paste', 'characters', 'short, smooth', 'for each', 'each line', 'line must start', 'first rizz', 'second rizz', 'third rizz')
-                non_empty = [l for l in arrow_lines if len(re.sub(r'^>>>\s*', '', l).strip()) > 10]
-                clean_lines = [l for l in non_empty if not any(w in l.lower() for w in skip_words)]
-                
-                if clean_lines:
-                    options = [{"text": re.sub(r'^>>>\s*', '', l).strip(), "confidence": random.randint(78, 98), "tone": persona} for l in clean_lines[:3]]
+                options = parse_suggestions(get_response_text(response), persona, key="tone")
+                if options:
                     return jsonify({"options": options})
+        elif USE_MOCK:
+            return jsonify({"options": mock_options(persona, key="tone")})
         
         return jsonify({"error": "AI failed to generate suggestions"}), 500
         
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
