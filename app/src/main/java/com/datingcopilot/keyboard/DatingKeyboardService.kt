@@ -6,7 +6,6 @@ import android.inputmethodservice.KeyboardView
 import android.graphics.drawable.GradientDrawable
 import android.view.KeyEvent
 import android.view.View
-import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
 import kotlinx.coroutines.*
 
@@ -14,7 +13,6 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
 
     private lateinit var keyboardView: KeyboardView
     private lateinit var suggestionBar: SuggestionBar
-    private lateinit var toneSelector: ToneSelector
     private lateinit var apiClient: ApiClient
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var currentTone = "playful"
@@ -22,12 +20,6 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
     override fun onCreate() {
         super.onCreate()
         apiClient = ApiClient(this)
-        scope.launch {
-            withContext(Dispatchers.IO) {
-                apiClient.fetchCurrentMatchContext()
-            }
-        }
-        // Load saved persona from preferences
         currentTone = getSharedPreferences("dating_copilot", MODE_PRIVATE)
             .getString("persona", "playful") ?: "playful"
     }
@@ -40,7 +32,6 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
 
         suggestionBar = SuggestionBar(this,
             onSuggestionTap = { text ->
-                // Replace entire input field content with the suggestion
                 val ic = currentInputConnection
                 val existing = ic?.getTextBeforeCursor(1000, 0)?.toString() ?: ""
                 ic?.deleteSurroundingText(existing.length, 0)
@@ -50,11 +41,6 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
                 fetchSuggestions()
             }
         )
-
-        toneSelector = ToneSelector(this) { tone ->
-            currentTone = tone
-            fetchSuggestions()
-        }
 
         // Custom keyboard container with rounded top corners
         val keyboardContainer = LinearLayout(this).apply {
@@ -90,35 +76,19 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
         ))
 
         root.addView(suggestionBar.rootView)
-        root.addView(toneSelector.rootView)
         root.addView(keyboardContainer)
 
         return root
-    }
-
-    override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
-        super.onStartInputView(info, restarting)
-        toneSelector.setSelectedTone(currentTone)
     }
 
     private fun fetchSuggestions() {
         val text = currentInputConnection?.getTextBeforeCursor(500, 0)?.toString() ?: return
         if (text.isBlank()) return
 
-        // Combine current input text with accessibility chat context
-        val chatCtx = ChatContextService.getChatContext(this)
-        val fullContext = if (chatCtx.isNotBlank()) {
-            chatCtx.takeLast(1500) + "\n" + text
-        } else {
-            text
-        }
-
-        val latestMessage = fullContext.lines().lastOrNull { it.isNotBlank() } ?: fullContext
-
         scope.launch {
             suggestionBar.showLoading(true)
             val result = withContext(Dispatchers.IO) {
-                apiClient.getSuggestions(latestMessage, currentTone)
+                apiClient.getSuggestions(text, currentTone)
             }
             suggestionBar.showLoading(false)
             if (result != null) {

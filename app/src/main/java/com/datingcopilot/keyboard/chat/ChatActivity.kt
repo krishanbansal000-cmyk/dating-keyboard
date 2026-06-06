@@ -27,7 +27,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.datingcopilot.keyboard.R
 import com.datingcopilot.keyboard.image.ImagePickerBottomSheet
-import com.datingcopilot.keyboard.profile.ProfileActivity
+import com.datingcopilot.keyboard.SettingsSheet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -171,7 +171,7 @@ class ChatActivity : AppCompatActivity() {
             textSize = 20f
             setPadding((8 * resources.displayMetrics.density).toInt(), 0, (8 * resources.displayMetrics.density).toInt(), 0)
             setOnClickListener {
-                startActivity(Intent(this@ChatActivity, ProfileActivity::class.java))
+                SettingsSheet().show(supportFragmentManager, "settings")
             }
         }
         topBar.addView(profileBtn)
