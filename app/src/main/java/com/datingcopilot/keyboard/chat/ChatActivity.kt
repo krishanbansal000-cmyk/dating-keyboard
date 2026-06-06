@@ -30,11 +30,19 @@ import com.datingcopilot.keyboard.R
 import com.datingcopilot.keyboard.image.ImagePickerBottomSheet
 import com.datingcopilot.keyboard.SettingsSheet
 import com.datingcopilot.keyboard.ChatContextService
+import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class ChatActivity : AppCompatActivity() {
+
+    companion object {
+        const val EXTRA_OPEN_IMAGE_PICKER = "com.datingcopilot.keyboard.OPEN_IMAGE_PICKER"
+        const val EXTRA_RETURN_TO_KEYBOARD = "com.datingcopilot.keyboard.RETURN_TO_KEYBOARD"
+        const val PREF_PENDING_KEYBOARD_SUGGESTIONS = "pending_keyboard_suggestions"
+        const val PREF_PENDING_KEYBOARD_CONTEXT = "chat_context"
+    }
 
     private lateinit var chatRecyclerView: RecyclerView
     private lateinit var chatAdapter: ChatAdapter
@@ -52,19 +60,13 @@ class ChatActivity : AppCompatActivity() {
     private var currentPlatform = "whatsapp"
     private var selectedToneChip: TextView? = null
     private var lastInputText = ""
+    private var returnToKeyboardAfterScreenshot = false
 
     private val apiClient by lazy { com.datingcopilot.keyboard.ApiClient(this) }
+    private val gson by lazy { Gson() }
 
     private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let { handleImageSelected(it) }
-    }
-
-    private val browseDevice = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            result.data?.data?.let { handleImageSelected(it) }
-        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,17 +86,29 @@ class ChatActivity : AppCompatActivity() {
 
         buildUI()
         handleSendImage(intent)
+        handleOpenImagePicker(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleSendImage(intent)
+        handleOpenImagePicker(intent)
     }
 
     private fun handleSendImage(intent: Intent?) {
         if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("image/") == true) {
             val imageUri = intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)
             imageUri?.let { handleImageSelected(it) }
+        }
+    }
+
+    private fun handleOpenImagePicker(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_IMAGE_PICKER, false) == true) {
+            returnToKeyboardAfterScreenshot = intent.getBooleanExtra(EXTRA_RETURN_TO_KEYBOARD, false)
+            intent.removeExtra(EXTRA_OPEN_IMAGE_PICKER)
+            intent.removeExtra(EXTRA_RETURN_TO_KEYBOARD)
+            Handler(Looper.getMainLooper()).post { showImagePicker() }
         }
     }
 
@@ -600,11 +614,6 @@ class ChatActivity : AppCompatActivity() {
                 pickImage.launch("image/*")
             }
 
-            override fun onBrowseDeviceSelected() {
-                val intent = Intent(this@ChatActivity, com.datingcopilot.keyboard.image.ImageBrowserActivity::class.java)
-                browseDevice.launch(intent)
-            }
-
             override fun onPasteTextSelected() {
                 showPasteTextDialog()
             }
@@ -719,13 +728,37 @@ class ChatActivity : AppCompatActivity() {
                     )
                 }
                 showLoading(false)
-                response?.let { handleAnalyzeResponse(it) }
-                    ?: Toast.makeText(this@ChatActivity, "Failed to analyze screenshot", Toast.LENGTH_LONG).show()
+                if (response != null) {
+                    if (returnToKeyboardAfterScreenshot) {
+                        saveKeyboardHandoff(response)
+                        Toast.makeText(this@ChatActivity, "Replies ready. Open RizzSe keyboard", Toast.LENGTH_SHORT).show()
+                        finish()
+                    } else {
+                        handleAnalyzeResponse(response)
+                    }
+                } else {
+                    Toast.makeText(this@ChatActivity, "Failed to analyze screenshot", Toast.LENGTH_LONG).show()
+                }
             } catch (e: Exception) {
                 showLoading(false)
                 Toast.makeText(this@ChatActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    private fun saveKeyboardHandoff(response: AnalyzeResponse) {
+        val suggestions = response.suggestions.orEmpty()
+        if (suggestions.isEmpty()) return
+
+        val contextText = response.conversation.orEmpty().joinToString("\n") {
+            "${if (it.sender == "you") "You" else "Them"}: ${it.text}"
+        }
+
+        getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+            .edit()
+            .putString(PREF_PENDING_KEYBOARD_SUGGESTIONS, gson.toJson(suggestions))
+            .putString(PREF_PENDING_KEYBOARD_CONTEXT, contextText)
+            .apply()
     }
 
     private fun analyzeText(text: String) {

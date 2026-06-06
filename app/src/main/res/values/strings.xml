@@ -9,5 +9,4 @@
     <string name="thinking">AI is thinking...</string>
     <string name="tap_hint">Tap a message to get AI suggestions</string>
     <string name="connection_error">Could not connect. Check your backend URL.</string>
-    <string name="accessibility_service_description">Lets RizzSe read visible chat text to generate contextual reply suggestions.</string>
 </resources>

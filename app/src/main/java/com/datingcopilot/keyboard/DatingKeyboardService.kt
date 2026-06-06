@@ -1,12 +1,16 @@
 package com.datingcopilot.keyboard
 
+import android.content.Intent
 import android.inputmethodservice.InputMethodService
 import android.inputmethodservice.Keyboard
 import android.inputmethodservice.KeyboardView
 import android.graphics.drawable.GradientDrawable
 import android.view.KeyEvent
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
+import com.datingcopilot.keyboard.chat.SuggestionOption
+import com.google.gson.Gson
 import kotlinx.coroutines.*
 
 class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActionListener {
@@ -15,6 +19,7 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
     private lateinit var suggestionBar: SuggestionBar
     private lateinit var apiClient: ApiClient
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val gson = Gson()
     private var currentTone = "playful"
     private var currentIntent = "keep_going"
     private var currentPlatform = "whatsapp"
@@ -43,6 +48,9 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
             },
             onGenerateTap = {
                 fetchSuggestions()
+            },
+            onScreenshotTap = {
+                openScreenshotPicker()
             }
         )
 
@@ -81,14 +89,22 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
 
         root.addView(suggestionBar.rootView)
         root.addView(keyboardContainer)
+        loadPendingScreenshotSuggestions()
 
         return root
+    }
+
+    override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
+        super.onStartInputView(info, restarting)
+        if (::suggestionBar.isInitialized) {
+            loadPendingScreenshotSuggestions()
+        }
     }
 
     private fun fetchSuggestions() {
         val text = currentInputConnection?.getTextBeforeCursor(500, 0)?.toString() ?: ""
 
-        // Get chat context from accessibility service
+        // Use any saved context from app flows; no screen-reading service is packaged.
         val chatCtx = ChatContextService.getChatContext(this)
         
         // Do NOT merge chat context with user text into one blob.
@@ -106,6 +122,27 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
             } else {
                 suggestionBar.showError()
             }
+        }
+    }
+
+    private fun openScreenshotPicker() {
+        requestHideSelf(0)
+        val intent = Intent(this, KeyboardScreenshotActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
+    }
+
+    private fun loadPendingScreenshotSuggestions() {
+        val prefs = getSharedPreferences("dating_copilot", MODE_PRIVATE)
+        val json = prefs.getString("pending_keyboard_suggestions", null) ?: return
+        val suggestions = runCatching {
+            gson.fromJson(json, Array<SuggestionOption>::class.java).toList()
+        }.getOrNull().orEmpty()
+
+        if (suggestions.isNotEmpty()) {
+            suggestionBar.showSuggestions(suggestions)
+            prefs.edit().remove("pending_keyboard_suggestions").apply()
         }
     }
 

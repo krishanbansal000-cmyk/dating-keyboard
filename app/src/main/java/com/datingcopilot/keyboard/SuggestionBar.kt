@@ -12,7 +12,8 @@ import com.datingcopilot.keyboard.chat.SuggestionOption
 class SuggestionBar(
     private val context: Context,
     private val onSuggestionTap: (String) -> Unit,
-    private val onGenerateTap: (() -> Unit)? = null
+    private val onGenerateTap: (() -> Unit)? = null,
+    private val onScreenshotTap: (() -> Unit)? = null
 ) {
 
     private val container = LinearLayout(context).apply {
@@ -62,6 +63,27 @@ class SuggestionBar(
         setOnClickListener { onGenerateTap?.invoke() }
     }
 
+    private val screenshotBtn = TextView(context).apply {
+        text = "📸 Screenshot"
+        textSize = 12f
+        setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+        gravity = Gravity.CENTER
+        isClickable = true
+        isFocusable = true
+        setPadding(dpToPx(14), dpToPx(6), dpToPx(14), dpToPx(6))
+        val bg = GradientDrawable().apply {
+            cornerRadius = dpToPx(16).toFloat()
+            setColor(ContextCompat.getColor(context, R.color.bg_card))
+            setStroke(dpToPx(1), ContextCompat.getColor(context, R.color.glass_border))
+        }
+        background = bg
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { marginStart = dpToPx(6) }
+        setOnClickListener { onScreenshotTap?.invoke() }
+    }
+
     // Loading dots shown while generating
     private val loadingDots = TextView(context).apply {
         text = ". . ."
@@ -87,6 +109,7 @@ class SuggestionBar(
     init {
         suggestionsContainer.addView(suggestionsInner)
         row.addView(generateBtn)
+        row.addView(screenshotBtn)
         row.addView(loadingDots)
         container.addView(row)
         container.addView(suggestionsContainer)
@@ -98,6 +121,7 @@ class SuggestionBar(
     fun showLoading(loading: Boolean) {
         if (loading) {
             generateBtn.visibility = View.GONE
+            screenshotBtn.visibility = View.GONE
             suggestionsContainer.visibility = View.GONE
             loadingDots.visibility = View.VISIBLE
         } else {
@@ -109,6 +133,7 @@ class SuggestionBar(
         suggestionsInner.removeAllViews()
         loadingDots.visibility = View.GONE
         generateBtn.visibility = View.GONE
+        screenshotBtn.visibility = View.GONE
         suggestionsContainer.visibility = View.VISIBLE
 
         for (opt in options) {
@@ -122,6 +147,7 @@ class SuggestionBar(
         loadingDots.visibility = View.GONE
         generateBtn.text = "\u26A0\uFE0F Retry"
         generateBtn.visibility = View.VISIBLE
+        screenshotBtn.visibility = View.VISIBLE
     }
 
     fun reset() {
@@ -129,6 +155,7 @@ class SuggestionBar(
         loadingDots.visibility = View.GONE
         generateBtn.text = "\u2728 Generate"
         generateBtn.visibility = View.VISIBLE
+        screenshotBtn.visibility = View.VISIBLE
     }
 
     private fun createSuggestionCard(option: SuggestionOption): View {

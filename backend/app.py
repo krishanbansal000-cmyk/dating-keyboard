@@ -11,6 +11,7 @@ import json
 import re
 import random
 import traceback
+import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import requests as http_requests
 from dotenv import load_dotenv
@@ -167,13 +168,20 @@ MOCK_CONVERSATIONS = {
 }
 
 
-def encode_image(image_file):
-    """Encode image to base64 for Vision API."""
+def encode_image(image_file, max_side=900, quality=75):
+    """Encode a compact JPEG for faster vision requests."""
     image = Image.open(image_file)
     if image.mode in ('RGBA', 'LA', 'P'):
         image = image.convert('RGB')
+    longest_side = max(image.size)
+    if longest_side > max_side:
+        scale = max_side / longest_side
+        image = image.resize(
+            (max(1, int(image.width * scale)), max(1, int(image.height * scale))),
+            Image.Resampling.LANCZOS
+        )
     buffered = io.BytesIO()
-    image.save(buffered, format="JPEG", quality=85)
+    image.save(buffered, format="JPEG", quality=quality, optimize=True)
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
 
@@ -378,11 +386,12 @@ def call_ai(messages, model=None, max_tokens=90, temperature=0.65):
 
 
 def call_ai_fast(messages, **kwargs):
+    timeout_seconds = kwargs.pop("timeout_seconds", AI_TIMEOUT_SECONDS)
     future = ai_executor.submit(call_ai, messages, **kwargs)
     try:
-        return future.result(timeout=AI_TIMEOUT_SECONDS)
+        return future.result(timeout=timeout_seconds)
     except TimeoutError:
-        app.logger.warning("AI call exceeded %.1fs; returning fallback", AI_TIMEOUT_SECONDS)
+        app.logger.warning("AI call exceeded %.1fs; returning fallback", timeout_seconds)
         return None
 
 
@@ -451,6 +460,7 @@ def current_match():
 @app.route("/api/v1/analyze-screenshot", methods=["POST"])
 def analyze_screenshot():
     """Accept image + persona, return extracted conversation + suggestions."""
+    started_at = time.monotonic()
     try:
         persona = request.form.get("persona", "playful")
         intent = request.form.get("intent", "keep_going")
@@ -458,6 +468,7 @@ def analyze_screenshot():
         hinglish = truthy(request.form.get("hinglish", "false"))
         conversation = []
         suggestions = None
+        source = "none"
 
         if "image" in request.files:
             image_file = request.files["image"]
@@ -473,11 +484,11 @@ def analyze_screenshot():
                 is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
                 context_prompt = build_context_prompt(persona, intent, platform, hinglish)
                 
-                vision_prompt = f"""Look at this screenshot. If it shows a chat, read the latest incoming message and write 3 replies to that message. Do not write profile/opening lines unless no chat is visible. Keep each under 100 chars. Return Safe, Smooth, Bold. {context_prompt}
+                vision_prompt = f"""Read this chat screenshot. Reply to the latest incoming message. Keep each reply under 100 chars. Return only these 3 lines, no explanation. {context_prompt}
 
->>>
->>>
->>>"""
+>>> Safe:
+>>> Smooth:
+>>> Bold:"""
                 
                 if is_anthropic:
                     messages = [
@@ -494,39 +505,53 @@ def analyze_screenshot():
                         ]}
                     ]
                 
-                response = call_ai_fast(messages, model=OPENAI_MODEL, max_tokens=90, temperature=0.65)
+                response = call_ai_fast(
+                    messages,
+                    model=OPENAI_MODEL,
+                    max_tokens=900,
+                    temperature=0.65,
+                    timeout_seconds=30
+                )
                 
                 if response:
                     suggestions = parse_suggestions(get_response_text(response), persona)
+                    if suggestions:
+                        source = "vision_ai"
             
             if os.path.exists(filepath):
                 os.remove(filepath)
         
-        if not suggestions and not USE_MOCK:
-            try:
-                context_prompt = build_context_prompt(persona, intent, platform, hinglish)
-                response = call_ai_fast(
-                    [{"role": "user", "content": f"{context_prompt} Write 3 short openers or replies as Safe, Smooth, Bold (under 100 chars).\n\n>>> Safe:\n>>> Smooth:\n>>> Bold:"}],
-                    max_tokens=90, temperature=0.65
-                )
-                if response:
-                    suggestions = parse_suggestions(
-                        get_response_text(response), persona,
-                        min_confidence=75, max_confidence=90
-                    )
-            except Exception as e:
-                app.logger.warning("Fallback opener generation failed: %s", e)
-
-            suggestions = complete_suggestions(suggestions, persona, intent, hinglish=hinglish)
+        if not suggestions and USE_MOCK:
+            suggestions = fallback_suggestions(persona, intent, hinglish=hinglish)
+            source = "mock"
 
         if not suggestions:
-            return jsonify({"error": "AI failed to generate suggestions"}), 500
+            app.logger.warning(
+                "screenshot failed: model=%s source=%s duration=%.2fs",
+                OPENAI_MODEL,
+                source,
+                time.monotonic() - started_at
+            )
+            return jsonify({
+                "error": "Screenshot analysis failed. Try a clearer screenshot or paste the chat text.",
+                "model": OPENAI_MODEL,
+                "source": source
+            }), 502
+
+        app.logger.info(
+            "screenshot ok: model=%s source=%s suggestions=%d duration=%.2fs",
+            OPENAI_MODEL,
+            source,
+            len(suggestions),
+            time.monotonic() - started_at
+        )
         
         return jsonify({
             "conversation": conversation,
             "suggestions": suggestions,
             "detected_app": "Dating App",
-            "persona": persona
+            "persona": persona,
+            "source": source
         })
         
     except Exception as e:

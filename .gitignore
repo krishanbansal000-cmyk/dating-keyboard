@@ -31,6 +31,7 @@ backend/.venv/
 backend/venv/
 backend/uploads/
 backend/backend.log
+backend/server.pid
 backend/test_body.json
 
 # Environment

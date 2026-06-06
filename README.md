@@ -1,6 +1,6 @@
 # RizzSe — AI Dating Coach Keyboard
 
-RizzSe is an Android dating-assistant app and keyboard. It can analyze pasted text or screenshots, generate persona-based reply suggestions, and optionally use an accessibility service to bring visible chat context into the keyboard flow.
+RizzSe is an Android dating-assistant app and keyboard. It can analyze pasted text or screenshots and generate persona-based reply suggestions.
 
 ## Features
 
@@ -11,7 +11,6 @@ RizzSe is an Android dating-assistant app and keyboard. It can analyze pasted te
 - India-focused reply generation for WhatsApp, Instagram, Hinge, Bumble, and Tinder
 - Optional empty-input generation for first-message ideas
 - Keyboard IME with an AI suggestion strip
-- Optional accessibility service for visible chat context
 - Mock backend mode for running without an API key
 
 ## Architecture
@@ -84,7 +83,7 @@ Returns service status, model, mock mode, and client readiness.
 
 Supported intents: `keep_going`, `flirt`, `ask_date`, `recover_dry`, `first_message`, `reply_compliment`.
 
-Supported platforms: `whatsapp`, `instagram`, `hinge`, `bumble`, `tinder`. The app detects this automatically in keyboard/accessibility mode and silently defaults to WhatsApp for pasted text.
+Supported platforms: `whatsapp`, `instagram`, `hinge`, `bumble`, `tinder`. The app silently defaults to WhatsApp for pasted text.
 
 `POST /api/v1/analyze-screenshot`
 
@@ -111,4 +110,4 @@ backend/
 
 - Do not commit real API keys.
 - Production backend URLs should use HTTPS.
-- The accessibility service must be enabled by the user and should only be used for contextual suggestions.
+- Keep screenshot and pasted-chat handling transparent because user messages and images are sent to the backend for AI suggestions.
