@@ -34,7 +34,7 @@ data class MatchContext(
 class ApiClient(context: Context) {
 
     companion object {
-        const val DEFAULT_BACKEND_URL = "http://10.0.2.2:8000"
+        const val DEFAULT_BACKEND_URL = "http://164.68.103.130:8000"
     }
 
     private val appContext = context.applicationContext
