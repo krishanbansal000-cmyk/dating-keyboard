@@ -25,7 +25,7 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
         val prefs = getSharedPreferences("dating_copilot", MODE_PRIVATE)
         currentTone = prefs.getString("persona", "playful") ?: "playful"
         currentIntent = prefs.getString("intent", "keep_going") ?: "keep_going"
-        currentPlatform = prefs.getString("platform", "whatsapp") ?: "whatsapp"
+        currentPlatform = ChatContextService.getChatPlatform(this)
     }
 
     override fun onCreateInputView(): View {

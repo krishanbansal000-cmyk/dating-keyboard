@@ -33,11 +33,10 @@ Dating app chat
 
 ## Product Flow
 
-- User selects platform: WhatsApp, Instagram, Hinge, Bumble, or Tinder
-- User selects intent: keep going, flirt, ask date, recover dry chat, first message, or reply to compliment
-- User selects vibe: Sweet, Romantic, Confident, Funny, Playful, Respectful, Date Plan, or Flirty
-- User can paste a message, upload a screenshot, or leave input empty for first-message ideas
-- Backend generates three short Indian-friendly suggestions
+- User pastes a message, uploads a screenshot, or leaves input empty for first-message ideas
+- Keyboard/accessibility mode detects the chat app automatically from the active package
+- Backend generates three short Indian-friendly suggestions: Safe, Smooth, and Bold
+- User refines after generation with simple actions like more rizz, less cringe, Hinglish, or ask out
 
 ## Next Improvements
 

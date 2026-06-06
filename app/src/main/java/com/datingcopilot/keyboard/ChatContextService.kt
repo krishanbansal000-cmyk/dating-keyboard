@@ -36,8 +36,23 @@ class ChatContextService : AccessibilityService() {
             val text = extractText(root)
             root.recycle()
             if (text.isNotBlank()) {
-                prefs.edit().putString("chat_context", text.takeLast(3000)).apply()
+                prefs.edit()
+                    .putString("chat_context", text.takeLast(3000))
+                    .putString("detected_platform", detectPlatform(pkg))
+                    .apply()
             }
+        }
+    }
+
+    private fun detectPlatform(packageName: String): String {
+        return when {
+            packageName.contains("whatsapp", ignoreCase = true) -> "whatsapp"
+            packageName.contains("instagram", ignoreCase = true) -> "instagram"
+            packageName.contains("hinge", ignoreCase = true) -> "hinge"
+            packageName.contains("bumble", ignoreCase = true) -> "bumble"
+            packageName.contains("tinder", ignoreCase = true) -> "tinder"
+            packageName.contains("facebook.orca", ignoreCase = true) -> "instagram"
+            else -> "whatsapp"
         }
     }
 
@@ -57,6 +72,11 @@ class ChatContextService : AccessibilityService() {
         fun getChatContext(context: Context): String {
             return context.getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
                 .getString("chat_context", "") ?: ""
+        }
+
+        fun getChatPlatform(context: Context): String {
+            return context.getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+                .getString("detected_platform", "whatsapp") ?: "whatsapp"
         }
     }
 }

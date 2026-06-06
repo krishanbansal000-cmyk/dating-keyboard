@@ -54,18 +54,19 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB max
 
 SYSTEM_PROMPT = (
-    "Output 3 lines. Each starts with >>>."
+    "You write dating-chat replies. Output exactly 3 lines: >>> Safe:, >>> Smooth:, >>> Bold:. "
+    "No numbering, explanations, quotes, or emojis unless they are truly natural."
 )
 
 PERSONA_PROMPTS = {
-    "friendly": "Friendly smooth vibe. Short, warm, natural. Smile-inducing.",
-    "romantic": "Sweet romantic. Warm charm, genuine interest. A hint of poetry, not overdone.",
-    "bold": "Bold and direct. Take the lead, show high value. Cool confidence, never aggressive.",
-    "witty": "Witty tease. Sharp humor, wordplay, light teasing. Screenshot-worthy.",
-    "playful": "Playful flirt. Teasing, cheeky, electric banter. Max rizz energy.",
-    "chill": "Laid-back cool. Low pressure, effortless vibe. Simple confidence.",
-    "direct": "Direct mover. Cut small talk, set up the date. Confident and clear.",
-    "flirty": "Smooth seducer. Subtle tension, confident charm. Bold but classy."
+    "friendly": "Friendly: warm, calm, easy to reply to. No over-complimenting.",
+    "romantic": "Romantic: sweet but grounded. No poetry, no big promises.",
+    "bold": "Confident: direct and self-assured, but never arrogant or pushy.",
+    "witty": "Funny: dry, clever, lightly teasing. Modern meme-brain, no uncle jokes or puns.",
+    "playful": "Playful: bold Gen-Z rizz, teasing, cheeky, high-energy, but still self-aware.",
+    "chill": "Respectful: low-pressure, mature, and natural.",
+    "direct": "Date Plan: move toward a simple plan without sounding desperate.",
+    "flirty": "Flirty: subtle tension, confident charm, classy. Never vulgar."
 }
 
 INTENT_PROMPTS = {
@@ -87,9 +88,55 @@ PLATFORM_PROMPTS = {
 
 INDIA_STYLE_PROMPT = (
     "Audience is mostly Indian. Make replies natural for Indian dating/chat culture. "
-    "Hinglish is okay only when requested. Avoid cringe pickup lines, vulgarity, and overly western slang. "
-    "Prefer short, respectful, copy-pasteable replies."
+    "Hinglish is okay only when requested. The target user is young, so confident Gen-Z rizz is good: "
+    "bold, meme-aware, slightly risky, and screenshot-worthy. Avoid vulgarity, fake deep lines, "
+    "uncle-style pickup lines, and lines that sound like a template. Prefer short, copy-pasteable replies."
 )
+
+STYLE_RULES = (
+    "Reply to the latest message, not the whole chat. If they call something cringe, don't double down "
+    "with a weaker line; recover with self-aware confidence or push the bit forward cleverly. "
+    "Keep each reply under 100 characters. Always make 3 different options: Safe is low-risk, "
+    "Smooth is witty/flirty, Bold is high-risk/high-reward. "
+    "High-risk lines like deleting the app together, planning the future, or being dramatically confident are allowed "
+    "when the conversation has flirty momentum. Do not repeat the exact same joke twice. Avoid chemistry jokes, "
+    "'made boring disappear', 'trouble in the best way', 'your profile stopped my scrolling', and generic 'tell me your story'. "
+    "If no chat/profile details are provided, do not invent a bio, photo, smile, profile prompt, job, city, or hobby."
+)
+
+STYLE_EXAMPLES = """Examples:
+Them: you really don't quit do you
+Good:
+>>> Safe: Not when you're this fun to annoy
+>>> Smooth: I quit bad conversations, not good ones
+>>> Bold: Only after you admit the cringe worked
+Bad:
+>>> I never quit when the prize is you
+>>> Our future together starts now
+>>> You're too cute to quit
+
+Them: the first step to what?
+Good:
+>>> Safe: To me pretending I had a plan all along
+>>> Smooth: To me becoming your best bad decision
+>>> Bold: Deleting this app together, obviously
+
+Them: you're getting way ahead of yourself
+Good:
+>>> Safe: Fine, I'll downgrade us to one coffee for now
+>>> Smooth: True, but the view from ahead is pretty good
+>>> Bold: I call it confidence, HR would call it forecasting
+
+No message/profile context, first message:
+Good:
+>>> Safe: Quick vibe check: street food date or fancy coffee date?
+>>> Smooth: Important question: chai, coffee, or judging people who say neither?
+>>> Bold: Pick one: street food, coffee, or a walk with good gossip?
+Bad:
+>>> Hey beautiful, your profile stopped my scrolling
+>>> You look like trouble in the best way
+>>> Tell me your story
+"""
 
 OPENER_PROMPTS = {
     "friendly": "Smooth and approachable. Warm opener that feels natural.",
@@ -104,44 +151,44 @@ OPENER_PROMPTS = {
 
 MOCK_SUGGESTIONS = {
     "friendly": [
-        "That travel pic is fire — which country stole your heart? 🌍",
-        "Your vibe is immaculate. What's your go-to comfort food?",
-        "Honestly? You look like someone who'd win at karaoke. Prove me right."
+        "Okay, that smile deserves a better opener than mine",
+        "You seem fun in a way that makes replies easy",
+        "I'll keep it simple: what's been the best part of your week?"
     ],
     "romantic": [
-        "You have a way of making my heart skip a beat. Just saying 😘",
-        "I can't stop thinking about the last time we talked. You're special.",
-        "There's something about you that feels different. In the best way possible."
+        "There's something soft about your vibe, not gonna lie",
+        "You make calm look very attractive",
+        "I was trying to be smooth, but genuine might work better here"
     ],
     "bold": [
-        "Let's skip the small talk. When are you free this week?",
-        "I know what I want, and I want to take you out. Tonight?",
-        "You're interesting. Let's not waste time — coffee, tomorrow, 7pm."
+        "You're fun. Coffee this weekend, no overthinking?",
+        "I like this energy. Let's take it offline sometime",
+        "Fair warning: I'm better in person than in openers"
     ],
     "witty": [
-        "Are you a magician? Because every time I look at my phone, you've made the boring stuff disappear! 😄",
-        "I'd make a joke about chemistry, but I'm pretty sure we already have it.",
-        "You must be made of copper and tellurium because you're Cu-Te! (CuTe, get it?)"
+        "I can quit anytime, but you're making a strong case",
+        "Only if you admit I recovered from the cringe",
+        "Not quitting, just waiting for my redemption arc"
     ],
     "playful": [
-        "Oh you're dangerous 😏 I like it.",
-        "Tell me more... I'm intrigued now! 🔥",
-        "You're definitely not boring. That's a good sign 😉"
+        "Not when the conversation is this fun",
+        "I can quit, but this is clearly my best bad decision today",
+        "Only if you stop making it this entertaining"
     ],
     "chill": [
-        "Sounds good. Let me know when you're free and we'll figure something out.",
-        "Yeah I'm down. Keep me posted.",
-        "Cool, that works. Talk later?"
+        "Fair, I'll slow down. Still enjoying this though",
+        "Okay okay, I'll behave. Mostly",
+        "Noted. I'll keep the confidence, reduce the drama"
     ],
     "direct": [
-        "I like your vibe. Let's meet up this weekend.",
-        "Honestly, I think we should grab a drink. What's your number?",
-        "You seem cool. Let's not drag this out — drinks this Friday?"
+        "Then let me prove I'm less cringe over coffee",
+        "One coffee and I'll retire the dramatic lines",
+        "Give me one plan and I'll stop freelancing the future"
     ],
     "flirty": [
-        "I was just thinking about you... 😈 Great minds think alike.",
-        "You're looking good today. Not that I'm complaining 😉",
-        "I have a feeling we'd be very good at getting into trouble together."
+        "Only because you're making quitting difficult",
+        "I would quit, but your replies are a little addictive",
+        "Careful, that challenge almost sounded like encouragement"
     ]
 }
 
@@ -193,15 +240,24 @@ SKIP_WORDS = (
     'nothing else', 'rizz line 1', 'rizz line 2', 'rizz line 3'
 )
 
+BAD_ENDINGS = {
+    "a", "an", "the", "to", "with", "for", "from", "when", "while", "because",
+    "giving", "making", "looking", "getting", "going", "saying"
+}
+
 
 def get_response_text(response):
     if hasattr(response, 'choices'):
-        return response.choices[0].message.content.strip()
-    return response.content[0].text.strip()
+        return (response.choices[0].message.content or "").strip()
+    if getattr(response, "content", None):
+        return (getattr(response.content[0], "text", "") or "").strip()
+    return ""
 
 
 def parse_suggestions(text, persona, key="persona", min_confidence=78, max_confidence=98):
     """Parse model output into app-ready suggestion objects."""
+    if not text:
+        return []
     clean_text = re.sub(r'^\d+[\.\)]\s*', '', text, flags=re.MULTILINE)
     first_arrow = clean_text.find('>>>')
     if first_arrow > 0:
@@ -213,16 +269,101 @@ def parse_suggestions(text, persona, key="persona", min_confidence=78, max_confi
         if not line.startswith('>>>'):
             continue
         value = re.sub(r'^>>>\s*', '', line).strip()
-        if len(value) <= 10 or any(word in value.lower() for word in SKIP_WORDS):
+        label = persona
+        label_match = re.match(r'^(safe|smooth|bold)\s*:\s*(.+)$', value, flags=re.IGNORECASE)
+        if label_match:
+            label = label_match.group(1).lower()
+            value = label_match.group(2).strip()
+        last_word = re.sub(r'[^a-zA-Z]', '', value.split()[-1]).lower() if value.split() else ""
+        if len(value) <= 10 or last_word in BAD_ENDINGS or any(word in value.lower() for word in SKIP_WORDS):
             continue
         suggestions.append({
             "text": value[:180],
             "confidence": random.randint(min_confidence, max_confidence),
-            key: persona
+            key: label
         })
         if len(suggestions) == 3:
             break
+
+    if not suggestions:
+        for raw_line in clean_text.split('\n'):
+            value = re.sub(r'^(?:[-*]|\d+[\.\)]|>>>)+\s*', '', raw_line.strip()).strip('"')
+            label = persona
+            label_match = re.match(r'^(safe|smooth|bold)\s*:\s*(.+)$', value, flags=re.IGNORECASE)
+            if label_match:
+                label = label_match.group(1).lower()
+                value = label_match.group(2).strip()
+            last_word = re.sub(r'[^a-zA-Z]', '', value.split()[-1]).lower() if value.split() else ""
+            if len(value) <= 10 or last_word in BAD_ENDINGS or any(word in value.lower() for word in SKIP_WORDS):
+                continue
+            suggestions.append({
+                "text": value[:180],
+                "confidence": random.randint(min_confidence, max_confidence),
+                key: label
+            })
+            if len(suggestions) == 3:
+                break
     return suggestions
+
+
+def fallback_suggestions(persona, intent="keep_going", key="persona", hinglish=False, latest_text=""):
+    latest = latest_text.lower()
+    if "first step to what" in latest:
+        lines = [
+            ("safe", "To me pretending I had a plan all along"),
+            ("smooth", "To me becoming your best bad decision"),
+            ("bold", "Deleting this app together, obviously")
+        ]
+    elif "getting way ahead" in latest or "way ahead of yourself" in latest:
+        lines = [
+            ("safe", "Fine, I'll downgrade us to one coffee for now"),
+            ("smooth", "True, but the view from ahead is pretty good"),
+            ("bold", "I call it confidence, HR would call it forecasting")
+        ]
+    elif "don't quit" in latest or "dont quit" in latest:
+        lines = [
+            ("safe", "Not when you're this fun to annoy"),
+            ("smooth", "I quit bad conversations, not good ones"),
+            ("bold", "Only after you admit the cringe worked")
+        ]
+    elif intent == "first_message":
+        if hinglish:
+            lines = [
+                ("safe", "Quick vibe check: chai, coffee, ya street food date?"),
+                ("smooth", "Weekend pe coffee person ho ya pani puri person?"),
+                ("bold", "Pick one: long walk, good gossip, ya ek solid coffee?")
+            ]
+        else:
+            lines = [
+                ("safe", "Quick vibe check: street food date or fancy coffee date?"),
+                ("smooth", "Important question: chai, coffee, or judging people who say neither?"),
+                ("bold", "Pick one: street food, coffee, or a walk with good gossip?")
+            ]
+    elif intent == "ask_date":
+        lines = [
+            ("safe", "Fine, I'll pause the flirting. Coffee instead?"),
+            ("smooth", "One coffee and I'll retire the dramatic lines"),
+            ("bold", "Let me prove I'm less cringe in person")
+        ]
+    else:
+        raw_lines = MOCK_SUGGESTIONS.get(persona, MOCK_SUGGESTIONS["playful"])
+        lines = list(zip(("safe", "smooth", "bold"), raw_lines))
+    return [
+        {"text": text, "confidence": random.randint(78, 96), key: label}
+        for label, text in lines[:3]
+    ]
+
+
+def complete_suggestions(suggestions, persona, intent="keep_going", key="persona", hinglish=False, latest_text=""):
+    suggestions = suggestions or []
+    seen = {s.get("text", "").lower() for s in suggestions}
+    for fallback in fallback_suggestions(persona, intent, key=key, hinglish=hinglish, latest_text=latest_text):
+        if len(suggestions) >= 3:
+            break
+        if fallback["text"].lower() not in seen:
+            suggestions.append(fallback)
+            seen.add(fallback["text"].lower())
+    return suggestions[:3]
 
 
 def mock_options(persona, key="persona"):
@@ -237,7 +378,7 @@ def build_context_prompt(persona, intent="keep_going", platform="whatsapp", hing
     intent_prompt = INTENT_PROMPTS.get(intent, INTENT_PROMPTS["keep_going"])
     platform_prompt = PLATFORM_PROMPTS.get(platform, PLATFORM_PROMPTS["whatsapp"])
     lang_hint = "Use natural Hinglish." if hinglish else "Use English with Indian-friendly phrasing."
-    return f"{INDIA_STYLE_PROMPT} {platform_prompt} {intent_prompt} {persona_prompt} {lang_hint}"
+    return f"{INDIA_STYLE_PROMPT} {STYLE_RULES} {platform_prompt} {intent_prompt} {persona_prompt} {lang_hint}\n{STYLE_EXAMPLES}"
 
 
 def truthy(value):
@@ -328,7 +469,7 @@ def analyze_screenshot():
                 is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
                 context_prompt = build_context_prompt(persona, intent, platform, hinglish)
                 
-                vision_prompt = f"""Look at this screenshot. Write 3 short replies (under 100 chars each) based on what you see. {context_prompt}
+                vision_prompt = f"""Look at this screenshot. If it shows a chat, read the latest incoming message and write 3 replies to that message. Do not write profile/opening lines unless no chat is visible. Keep each under 100 chars. Return Safe, Smooth, Bold. {context_prompt}
 
 >>>
 >>>
@@ -361,7 +502,7 @@ def analyze_screenshot():
             try:
                 context_prompt = build_context_prompt(persona, intent, platform, hinglish)
                 response = call_ai(
-                    [{"role": "user", "content": f"{context_prompt} Write 3 short openers or replies (under 100 chars).\n\n>>>\n>>>\n>>>"}],
+                    [{"role": "user", "content": f"{context_prompt} Write 3 short openers or replies as Safe, Smooth, Bold (under 100 chars).\n\n>>> Safe:\n>>> Smooth:\n>>> Bold:"}],
                     max_tokens=600, temperature=0.95
                 )
                 if response:
@@ -372,8 +513,7 @@ def analyze_screenshot():
             except Exception as e:
                 app.logger.warning("Fallback opener generation failed: %s", e)
 
-        if not suggestions and USE_MOCK:
-            suggestions = mock_options(persona)
+            suggestions = complete_suggestions(suggestions, persona, intent, hinglish=hinglish)
 
         if not suggestions:
             return jsonify({"error": "AI failed to generate suggestions"}), 500
@@ -400,6 +540,14 @@ def chat_draft():
         platform = data.get("platform", "whatsapp")
         hinglish = truthy(data.get("hinglish", "false"))
         conversation = data.get("conversation", [])
+        latest_text = ""
+        if conversation:
+            latest_text = str(conversation[-1].get("text", ""))
+
+        if not conversation and intent == "first_message":
+            return jsonify({
+                "options": fallback_suggestions(persona, intent, key="tone", hinglish=hinglish)
+            })
         
         have_client = not USE_MOCK and (openai_client is not None or anthropic_client is not None)
         if have_client:
@@ -408,22 +556,32 @@ def chat_draft():
                 f"{'You' if msg.get('sender') == 'you' else 'Them'}: {msg.get('text', '')}"
                 for msg in conversation
             ])
-            input_hint = convo_text[:700] if convo_text else "No message provided yet. Generate useful first-message options."
+            input_hint = convo_text[:700] if convo_text else (
+                "No chat or profile details are available. Generate profile-neutral first-message options. "
+                "Do not mention their bio, photo, smile, looks, job, city, or hobbies."
+            )
             
             response = call_ai(
-                [{"role": "user", "content": f"{input_hint}\n\n{context_prompt} Write 3 short replies (under 100 chars each).\n\n>>>\n>>>\n>>>"}],
+                [{"role": "user", "content": f"{input_hint}\n\n{context_prompt} Write 3 short replies as Safe, Smooth, Bold (under 100 chars each).\n\n>>> Safe:\n>>> Smooth:\n>>> Bold:"}],
                 max_tokens=600, temperature=0.95
             )
             
             if response:
                 options = parse_suggestions(get_response_text(response), persona, key="tone")
                 if options:
+                    options = complete_suggestions(
+                        options, persona, intent, key="tone", hinglish=hinglish, latest_text=latest_text
+                    )
                     return jsonify({"options": options})
         elif USE_MOCK:
             return jsonify({"options": mock_options(persona, key="tone")})
-        
+
+        fallback = fallback_suggestions(persona, intent, key="tone", hinglish=hinglish, latest_text=latest_text)
+        if fallback:
+            return jsonify({"options": fallback})
+
         return jsonify({"error": "AI failed to generate suggestions"}), 500
-        
+
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500

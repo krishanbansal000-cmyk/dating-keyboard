@@ -29,6 +29,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.datingcopilot.keyboard.R
 import com.datingcopilot.keyboard.image.ImagePickerBottomSheet
 import com.datingcopilot.keyboard.SettingsSheet
+import com.datingcopilot.keyboard.ChatContextService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -40,44 +41,17 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var suggestionsRecyclerView: RecyclerView
     private lateinit var suggestionAdapter: SuggestionCardAdapter
     private lateinit var suggestionsLabel: TextView
-    private lateinit var personaBar: LinearLayout
-    private lateinit var intentBar: LinearLayout
-    private lateinit var platformBar: LinearLayout
+    private lateinit var toneBar: LinearLayout
+    private lateinit var messageInput: android.widget.EditText
     private lateinit var loadingView: FrameLayout
     private lateinit var emptyStateView: LinearLayout
-    
+
     private val messages = mutableListOf<ChatMessage>()
-    private val personas = listOf(
-        "Sweet" to "friendly",
-        "Romantic" to "romantic",
-        "Confident" to "bold",
-        "Funny" to "witty",
-        "Playful" to "playful",
-        "Respectful" to "chill",
-        "Date Plan" to "direct",
-        "Flirty" to "flirty"
-    )
-    private val intents = listOf(
-        "Keep Going" to "keep_going",
-        "Flirt" to "flirt",
-        "Ask Date" to "ask_date",
-        "Dry Chat" to "recover_dry",
-        "First Msg" to "first_message",
-        "Compliment" to "reply_compliment"
-    )
-    private val platforms = listOf(
-        "WhatsApp" to "whatsapp",
-        "Instagram" to "instagram",
-        "Hinge" to "hinge",
-        "Bumble" to "bumble",
-        "Tinder" to "tinder"
-    )
     private var currentPersona = "playful"
-    private var currentIntent = "keep_going"
+    private var currentIntent = "flirt"
     private var currentPlatform = "whatsapp"
-    private var selectedPersonaChip: TextView? = null
-    private var selectedIntentChip: TextView? = null
-    private var selectedPlatformChip: TextView? = null
+    private var selectedToneChip: TextView? = null
+    private var lastInputText = ""
 
     private val apiClient by lazy { com.datingcopilot.keyboard.ApiClient(this) }
 
@@ -105,8 +79,8 @@ class ChatActivity : AppCompatActivity() {
         }
 
         currentPersona = prefs.getString("persona", "playful") ?: "playful"
-        currentIntent = prefs.getString("intent", "keep_going") ?: "keep_going"
-        currentPlatform = prefs.getString("platform", "whatsapp") ?: "whatsapp"
+        currentIntent = prefs.getString("intent", "flirt") ?: "flirt"
+        currentPlatform = ChatContextService.getChatPlatform(this)
 
         buildUI()
         handleSendImage(intent)
@@ -247,15 +221,15 @@ class ChatActivity : AppCompatActivity() {
             )
 
             val emptyEmoji = TextView(this@ChatActivity).apply {
-                text = "✨"
-                textSize = 64f
+                text = "⚡"
+                textSize = 48f
                 textAlignment = TextView.TEXT_ALIGNMENT_CENTER
-                setPadding(0, 0, 0, (16 * resources.displayMetrics.density).toInt())
+                setPadding(0, 0, 0, (12 * resources.displayMetrics.density).toInt())
             }
             addView(emptyEmoji)
 
             val pill = TextView(this@ChatActivity).apply {
-                text = "AI DATING COACH"
+                text = "GEN-Z REPLY COACH"
                 textSize = 11f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(resources.getColor(R.color.accent_violet, null))
@@ -278,8 +252,8 @@ class ChatActivity : AppCompatActivity() {
             addView(pill)
 
             val emptyTitle = TextView(this@ChatActivity).apply {
-                text = "Ready to up your rizz?"
-                textSize = 22f
+                text = "Make the next text hit"
+                textSize = 24f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(resources.getColor(R.color.text_primary, null))
                 textAlignment = TextView.TEXT_ALIGNMENT_CENTER
@@ -287,14 +261,14 @@ class ChatActivity : AppCompatActivity() {
             addView(emptyTitle)
 
             val emptySubtitle = TextView(this@ChatActivity).apply {
-                text = "Paste a chat, upload a screenshot, or generate from scratch with Indian-friendly reply styles."
+                text = "Paste or type below. Leave it empty for opener ideas."
                 textSize = 14f
                 setTextColor(resources.getColor(R.color.text_secondary, null))
                 textAlignment = TextView.TEXT_ALIGNMENT_CENTER
                 setPadding(
-                    (40 * resources.displayMetrics.density).toInt(),
+                    (32 * resources.displayMetrics.density).toInt(),
                     (8 * resources.displayMetrics.density).toInt(),
-                    (40 * resources.displayMetrics.density).toInt(),
+                    (32 * resources.displayMetrics.density).toInt(),
                     0
                 )
                 maxLines = 3
@@ -302,25 +276,26 @@ class ChatActivity : AppCompatActivity() {
             addView(emptySubtitle)
 
             val uploadHint = TextView(this@ChatActivity).apply {
-                text = "➕ Upload Screenshot"
-                textSize = 15f
+                text = "📸 Upload Screenshot"
+                textSize = 14f
                 setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(resources.getColor(R.color.white, null))
+                setTextColor(resources.getColor(R.color.accent_violet, null))
                 textAlignment = TextView.TEXT_ALIGNMENT_CENTER
                 setPadding(
-                    (32 * resources.displayMetrics.density).toInt(),
-                    (14 * resources.displayMetrics.density).toInt(),
-                    (32 * resources.displayMetrics.density).toInt(),
-                    (14 * resources.displayMetrics.density).toInt()
+                    (24 * resources.displayMetrics.density).toInt(),
+                    (12 * resources.displayMetrics.density).toInt(),
+                    (24 * resources.displayMetrics.density).toInt(),
+                    (12 * resources.displayMetrics.density).toInt()
                 )
-                val btnBg = android.graphics.drawable.GradientDrawable()
-                btnBg.cornerRadius = 32 * resources.displayMetrics.density
-                btnBg.setColor(resources.getColor(R.color.accent_violet, null))
-                background = btnBg
+                val outlineBg = android.graphics.drawable.GradientDrawable()
+                outlineBg.cornerRadius = 32 * resources.displayMetrics.density
+                outlineBg.setColor(resources.getColor(R.color.bg_surface, null))
+                outlineBg.setStroke(1, resources.getColor(R.color.accent_violet, null))
+                background = outlineBg
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { gravity = Gravity.CENTER; topMargin = (28 * resources.displayMetrics.density).toInt() }
+                ).apply { gravity = Gravity.CENTER; topMargin = (24 * resources.displayMetrics.density).toInt() }
                 isClickable = true
                 setOnClickListener { showImagePicker() }
             }
@@ -384,7 +359,7 @@ class ChatActivity : AppCompatActivity() {
 
         // Suggestions carousel
         suggestionsLabel = TextView(this).apply {
-            text = "AI Suggestions"
+            text = "Pick a reply"
             textSize = 14f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(resources.getColor(R.color.text_secondary, null))
@@ -415,97 +390,98 @@ class ChatActivity : AppCompatActivity() {
         }
         suggestionAdapter = SuggestionCardAdapter { suggestion ->
             copyToClipboard(suggestion.text)
-            Toast.makeText(this, "Copied! Paste in your dating app", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Reply copied. Paste it in your chat", Toast.LENGTH_SHORT).show()
         }
         suggestionsRecyclerView.adapter = suggestionAdapter
         mainLayout.addView(suggestionsRecyclerView)
 
-        mainLayout.addView(sectionLabel("Where are you chatting?"))
-        val platformScroll = HorizontalScrollView(this).apply {
+        mainLayout.addView(sectionLabel("Tone"))
+        val toneScroll = HorizontalScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
             isHorizontalScrollBarEnabled = false
         }
-        platformBar = LinearLayout(this).apply {
+
+        toneBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(
-                (12 * resources.displayMetrics.density).toInt(),
+                (16 * resources.displayMetrics.density).toInt(),
                 0,
-                (12 * resources.displayMetrics.density).toInt(),
-                (8 * resources.displayMetrics.density).toInt()
+                (16 * resources.displayMetrics.density).toInt(),
+                (10 * resources.displayMetrics.density).toInt()
             )
         }
-        platforms.forEach { (label, value) ->
-            platformBar.addView(choiceChip(label, value == currentPlatform) {
-                currentPlatform = value
-                savePreference("platform", value)
-                selectedPlatformChip = updateSelectedChip(selectedPlatformChip, it as TextView)
-            }.also { if (value == currentPlatform) selectedPlatformChip = it })
-        }
-        platformScroll.addView(platformBar)
-        mainLayout.addView(platformScroll)
 
-        mainLayout.addView(sectionLabel("What do you want to do?"))
-        val intentScroll = HorizontalScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            isHorizontalScrollBarEnabled = false
-        }
-        intentBar = LinearLayout(this).apply {
+        toneBar.addView(toneChip("Rizz", "playful", "flirt", selected = currentPersona == "playful" && currentIntent == "flirt"))
+        toneBar.addView(toneChip("Funny", "witty", "recover_dry", selected = currentPersona == "witty"))
+        toneBar.addView(toneChip("Chill", "chill", "keep_going", selected = currentPersona == "chill"))
+        toneBar.addView(toneChip("Ask out", "direct", "ask_date", selected = currentPersona == "direct"))
+
+        toneScroll.addView(toneBar)
+        mainLayout.addView(toneScroll)
+
+        val inputRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             setPadding(
-                (12 * resources.displayMetrics.density).toInt(),
+                (16 * resources.displayMetrics.density).toInt(),
                 0,
-                (12 * resources.displayMetrics.density).toInt(),
-                (8 * resources.displayMetrics.density).toInt()
-            )
-        }
-        intents.forEach { (label, value) ->
-            intentBar.addView(choiceChip(label, value == currentIntent) {
-                currentIntent = value
-                savePreference("intent", value)
-                selectedIntentChip = updateSelectedChip(selectedIntentChip, it as TextView)
-                if (messages.isNotEmpty()) regenerateSuggestions()
-            }.also { if (value == currentIntent) selectedIntentChip = it })
-        }
-        intentScroll.addView(intentBar)
-        mainLayout.addView(intentScroll)
-
-        // Persona selector bar
-        mainLayout.addView(sectionLabel("Choose your vibe"))
-        val personaScroll = HorizontalScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            isHorizontalScrollBarEnabled = false
-        }
-
-        personaBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(
-                (12 * resources.displayMetrics.density).toInt(),
-                (8 * resources.displayMetrics.density).toInt(),
-                (12 * resources.displayMetrics.density).toInt(),
+                (16 * resources.displayMetrics.density).toInt(),
                 (16 * resources.displayMetrics.density).toInt()
             )
         }
 
-        personas.forEach { (label, value) ->
-            personaBar.addView(choiceChip(label, value == currentPersona) {
-                currentPersona = value
-                savePreference("persona", value)
-                selectedPersonaChip = updateSelectedChip(selectedPersonaChip, it as TextView)
-                if (messages.isNotEmpty()) regenerateSuggestions()
-            }.also { if (value == currentPersona) selectedPersonaChip = it })
+        messageInput = android.widget.EditText(this).apply {
+            hint = "Paste chat or leave empty"
+            textSize = 14f
+            singleLine = false
+            maxLines = 3
+            setTextColor(resources.getColor(R.color.text_primary, null))
+            setHintTextColor(resources.getColor(R.color.text_muted, null))
+            setPadding(
+                (14 * resources.displayMetrics.density).toInt(),
+                (10 * resources.displayMetrics.density).toInt(),
+                (14 * resources.displayMetrics.density).toInt(),
+                (10 * resources.displayMetrics.density).toInt()
+            )
+            val bg = GradientDrawable()
+            bg.cornerRadius = 18 * resources.displayMetrics.density
+            bg.setColor(resources.getColor(R.color.bg_input, null))
+            bg.setStroke(1, resources.getColor(R.color.glass_border, null))
+            background = bg
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+            ).apply { marginEnd = (10 * resources.displayMetrics.density).toInt() }
         }
+        inputRow.addView(messageInput)
 
-        personaScroll.addView(personaBar)
-        mainLayout.addView(personaScroll)
+        val generateBtn = TextView(this).apply {
+            text = "Go"
+            textSize = 14f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.white, null))
+            gravity = Gravity.CENTER
+            setPadding(
+                (18 * resources.displayMetrics.density).toInt(),
+                (12 * resources.displayMetrics.density).toInt(),
+                (18 * resources.displayMetrics.density).toInt(),
+                (12 * resources.displayMetrics.density).toInt()
+            )
+            val bg = GradientDrawable()
+            bg.cornerRadius = 18 * resources.displayMetrics.density
+            bg.setColor(resources.getColor(R.color.accent_violet, null))
+            background = bg
+            isClickable = true
+            setOnClickListener {
+                analyzeText(messageInput.text.toString().trim())
+            }
+        }
+        inputRow.addView(generateBtn)
+        mainLayout.addView(inputRow)
 
         root.addView(mainLayout)
         setContentView(root)
@@ -545,6 +521,19 @@ class ChatActivity : AppCompatActivity() {
             applyChipStyle(this, selected)
             setOnClickListener(onClick)
         }
+    }
+
+    private fun toneChip(label: String, persona: String, intent: String, selected: Boolean = false): TextView {
+        val chip = choiceChip(label, selected) { view ->
+            currentPersona = persona
+            currentIntent = intent
+            savePreference("persona", persona)
+            savePreference("intent", intent)
+            selectedToneChip = updateSelectedChip(selectedToneChip, view as TextView)
+            if (suggestionsRecyclerView.visibility == View.VISIBLE) regenerateSuggestions()
+        }
+        if (selected) selectedToneChip = chip
+        return chip
     }
 
     private fun updateSelectedChip(previous: TextView?, selected: TextView): TextView {
@@ -613,13 +602,21 @@ class ChatActivity : AppCompatActivity() {
         }
 
         val title = TextView(this).apply {
-            text = "Paste Conversation"
+            text = "Paste chat or start fresh"
             textSize = 20f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(resources.getColor(R.color.text_primary, null))
-            setPadding(0, 0, 0, (16 * resources.displayMetrics.density).toInt())
+            setPadding(0, 0, 0, (8 * resources.displayMetrics.density).toInt())
         }
         layout.addView(title)
+
+        val helper = TextView(this).apply {
+            text = "Leave it empty for first-message ideas. Add the latest messages for sharper replies."
+            textSize = 13f
+            setTextColor(resources.getColor(R.color.text_secondary, null))
+            setPadding(0, 0, 0, (16 * resources.displayMetrics.density).toInt())
+        }
+        layout.addView(helper)
 
         val editText = android.widget.EditText(this).apply {
             hint = "Paste the conversation text here, or leave empty for first-message ideas..."
@@ -661,7 +658,7 @@ class ChatActivity : AppCompatActivity() {
         btnLayout.addView(cancelBtn)
 
         val submitBtn = TextView(this).apply {
-            text = "Generate"
+            text = "Generate 3 replies"
             textSize = 14f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(resources.getColor(R.color.white, null))
@@ -709,6 +706,7 @@ class ChatActivity : AppCompatActivity() {
 
     private fun analyzeText(text: String) {
         showLoading(true)
+        lastInputText = text
         
         // Convert text to messages and send to backend
         val lines = text.lines().filter { it.isNotBlank() }
@@ -725,8 +723,9 @@ class ChatActivity : AppCompatActivity() {
         
         lifecycleScope.launch {
             try {
+                val requestIntent = if (text.isBlank()) "first_message" else currentIntent
                 val response = withContext(Dispatchers.IO) {
-                    apiClient.getSuggestionsFromText(text, currentPersona, currentIntent, currentPlatform)
+                    apiClient.getSuggestionsFromText(text, currentPersona, requestIntent, currentPlatform)
                 }
                 showLoading(false)
                 response?.let {
@@ -775,7 +774,10 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun regenerateSuggestions() {
-        if (messages.isEmpty()) return
+        if (messages.isEmpty()) {
+            analyzeText(lastInputText)
+            return
+        }
         showLoading(true)
         
         val convoText = messages.joinToString("\n") { 

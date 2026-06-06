@@ -8,7 +8,7 @@ RizzSe is an Android dating-assistant app and keyboard. It can analyze pasted te
 - Pasted conversation analysis via `/api/v1/chat/draft`
 - Eight tones: friendly, romantic, bold, witty, playful, chill, direct, flirty
 - Android chat screen with upload, paste, copy, persona switching, and Hinglish mode
-- India-focused platform, intent, and vibe chips for WhatsApp, Instagram, Hinge, Bumble, and Tinder
+- India-focused reply generation for WhatsApp, Instagram, Hinge, Bumble, and Tinder
 - Optional empty-input generation for first-message ideas
 - Keyboard IME with an AI suggestion strip
 - Optional accessibility service for visible chat context
@@ -84,7 +84,7 @@ Returns service status, model, mock mode, and client readiness.
 
 Supported intents: `keep_going`, `flirt`, `ask_date`, `recover_dry`, `first_message`, `reply_compliment`.
 
-Supported platforms: `whatsapp`, `instagram`, `hinge`, `bumble`, `tinder`.
+Supported platforms: `whatsapp`, `instagram`, `hinge`, `bumble`, `tinder`. The app detects this automatically in keyboard/accessibility mode and silently defaults to WhatsApp for pasted text.
 
 `POST /api/v1/analyze-screenshot`
 

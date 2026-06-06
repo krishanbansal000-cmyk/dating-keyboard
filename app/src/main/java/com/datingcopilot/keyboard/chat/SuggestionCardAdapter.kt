@@ -25,8 +25,8 @@ class SuggestionCardAdapter(
         val container = LinearLayout(parent.context).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = ViewGroup.MarginLayoutParams(
-                (280 * resources.displayMetrics.density).toInt(),
-                (200 * resources.displayMetrics.density).toInt()
+                (300 * resources.displayMetrics.density).toInt(),
+                (170 * resources.displayMetrics.density).toInt()
             ).apply {
                 marginStart = (8 * resources.displayMetrics.density).toInt()
                 marginEnd = (8 * resources.displayMetrics.density).toInt()
@@ -52,20 +52,20 @@ class SuggestionCardAdapter(
             
             container.removeAllViews()
             container.setPadding(
-                (18 * density).toInt(),
-                (18 * density).toInt(),
-                (18 * density).toInt(),
-                (14 * density).toInt()
+                (16 * density).toInt(),
+                (16 * density).toInt(),
+                (16 * density).toInt(),
+                (12 * density).toInt()
             )
             container.setBackgroundResource(0)
             
             val cardBg = GradientDrawable()
-            cardBg.cornerRadius = 20 * density
+            cardBg.cornerRadius = 18 * density
             cardBg.setColor(context.resources.getColor(R.color.bg_card, null))
             cardBg.setStroke(1, context.resources.getColor(R.color.glass_border, null))
             container.background = cardBg
 
-            // Top row: persona badge + confidence
+            // Top row: reply type badge
             val topRow = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -93,18 +93,6 @@ class SuggestionCardAdapter(
             }
             topRow.addView(personaBadge)
 
-            val spacer = View(context).apply {
-                layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
-            }
-            topRow.addView(spacer)
-
-            val confidenceView = TextView(context).apply {
-                text = "${suggestion.confidence}% match"
-                textSize = 10f
-                setTextColor(context.resources.getColor(R.color.text_muted, null))
-            }
-            topRow.addView(confidenceView)
-
             container.addView(topRow)
 
             // Suggestion text
@@ -118,24 +106,29 @@ class SuggestionCardAdapter(
 
             val textView = TextView(context).apply {
                 text = suggestion.text
-                textSize = 14f
+                textSize = 15f
                 setTextColor(context.resources.getColor(R.color.text_primary, null))
-                maxLines = 4
+                maxLines = 3
                 setLineSpacing(2f, 1.0f)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    0,
+                    1f
+                )
             }
             container.addView(textView)
 
-            // Bottom: copy button
+            // Bottom: use-reply button
             val spacing2 = View(context).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    (12 * density).toInt()
+                    (8 * density).toInt()
                 )
             }
             container.addView(spacing2)
 
             val copyBtn = TextView(context).apply {
-                text = "📋 Copy"
+                text = "Use this reply"
                 textSize = 12f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(context.resources.getColor(R.color.white, null))
