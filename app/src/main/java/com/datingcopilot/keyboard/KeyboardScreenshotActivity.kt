@@ -1,13 +1,9 @@
 package com.datingcopilot.keyboard
 
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.ImageReader
@@ -18,13 +14,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.DisplayMetrics
-import android.view.Gravity
-import android.view.View
-import android.view.animation.AccelerateDecelerateInterpolator
-import android.widget.FrameLayout
-import android.widget.LinearLayout
-import android.widget.ProgressBar
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -49,10 +38,6 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
     private var captured = false
-    private var overlayRoot: FrameLayout? = null
-    private var statusText: TextView? = null
-    private var pulseAnimator: ObjectAnimator? = null
-    private var textAnimator: ValueAnimator? = null
 
     private val requestScreenCapture = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -60,7 +45,10 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
         if (result.resultCode != RESULT_OK || result.data == null) {
             finish()
         } else {
-            startCapture(result.resultCode, result.data!!)
+            moveTaskToBack(true)
+            Handler(Looper.getMainLooper()).postDelayed({
+                startCapture(result.resultCode, result.data!!)
+            }, 350)
         }
     }
 
@@ -150,7 +138,7 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
         val intent = prefs.getString("intent", "flirt") ?: "flirt"
         val platform = ChatContextService.getChatPlatform(this)
 
-        showGeneratingOverlay()
+        Toast.makeText(this, "Generating replies in background...", Toast.LENGTH_SHORT).show()
 
         lifecycleScope.launch {
             val response = withContext(Dispatchers.IO) {
@@ -160,14 +148,12 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
 
             if (response?.suggestions?.isNotEmpty() == true) {
                 saveKeyboardHandoff(response)
-                statusText?.text = "Replies ready"
                 Toast.makeText(
                     this@KeyboardScreenshotActivity,
                     "Replies ready. Return to chat and open RizzSe keyboard",
                     Toast.LENGTH_LONG
                 ).show()
             } else {
-                statusText?.text = "Screenshot was hard to read"
                 Toast.makeText(
                     this@KeyboardScreenshotActivity,
                     "Could not read screenshot. Try a clearer one",
@@ -179,105 +165,8 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        pulseAnimator?.cancel()
-        textAnimator?.cancel()
         cleanupCapture()
         super.onDestroy()
-    }
-
-    private fun showGeneratingOverlay() {
-        if (overlayRoot != null) return
-
-        val density = resources.displayMetrics.density
-        val root = FrameLayout(this).apply {
-            setPadding(
-                (16 * density).toInt(),
-                (16 * density).toInt(),
-                (16 * density).toInt(),
-                (28 * density).toInt()
-            )
-        }
-
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(
-                (18 * density).toInt(),
-                (14 * density).toInt(),
-                (18 * density).toInt(),
-                (14 * density).toInt()
-            )
-            background = GradientDrawable().apply {
-                cornerRadius = 24 * density
-                setColor(0xF21A1025.toInt())
-                setStroke((1 * density).toInt(), 0x66A855F7)
-            }
-            elevation = 16 * density
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.BOTTOM
-            }
-        }
-
-        val spinner = ProgressBar(this).apply {
-            isIndeterminate = true
-            layoutParams = LinearLayout.LayoutParams(
-                (34 * density).toInt(),
-                (34 * density).toInt()
-            ).apply { marginEnd = (14 * density).toInt() }
-        }
-        card.addView(spinner)
-
-        val copy = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-
-        val title = TextView(this).apply {
-            text = "Reading this chat"
-            textSize = 15f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFFFFFFFF.toInt())
-        }
-        copy.addView(title)
-
-        statusText = TextView(this).apply {
-            text = "Finding the best replies..."
-            textSize = 12f
-            setTextColor(0xFFDDD6FE.toInt())
-            setPadding(0, (3 * density).toInt(), 0, 0)
-        }
-        copy.addView(statusText)
-
-        card.addView(copy)
-        root.addView(card)
-        setContentView(root)
-        overlayRoot = root
-
-        pulseAnimator = ObjectAnimator.ofFloat(card, View.ALPHA, 0.82f, 1f).apply {
-            duration = 850
-            repeatMode = ValueAnimator.REVERSE
-            repeatCount = ValueAnimator.INFINITE
-            interpolator = AccelerateDecelerateInterpolator()
-            start()
-        }
-
-        val states = arrayOf(
-            "Reading screenshot...",
-            "Understanding the chat...",
-            "Writing 3 replies...",
-            "Making it sound natural..."
-        )
-        textAnimator = ValueAnimator.ofInt(0, states.lastIndex).apply {
-            duration = 2800
-            repeatCount = ValueAnimator.INFINITE
-            addUpdateListener { animator ->
-                statusText?.text = states[animator.animatedValue as Int]
-            }
-            start()
-        }
     }
 
     private fun saveKeyboardHandoff(response: AnalyzeResponse) {
