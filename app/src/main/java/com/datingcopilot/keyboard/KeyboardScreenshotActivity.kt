@@ -48,7 +48,7 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
             moveTaskToBack(true)
             Handler(Looper.getMainLooper()).postDelayed({
                 startCapture(result.resultCode, result.data!!)
-            }, 350)
+            }, 800)
         }
     }
 
