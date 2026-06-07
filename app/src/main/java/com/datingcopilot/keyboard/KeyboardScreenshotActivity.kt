@@ -9,7 +9,6 @@ import android.hardware.display.VirtualDisplay
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
-import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -17,19 +16,10 @@ import android.util.DisplayMetrics
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
-import com.datingcopilot.keyboard.chat.AnalyzeResponse
-import com.datingcopilot.keyboard.chat.ChatActivity
-import com.google.gson.Gson
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
 class KeyboardScreenshotActivity : AppCompatActivity() {
-    private val apiClient by lazy { ApiClient(this) }
-    private val gson by lazy { Gson() }
     private val projectionManager by lazy {
         getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
     }
@@ -104,7 +94,7 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
                 bitmap.recycle()
                 cropped.recycle()
                 cleanupCapture()
-                analyzeScreenshot(Uri.fromFile(file), file)
+                savePendingScreenshot(file)
             } finally {
                 image.close()
             }
@@ -132,53 +122,20 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
         projection?.stop()
     }
 
-    private fun analyzeScreenshot(uri: Uri, tempFile: File? = null) {
-        val prefs = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
-        val persona = prefs.getString("persona", "playful") ?: "playful"
-        val intent = prefs.getString("intent", "flirt") ?: "flirt"
-        val platform = ChatContextService.getChatPlatform(this)
-
-        Toast.makeText(this, "Generating replies in background...", Toast.LENGTH_SHORT).show()
-
-        lifecycleScope.launch {
-            val response = withContext(Dispatchers.IO) {
-                apiClient.uploadScreenshot(uri, persona, this@KeyboardScreenshotActivity, intent, platform)
-            }
-            tempFile?.delete()
-
-            if (response?.suggestions?.isNotEmpty() == true) {
-                saveKeyboardHandoff(response)
-                Toast.makeText(
-                    this@KeyboardScreenshotActivity,
-                    "Replies ready. Return to chat and open RizzSe keyboard",
-                    Toast.LENGTH_LONG
-                ).show()
-            } else {
-                Toast.makeText(
-                    this@KeyboardScreenshotActivity,
-                    "Could not read screenshot. Try a clearer one",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-            finish()
-        }
-    }
-
     override fun onDestroy() {
         cleanupCapture()
         super.onDestroy()
     }
 
-    private fun saveKeyboardHandoff(response: AnalyzeResponse) {
-        val suggestions = response.suggestions.orEmpty()
-        val contextText = response.conversation.orEmpty().joinToString("\n") {
-            "${if (it.sender == "you") "You" else "Them"}: ${it.text}"
+    private fun savePendingScreenshot(file: File) {
+        val prefs = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+        prefs.getString("pending_keyboard_screenshot_path", null)?.let { oldPath ->
+            File(oldPath).delete()
         }
-
-        getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
-            .edit()
-            .putString(ChatActivity.PREF_PENDING_KEYBOARD_SUGGESTIONS, gson.toJson(suggestions))
-            .putString(ChatActivity.PREF_PENDING_KEYBOARD_CONTEXT, contextText)
+        prefs.edit()
+            .putString("pending_keyboard_screenshot_path", file.absolutePath)
             .apply()
+        Toast.makeText(this, "Screenshot captured. Pick tone in RizzSe keyboard", Toast.LENGTH_LONG).show()
+        finish()
     }
 }

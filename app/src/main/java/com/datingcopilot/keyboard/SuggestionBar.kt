@@ -142,6 +142,37 @@ class SuggestionBar(
         }
     }
 
+    fun showScreenshotToneOptions(onToneSelected: (String, String) -> Unit) {
+        suggestionsInner.removeAllViews()
+        loadingDots.visibility = View.GONE
+        generateBtn.visibility = View.GONE
+        screenshotBtn.visibility = View.GONE
+        suggestionsContainer.visibility = View.VISIBLE
+
+        val label = TextView(context).apply {
+            text = "Caption tone"
+            textSize = 12f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dpToPx(36)
+            ).apply { marginEnd = dpToPx(8) }
+        }
+        suggestionsInner.addView(label)
+
+        val tones = listOf(
+            Triple("Rizz", "playful", "flirt"),
+            Triple("Funny", "witty", "recover_dry"),
+            Triple("Chill", "chill", "keep_going"),
+            Triple("Ask out", "direct", "ask_date")
+        )
+        tones.forEach { (labelText, persona, intent) ->
+            suggestionsInner.addView(createToneChip(labelText) { onToneSelected(persona, intent) })
+        }
+    }
+
     fun showError() {
         suggestionsContainer.visibility = View.GONE
         loadingDots.visibility = View.GONE
@@ -206,6 +237,28 @@ class SuggestionBar(
         card.layoutParams = marginParams
 
         return card
+    }
+
+    private fun createToneChip(label: String, onClick: () -> Unit): View {
+        return TextView(context).apply {
+            text = label
+            textSize = 12f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(ContextCompat.getColor(context, R.color.white))
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            setPadding(dpToPx(14), 0, dpToPx(14), 0)
+            background = GradientDrawable().apply {
+                cornerRadius = dpToPx(18).toFloat()
+                setColor(ContextCompat.getColor(context, R.color.accent_violet))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dpToPx(36)
+            ).apply { marginEnd = dpToPx(6) }
+            setOnClickListener { onClick() }
+        }
     }
 
     private fun dpToPx(dp: Int): Int {

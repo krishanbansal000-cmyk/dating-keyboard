@@ -5,13 +5,16 @@ import android.inputmethodservice.InputMethodService
 import android.inputmethodservice.Keyboard
 import android.inputmethodservice.KeyboardView
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
+import android.widget.Toast
 import com.datingcopilot.keyboard.chat.SuggestionOption
 import com.google.gson.Gson
 import kotlinx.coroutines.*
+import java.io.File
 
 class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActionListener {
 
@@ -89,7 +92,7 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
 
         root.addView(suggestionBar.rootView)
         root.addView(keyboardContainer)
-        loadPendingScreenshotSuggestions()
+        loadPendingKeyboardState()
 
         return root
     }
@@ -97,7 +100,7 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         if (::suggestionBar.isInitialized) {
-            loadPendingScreenshotSuggestions()
+            loadPendingKeyboardState()
         }
     }
 
@@ -133,9 +136,14 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
         startActivity(intent)
     }
 
-    private fun loadPendingScreenshotSuggestions() {
+    private fun loadPendingKeyboardState() {
+        if (loadPendingScreenshotSuggestions()) return
+        loadPendingScreenshotToneOptions()
+    }
+
+    private fun loadPendingScreenshotSuggestions(): Boolean {
         val prefs = getSharedPreferences("dating_copilot", MODE_PRIVATE)
-        val json = prefs.getString("pending_keyboard_suggestions", null) ?: return
+        val json = prefs.getString("pending_keyboard_suggestions", null) ?: return false
         val suggestions = runCatching {
             gson.fromJson(json, Array<SuggestionOption>::class.java).toList()
         }.getOrNull().orEmpty()
@@ -143,6 +151,52 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
         if (suggestions.isNotEmpty()) {
             suggestionBar.showSuggestions(suggestions)
             prefs.edit().remove("pending_keyboard_suggestions").apply()
+            return true
+        }
+        return false
+    }
+
+    private fun loadPendingScreenshotToneOptions() {
+        val prefs = getSharedPreferences("dating_copilot", MODE_PRIVATE)
+        val path = prefs.getString("pending_keyboard_screenshot_path", null) ?: return
+        if (!File(path).exists()) {
+            prefs.edit().remove("pending_keyboard_screenshot_path").apply()
+            return
+        }
+        suggestionBar.showScreenshotToneOptions { persona, intent ->
+            generateFromPendingScreenshot(path, persona, intent)
+        }
+    }
+
+    private fun generateFromPendingScreenshot(path: String, persona: String, intent: String) {
+        val screenshot = File(path)
+        if (!screenshot.exists()) {
+            getSharedPreferences("dating_copilot", MODE_PRIVATE)
+                .edit()
+                .remove("pending_keyboard_screenshot_path")
+                .apply()
+            suggestionBar.showError()
+            return
+        }
+
+        scope.launch {
+            suggestionBar.showLoading(true)
+            val result = withContext(Dispatchers.IO) {
+                apiClient.uploadScreenshot(Uri.fromFile(screenshot), persona, this@DatingKeyboardService, intent, currentPlatform)
+            }
+            suggestionBar.showLoading(false)
+            val suggestions = result?.suggestions.orEmpty()
+            if (suggestions.isNotEmpty()) {
+                screenshot.delete()
+                getSharedPreferences("dating_copilot", MODE_PRIVATE)
+                    .edit()
+                    .remove("pending_keyboard_screenshot_path")
+                    .apply()
+                suggestionBar.showSuggestions(suggestions)
+            } else {
+                Toast.makeText(this@DatingKeyboardService, "Could not read screenshot", Toast.LENGTH_SHORT).show()
+                suggestionBar.showError()
+            }
         }
     }
 
@@ -161,6 +215,13 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
             32 -> ic.commitText(" ", 1)
             44 -> ic.commitText(",", 1)
             46 -> ic.commitText(".", 1)
+            -101 -> ic.commitText("❤️", 1)
+            -102 -> ic.commitText("😍", 1)
+            -103 -> ic.commitText("😘", 1)
+            -104 -> ic.commitText("🥰", 1)
+            -105 -> ic.commitText("😉", 1)
+            -106 -> ic.commitText("💕", 1)
+            -107 -> ic.commitText("🔥", 1)
             -1 -> {}
             else -> ic.commitText(primaryCode.toChar().toString(), 1)
         }
