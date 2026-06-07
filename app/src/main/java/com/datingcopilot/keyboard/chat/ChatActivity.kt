@@ -173,6 +173,16 @@ class ChatActivity : AppCompatActivity() {
         }
         topBar.addView(titleText)
 
+        val historyBtn = TextView(this).apply {
+            text = "📋"
+            textSize = 18f
+            setPadding(0, 0, (8 * resources.displayMetrics.density).toInt(), 0)
+            setOnClickListener {
+                startActivity(Intent(this@ChatActivity, HistoryActivity::class.java))
+            }
+        }
+        topBar.addView(historyBtn)
+
         val profileBtn = TextView(this).apply {
             text = "⚙️"
             textSize = 20f
@@ -229,29 +239,6 @@ class ChatActivity : AppCompatActivity() {
             }
             addView(emptyEmoji)
 
-            val pill = TextView(this@ChatActivity).apply {
-                text = "GEN-Z REPLY COACH"
-                textSize = 11f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(resources.getColor(R.color.accent_violet, null))
-                textAlignment = TextView.TEXT_ALIGNMENT_CENTER
-                setPadding(
-                    (16 * resources.displayMetrics.density).toInt(),
-                    (6 * resources.displayMetrics.density).toInt(),
-                    (16 * resources.displayMetrics.density).toInt(),
-                    (6 * resources.displayMetrics.density).toInt()
-                )
-                val pillBg = android.graphics.drawable.GradientDrawable()
-                pillBg.cornerRadius = 32 * resources.displayMetrics.density
-                pillBg.setColor(resources.getColor(R.color.bg_surface, null))
-                background = pillBg
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { gravity = Gravity.CENTER; bottomMargin = (12 * resources.displayMetrics.density).toInt() }
-            }
-            addView(pill)
-
             val emptyTitle = TextView(this@ChatActivity).apply {
                 text = "Make the next text hit"
                 textSize = 24f
@@ -302,7 +289,6 @@ class ChatActivity : AppCompatActivity() {
             }
             addView(uploadHint)
 
-            addHistoryButton(this)
         }
         chatContainer.addView(emptyStateView)
 
@@ -774,35 +760,6 @@ class ChatActivity : AppCompatActivity() {
             .putString(PREF_PENDING_KEYBOARD_SUGGESTIONS, gson.toJson(suggestions))
             .putString(PREF_PENDING_KEYBOARD_CONTEXT, contextText)
             .apply()
-    }
-
-    private fun addHistoryButton(parent: LinearLayout) {
-        val history = AppHistoryStore.get(this)
-        if (history.isEmpty()) return
-
-        parent.addView(TextView(this).apply {
-            text = "📋 History (${history.size})"
-            textSize = 13f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.accent_violet, null))
-            textAlignment = TextView.TEXT_ALIGNMENT_CENTER
-            setPadding(dp(18), dp(10), dp(18), dp(10))
-            val bg = GradientDrawable().apply {
-                cornerRadius = dp(20).toFloat()
-                setColor(resources.getColor(R.color.bg_surface, null))
-                setStroke(dp(1), resources.getColor(R.color.glass_border, null))
-            }
-            background = bg
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { gravity = Gravity.CENTER; topMargin = dp(24) }
-            isClickable = true
-            isFocusable = true
-            setOnClickListener {
-                startActivity(Intent(this@ChatActivity, HistoryActivity::class.java))
-            }
-        })
     }
 
     private fun analyzeText(text: String) {

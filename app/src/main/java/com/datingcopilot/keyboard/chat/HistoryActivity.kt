@@ -38,16 +38,56 @@ class HistoryActivity : AppCompatActivity() {
             setPadding(dp(16), dp(48), dp(16), dp(40))
         }
 
-        root.addView(TextView(this).apply {
-            text = "History"
-            textSize = 20f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.text_primary, null))
+        val topBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(20) }
+        }
+
+        val backBtn = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(8), dp(14), dp(8))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat()
+                setColor(resources.getColor(R.color.bg_surface, null))
+                setStroke(dp(1), resources.getColor(R.color.glass_border_light, null))
+            }
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(20) }
+            )
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { finish() }
+        }
+        backBtn.addView(TextView(this).apply {
+            text = "‹"
+            textSize = 24f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.white, null))
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(dp(18), LinearLayout.LayoutParams.WRAP_CONTENT)
         })
+        backBtn.addView(TextView(this).apply {
+            text = "Back"
+            textSize = 13f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.text_secondary, null))
+        })
+        topBar.addView(backBtn)
+
+        topBar.addView(TextView(this).apply {
+            text = "History"
+            textSize = 18f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.text_primary, null))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER }
+        })
+        root.addView(topBar)
 
         history.forEachIndexed { index, entry ->
             val card = LinearLayout(this).apply {
