@@ -27,7 +27,8 @@ API_ENDPOINT = os.getenv("OPENAI_BASE_URL", "https://opencode.ai/zen/go/v1")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "mimo-v2.5")
 USE_MOCK = os.getenv("USE_MOCK", "false").lower() in {"1", "true", "yes", "on"}
 AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "12"))
-ai_executor = ThreadPoolExecutor(max_workers=4)
+AI_MAX_WORKERS = int(os.getenv("AI_MAX_WORKERS", "16"))
+ai_executor = ThreadPoolExecutor(max_workers=AI_MAX_WORKERS)
 
 # Anthropic-compatible models (use Messages API endpoint)
 ANTHROPIC_MODELS = {"qwen3.7-plus", "qwen3.7-max", "qwen3.6-plus", "minimax-m3", "minimax-m2.7", "minimax-m2.5"}
@@ -737,4 +738,4 @@ def chat_draft_stream():
 
 if __name__ == "__main__":
     port = int(os.getenv("FLASK_PORT", 8000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
