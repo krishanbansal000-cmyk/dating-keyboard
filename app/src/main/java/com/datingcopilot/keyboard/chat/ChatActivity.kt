@@ -865,14 +865,16 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun regenerateSuggestions() {
-        if (messages.isEmpty()) {
-            analyzeText(lastInputText)
-            return
-        }
+        if (messages.isEmpty() && lastInputText.isBlank()) return
+        
         showLoading(true)
         
-        val convoText = messages.joinToString("\n") { 
-            "${if (it.sender == "you") "You" else "Them"}: ${it.text}" 
+        val convoText = if (messages.isNotEmpty()) {
+            messages.joinToString("\n") { 
+                "${if (it.sender == "you") "You" else "Them"}: ${it.text}" 
+            }
+        } else {
+            lastInputText
         }
         
         lifecycleScope.launch {
@@ -881,9 +883,16 @@ class ChatActivity : AppCompatActivity() {
                     apiClient.getSuggestionsFromText(convoText, currentPersona, currentIntent, currentPlatform)
                 }
                 showLoading(false)
-                response?.let { showSuggestions(it) }
+                if (response != null) {
+                    showSuggestions(response)
+                } else {
+                    android.util.Log.e("ChatActivity", "regenerateSuggestions: API returned null")
+                    Toast.makeText(this@ChatActivity, "Could not regenerate. Try again.", Toast.LENGTH_SHORT).show()
+                }
             } catch (e: Exception) {
                 showLoading(false)
+                android.util.Log.e("ChatActivity", "regenerateSuggestions exception: ${e.message}", e)
+                Toast.makeText(this@ChatActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
