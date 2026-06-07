@@ -173,7 +173,7 @@ MOCK_CONVERSATIONS = {
 }
 
 
-def encode_image(image_file, max_side=720, quality=68):
+def encode_image(image_file, max_side=1200, quality=72):
     """Encode a compact JPEG for faster vision requests."""
     image = Image.open(image_file)
     if image.mode in ('RGBA', 'LA', 'P'):
@@ -407,6 +407,20 @@ def call_ai_fast(messages, **kwargs):
     except TimeoutError:
         app.logger.warning("AI call exceeded %.1fs; returning fallback", timeout_seconds)
         return None
+    except Exception as e:
+        app.logger.warning("AI call failed: %s", e)
+        return None
+
+
+def call_ai_with_error(messages, **kwargs):
+    timeout_seconds = kwargs.pop("timeout_seconds", AI_TIMEOUT_SECONDS)
+    future = ai_executor.submit(call_ai, messages, **kwargs)
+    try:
+        return future.result(timeout=timeout_seconds), None
+    except TimeoutError:
+        return None, f"AI call timed out after {timeout_seconds:.1f}s"
+    except Exception as e:
+        return None, str(e)
 
 
 def call_ai_stream(messages, **kwargs):
@@ -485,6 +499,7 @@ def analyze_screenshot():
         source = "none"
         raw_model_text = ""
         image_info = "unknown"
+        failure_reason = "No image file was provided"
 
         if "image" in request.files:
             image_file = request.files["image"]
@@ -523,21 +538,26 @@ def analyze_screenshot():
                         ]}
                     ]
                 
-                response = call_ai_fast(
+                response, first_error = call_ai_with_error(
                     messages,
                     model=OPENAI_MODEL,
                     max_tokens=220,
                     temperature=0.55,
                     timeout_seconds=30
                 )
+                if first_error:
+                    failure_reason = f"First vision call failed: {first_error}"
                 
                 if response:
                     raw_model_text = get_response_text(response)
                     suggestions = parse_suggestions(raw_model_text, persona)
-                    if suggestions:
+                    if len(suggestions) == 3:
                         source = "vision_ai"
+                    else:
+                        failure_reason = f"First vision response had {len(suggestions)} parseable suggestions"
+                        suggestions = None
 
-                if not suggestions and response:
+                if not suggestions:
                     app.logger.warning(
                         "screenshot parse failed: image=%s response_len=%d response=%r",
                         image_info,
@@ -545,7 +565,7 @@ def analyze_screenshot():
                         raw_model_text[:500]
                     )
 
-                    retry_prompt = f"""Read this chat screenshot carefully. If it contains a chat, write 3 respectful replies to the latest incoming message. Return exactly this format and nothing else. {context_prompt}
+                    retry_prompt = f"""Read this chat screenshot carefully. If it contains a chat, write exactly 3 respectful replies to the latest incoming message. You MUST include Safe, Smooth, and Bold. Return exactly this format and nothing else. {context_prompt}
 
 >>> Safe: <reply>
 >>> Smooth: <reply>
@@ -553,41 +573,45 @@ def analyze_screenshot():
                     retry_messages = [
                         {"role": "user", "content": [
                             {"type": "text", "text": retry_prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "auto"}}
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "low"}}
                         ]}
                     ]
-                    retry_response = call_ai_fast(
+                    retry_response, retry_error = call_ai_with_error(
                         retry_messages,
                         model=OPENAI_MODEL,
                         max_tokens=420,
                         temperature=0.45,
                         timeout_seconds=30
                     )
+                    if retry_error:
+                        failure_reason = f"Retry vision call failed: {retry_error}"
                     if retry_response:
                         raw_model_text = get_response_text(retry_response)
                         suggestions = parse_suggestions(raw_model_text, persona)
-                        if suggestions:
+                        if len(suggestions) == 3:
                             source = "vision_ai_retry"
+                        else:
+                            failure_reason = f"Retry vision response had {len(suggestions)} parseable suggestions"
+                            suggestions = None
             
             if os.path.exists(filepath):
                 os.remove(filepath)
         
-        if not suggestions and USE_MOCK:
-            suggestions = fallback_suggestions(persona, intent, hinglish=hinglish)
-            source = "mock"
-
         if not suggestions:
             app.logger.warning(
-                "screenshot failed: model=%s source=%s image=%s response_len=%d response=%r duration=%.2fs",
+                "screenshot failed: model=%s source=%s image=%s reason=%s response_len=%d response=%r duration=%.2fs",
                 OPENAI_MODEL,
                 source,
                 image_info,
+                failure_reason,
                 len(raw_model_text),
                 raw_model_text[:500],
                 time.monotonic() - started_at
             )
             return jsonify({
-                "error": "Screenshot analysis failed. Try a clearer screenshot or paste the chat text.",
+                "error": "Screenshot analysis failed",
+                "reason": failure_reason,
+                "image": image_info,
                 "model": OPENAI_MODEL,
                 "source": source
             }), 502
