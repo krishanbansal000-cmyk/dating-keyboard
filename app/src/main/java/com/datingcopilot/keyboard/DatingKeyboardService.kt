@@ -171,6 +171,7 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
     private fun generateFromPendingScreenshot(path: String, persona: String, intent: String) {
         val screenshot = File(path)
         if (!screenshot.exists()) {
+            android.util.Log.e("KeyboardService", "screenshot file not found: $path")
             getSharedPreferences("dating_copilot", MODE_PRIVATE)
                 .edit()
                 .remove("pending_keyboard_screenshot_path")
@@ -181,20 +182,31 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
 
         scope.launch {
             suggestionBar.showLoading(true)
-            val result = withContext(Dispatchers.IO) {
-                apiClient.uploadScreenshot(Uri.fromFile(screenshot), persona, this@DatingKeyboardService, intent, currentPlatform)
-            }
-            suggestionBar.showLoading(false)
-            val suggestions = result?.suggestions.orEmpty()
-            if (suggestions.isNotEmpty()) {
-                screenshot.delete()
-                getSharedPreferences("dating_copilot", MODE_PRIVATE)
-                    .edit()
-                    .remove("pending_keyboard_screenshot_path")
-                    .apply()
-                suggestionBar.showSuggestions(suggestions)
-            } else {
-                Toast.makeText(this@DatingKeyboardService, "Could not read screenshot", Toast.LENGTH_SHORT).show()
+            android.util.Log.d("KeyboardService", "uploading screenshot for analysis")
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    apiClient.uploadScreenshot(Uri.fromFile(screenshot), persona, this@DatingKeyboardService, intent, currentPlatform)
+                }
+                suggestionBar.showLoading(false)
+                val suggestions = result?.suggestions.orEmpty()
+                if (suggestions.isNotEmpty()) {
+                    screenshot.delete()
+                    getSharedPreferences("dating_copilot", MODE_PRIVATE)
+                        .edit()
+                        .remove("pending_keyboard_screenshot_path")
+                        .apply()
+                    suggestionBar.showSuggestions(suggestions)
+                    android.util.Log.d("KeyboardService", "screenshot analysis OK, ${suggestions.size} suggestions")
+                } else {
+                    val errMsg = if (result == null) "API returned null" else "empty suggestions"
+                    android.util.Log.e("KeyboardService", "screenshot analysis failed: $errMsg")
+                    Toast.makeText(this@DatingKeyboardService, "Analyze failed", Toast.LENGTH_SHORT).show()
+                    suggestionBar.showError()
+                }
+            } catch (e: Exception) {
+                suggestionBar.showLoading(false)
+                android.util.Log.e("KeyboardService", "screenshot exception: ${e.message}", e)
+                Toast.makeText(this@DatingKeyboardService, "Error: ${e.message?.take(50)}", Toast.LENGTH_LONG).show()
                 suggestionBar.showError()
             }
         }
