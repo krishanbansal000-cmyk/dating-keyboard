@@ -1,5 +1,7 @@
 package com.datingcopilot.keyboard.chat
 
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -52,6 +54,8 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var toneBar: LinearLayout
     private lateinit var messageInput: android.widget.EditText
     private lateinit var loadingView: FrameLayout
+    private lateinit var loadingTextView: TextView
+    private lateinit var loadingPreviewImage: ImageView
     private lateinit var emptyStateView: LinearLayout
 
     private val messages = mutableListOf<ChatMessage>()
@@ -61,6 +65,7 @@ class ChatActivity : AppCompatActivity() {
     private var selectedToneChip: TextView? = null
     private var lastInputText = ""
     private var returnToKeyboardAfterScreenshot = false
+    private var loadingPulseAnimator: ObjectAnimator? = null
 
     private val apiClient by lazy { com.datingcopilot.keyboard.ApiClient(this) }
     private val gson by lazy { Gson() }
@@ -357,14 +362,39 @@ class ChatActivity : AppCompatActivity() {
                 )
             }
 
-            val loadingText = TextView(this@ChatActivity).apply {
+            loadingPreviewImage = ImageView(this@ChatActivity).apply {
+                visibility = View.GONE
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                layoutParams = LinearLayout.LayoutParams(
+                    (92 * resources.displayMetrics.density).toInt(),
+                    (70 * resources.displayMetrics.density).toInt()
+                ).apply { bottomMargin = (8 * resources.displayMetrics.density).toInt() }
+                val bg = GradientDrawable()
+                bg.cornerRadius = 14 * resources.displayMetrics.density
+                bg.setColor(resources.getColor(R.color.bg_surface, null))
+                bg.setStroke(1, resources.getColor(R.color.accent_violet, null))
+                background = bg
+                clipToOutline = true
+            }
+            loadingContent.addView(loadingPreviewImage)
+
+            loadingTextView = TextView(this@ChatActivity).apply {
                 text = "Generating replies..."
                 textSize = 13f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(resources.getColor(R.color.accent_violet, null))
-                setPadding(0, 0, 0, (12 * resources.displayMetrics.density).toInt())
+                setPadding(0, 0, 0, (8 * resources.displayMetrics.density).toInt())
             }
-            loadingContent.addView(loadingText)
+            loadingContent.addView(loadingTextView)
+
+            val loadingProgressBar = ProgressBar(this@ChatActivity).apply {
+                isIndeterminate = true
+                layoutParams = LinearLayout.LayoutParams(
+                    (28 * resources.displayMetrics.density).toInt(),
+                    (28 * resources.displayMetrics.density).toInt()
+                ).apply { bottomMargin = (10 * resources.displayMetrics.density).toInt() }
+            }
+            loadingContent.addView(loadingProgressBar)
 
             // Skeleton cards row
             val skeletonRow = LinearLayout(this@ChatActivity).apply {
@@ -715,7 +745,7 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun handleImageSelected(uri: Uri) {
-        showLoading(true)
+        showLoading(true, uri)
         
         lifecycleScope.launch {
             try {
@@ -827,10 +857,7 @@ class ChatActivity : AppCompatActivity() {
             "Generating replies..."
         }
         
-        // Find and update the loading text view
-        val loadingContent = loadingView.getChildAt(0) as? LinearLayout
-        val loadingTextView = loadingContent?.getChildAt(0) as? TextView
-        loadingTextView?.text = displayText
+        loadingTextView.text = displayText
     }
 
     private fun handleAnalyzeResponse(response: AnalyzeResponse) {
@@ -898,8 +925,33 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
-    private fun showLoading(show: Boolean) {
+    private fun showLoading(show: Boolean, screenshotUri: Uri? = null) {
         loadingView.visibility = if (show) View.VISIBLE else View.GONE
+        if (show) {
+            loadingTextView.text = if (screenshotUri != null) "Reading screenshot..." else "Generating replies..."
+            loadingPreviewImage.visibility = if (screenshotUri != null) View.VISIBLE else View.GONE
+            if (screenshotUri != null) loadingPreviewImage.setImageURI(screenshotUri)
+            startLoadingPulse()
+        } else {
+            stopLoadingPulse()
+        }
+    }
+
+    private fun startLoadingPulse() {
+        loadingPulseAnimator?.cancel()
+        loadingView.alpha = 0.95f
+        loadingPulseAnimator = ObjectAnimator.ofFloat(loadingView, View.ALPHA, 0.88f, 1f).apply {
+            duration = 850
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+            start()
+        }
+    }
+
+    private fun stopLoadingPulse() {
+        loadingPulseAnimator?.cancel()
+        loadingPulseAnimator = null
+        loadingView.alpha = 0.95f
     }
 
     private fun copyToClipboard(text: String) {

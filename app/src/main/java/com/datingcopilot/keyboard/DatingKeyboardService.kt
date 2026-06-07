@@ -181,7 +181,7 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
         }
 
         scope.launch {
-            suggestionBar.showLoading(true)
+            suggestionBar.showScreenshotLoading(Uri.fromFile(screenshot))
             android.util.Log.d("KeyboardService", "uploading screenshot for analysis")
             try {
                 val result = withContext(Dispatchers.IO) {

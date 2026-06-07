@@ -3,6 +3,7 @@ package com.datingcopilot.keyboard
 import android.content.Context
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.view.Gravity
 import android.view.View
 import android.widget.*
@@ -127,6 +128,39 @@ class SuggestionBar(
         } else {
             loadingDots.visibility = View.GONE
         }
+    }
+
+    fun showScreenshotLoading(uri: Uri) {
+        suggestionsInner.removeAllViews()
+        generateBtn.visibility = View.GONE
+        screenshotBtn.visibility = View.GONE
+        loadingDots.visibility = View.GONE
+        suggestionsContainer.visibility = View.VISIBLE
+
+        suggestionsInner.addView(createScreenshotPreview(uri))
+
+        val status = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dpToPx(40)
+            )
+        }
+        status.addView(ProgressBar(context).apply {
+            isIndeterminate = true
+            layoutParams = LinearLayout.LayoutParams(dpToPx(22), dpToPx(22)).apply {
+                marginEnd = dpToPx(8)
+            }
+        })
+        status.addView(TextView(context).apply {
+            text = "Reading screenshot..."
+            textSize = 12f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            gravity = Gravity.CENTER_VERTICAL
+        })
+        suggestionsInner.addView(status)
     }
 
     fun showSuggestions(options: List<SuggestionOption>) {
@@ -259,6 +293,30 @@ class SuggestionBar(
             ).apply { marginEnd = dpToPx(6) }
             setOnClickListener { onClick() }
         }
+    }
+
+    private fun createScreenshotPreview(uri: Uri): View {
+        val frame = FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(dpToPx(54), dpToPx(40)).apply {
+                marginEnd = dpToPx(8)
+            }
+            background = GradientDrawable().apply {
+                cornerRadius = dpToPx(10).toFloat()
+                setColor(ContextCompat.getColor(context, R.color.bg_card))
+                setStroke(dpToPx(1), ContextCompat.getColor(context, R.color.accent_violet))
+            }
+            clipToOutline = true
+        }
+        frame.addView(ImageView(context).apply {
+            setImageURI(uri)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            alpha = 0.82f
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        })
+        return frame
     }
 
     private fun dpToPx(dp: Int): Int {
