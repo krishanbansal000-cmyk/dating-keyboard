@@ -4,24 +4,16 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
-import android.graphics.drawable.GradientDrawable
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.DisplayMetrics
-import android.view.Gravity
-import android.view.View
 import android.view.inputmethod.InputMethodManager
-import android.widget.FrameLayout
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -53,110 +45,9 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(buildExplanationUI())
-    }
-
-    private fun buildExplanationUI(): View {
-        val density = resources.displayMetrics.density
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding((32 * density).toInt(), (48 * density).toInt(), (32 * density).toInt(), (32 * density).toInt())
-            setBackgroundColor(resources.getColor(R.color.bg_dark, null))
+        if (savedInstanceState == null) {
+            requestScreenCapture.launch(projectionManager.createScreenCaptureIntent())
         }
-
-        // Icon
-        root.addView(TextView(this).apply {
-            text = "📸"
-            textSize = 48f
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = (20 * density).toInt() }
-        })
-
-        // Title
-        root.addView(TextView(this).apply {
-            text = "Capture your chat"
-            textSize = 22f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.text_primary, null))
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = (12 * density).toInt() }
-        })
-
-        // Description
-        root.addView(TextView(this).apply {
-            text = "RizzSe will take a quick screenshot of your current screen to analyze the conversation and suggest replies."
-            textSize = 14f
-            setTextColor(resources.getColor(R.color.text_secondary, null))
-            gravity = Gravity.CENTER
-            setLineSpacing(4f, 1.0f)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = (32 * density).toInt() }
-        })
-
-        // Note about system dialog
-        root.addView(TextView(this).apply {
-            text = "Note: Android will show a permission dialog. Tap \"Start now\" to proceed."
-            textSize = 12f
-            setTextColor(resources.getColor(R.color.text_muted, null))
-            gravity = Gravity.CENTER
-            setPadding(
-                (16 * density).toInt(), (10 * density).toInt(),
-                (16 * density).toInt(), (10 * density).toInt()
-            )
-            val bg = GradientDrawable()
-            bg.cornerRadius = 12 * density
-            bg.setColor(resources.getColor(R.color.bg_card, null))
-            bg.setStroke(1, resources.getColor(R.color.glass_border, null))
-            background = bg
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = (32 * density).toInt() }
-        })
-
-        // Continue button
-        root.addView(TextView(this).apply {
-            text = "Continue →"
-            textSize = 16f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.white, null))
-            gravity = Gravity.CENTER
-            setPadding(0, (14 * density).toInt(), 0, (14 * density).toInt())
-            val bg = GradientDrawable()
-            bg.cornerRadius = 24 * density
-            bg.setColor(resources.getColor(R.color.accent_violet, null))
-            background = bg
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = (12 * density).toInt() }
-            isClickable = true
-            setOnClickListener {
-                requestScreenCapture.launch(projectionManager.createScreenCaptureIntent())
-            }
-        })
-
-        // Cancel
-        root.addView(TextView(this).apply {
-            text = "Cancel"
-            textSize = 14f
-            setTextColor(resources.getColor(R.color.text_muted, null))
-            gravity = Gravity.CENTER
-            setPadding(0, (8 * density).toInt(), 0, (8 * density).toInt())
-            isClickable = true
-            setOnClickListener { finishAndShowKeyboard() }
-        })
-
-        return root
     }
 
     private fun startCapture(resultCode: Int, data: Intent) {
@@ -177,8 +68,8 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
         imageReader = reader
         reader.setOnImageAvailableListener({ ir ->
             if (captured) return@setOnImageAvailableListener
-            captured = true
             val image = ir.acquireLatestImage() ?: return@setOnImageAvailableListener
+            captured = true
             try {
                 val plane = image.planes[0]
                 val buffer = plane.buffer

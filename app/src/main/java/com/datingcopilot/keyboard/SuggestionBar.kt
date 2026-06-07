@@ -80,6 +80,8 @@ class SuggestionBar(
     }
 
     init {
+        generateBtn.setOnClickListener { onGenerateTap?.invoke() }
+        screenshotBtn.setOnClickListener { onScreenshotTap?.invoke() }
         loadingDots.forEach { loadingContainer.addView(it) }
         suggestionsContainer.addView(suggestionsInner)
         row.addView(generateBtn)
