@@ -22,4 +22,14 @@
     <!-- Sparkle 2 -->
     <path android:fillColor="#D946EF"
         android:pathData="M24,32 L25,35 L28,36 L25,37 L24,40 L23,37 L20,36 L23,35 Z" />
+
+    <!-- zzzz text below bubble, each is a stroke Z -->
+    <path android:strokeWidth="2" android:strokeColor="#FFFFFF"
+        android:pathData="M42,84 L50,84 L42,92 L50,92" />
+    <path android:strokeWidth="2" android:strokeColor="#FFFFFF"
+        android:pathData="M54,84 L62,84 L54,92 L62,92" />
+    <path android:strokeWidth="2" android:strokeColor="#FFFFFF"
+        android:pathData="M66,84 L74,84 L66,92 L74,92" />
+    <path android:strokeWidth="2" android:strokeColor="#FFFFFF"
+        android:pathData="M78,84 L86,84 L78,92 L86,92" />
 </vector>
