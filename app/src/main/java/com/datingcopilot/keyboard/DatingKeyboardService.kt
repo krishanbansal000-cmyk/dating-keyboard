@@ -49,8 +49,9 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
             onSuggestionTap = { text ->
                 android.util.Log.d("KeyboardService", "suggestion tapped: '${text.take(30)}'")
                 val ic = currentInputConnection
-                val existing = ic?.getTextBeforeCursor(1000, 0)?.toString() ?: ""
-                ic?.deleteSurroundingText(existing.length, 0)
+                // Clear the current entry aggressively so the tap behaves like a replacement.
+                ic?.finishComposingText()
+                ic?.deleteSurroundingText(1000, 1000)
                 ic?.commitText(text, 1)
                 suggestionBar.reset()
             },
