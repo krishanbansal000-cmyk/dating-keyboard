@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="false"
@@ -60,6 +63,16 @@
             android:name=".chat.ScreenshotAnalysisActivity"
             android:exported="false"
             android:parentActivityName=".chat.ChatActivity" />
+
+        <activity
+            android:name=".chat.HistoryActivity"
+            android:exported="false"
+            android:parentActivityName=".chat.ChatActivity" />
+
+        <service
+            android:name=".ScreenshotCaptureService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
 
     </application>
 </manifest>

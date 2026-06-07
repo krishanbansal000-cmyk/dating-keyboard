@@ -47,12 +47,15 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
 
         suggestionBar = SuggestionBar(this,
             onSuggestionTap = { text ->
+                android.util.Log.d("KeyboardService", "suggestion tapped: '${text.take(30)}'")
                 val ic = currentInputConnection
                 val existing = ic?.getTextBeforeCursor(1000, 0)?.toString() ?: ""
                 ic?.deleteSurroundingText(existing.length, 0)
                 ic?.commitText(text, 1)
+                suggestionBar.reset()
             },
             onGenerateTap = {
+                android.util.Log.d("KeyboardService", "generate button tapped")
                 fetchSuggestions()
             },
             onScreenshotTap = {
@@ -103,6 +106,7 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         if (::suggestionBar.isInitialized) {
+            if (!restarting) suggestionBar.reset()
             loadPendingKeyboardState()
         }
     }
@@ -116,20 +120,27 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
 
     private fun fetchSuggestions() {
         val text = currentInputConnection?.getTextBeforeCursor(500, 0)?.toString() ?: ""
+        android.util.Log.d("KeyboardService", "fetchSuggestions called, text='$text' ic=${currentInputConnection != null}")
 
         // Use any saved context from app flows; no screen-reading service is packaged.
         val chatCtx = ChatContextService.getChatContext(this)
+        android.util.Log.d("KeyboardService", "chatCtx='$chatCtx'")
         
         // Do NOT merge chat context with user text into one blob.
         // Instead, send chat context separately so backend can handle it properly.
-        if (text.isBlank() && chatCtx.isBlank()) return
+        if (text.isBlank() && chatCtx.isBlank()) {
+            android.util.Log.d("KeyboardService", "both blank, returning")
+            return
+        }
 
         scope.launch {
             suggestionBar.showLoading(true)
+            android.util.Log.d("KeyboardService", "calling API...")
             val result = withContext(Dispatchers.IO) {
                 apiClient.getSuggestionsWithContext(text, chatCtx, currentTone, currentIntent, currentPlatform)
             }
             suggestionBar.showLoading(false)
+            android.util.Log.d("KeyboardService", "API returned: ${result?.size} suggestions")
             if (result != null) {
                 AppHistoryStore.add(this@DatingKeyboardService, "Keyboard", text.ifBlank { chatCtx }, result)
                 suggestionBar.showSuggestions(result)

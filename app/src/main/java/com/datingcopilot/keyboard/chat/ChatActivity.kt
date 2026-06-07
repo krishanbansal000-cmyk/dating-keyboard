@@ -302,7 +302,7 @@ class ChatActivity : AppCompatActivity() {
             }
             addView(uploadHint)
 
-            addHistoryPreview(this)
+            addHistoryButton(this)
         }
         chatContainer.addView(emptyStateView)
 
@@ -776,44 +776,33 @@ class ChatActivity : AppCompatActivity() {
             .apply()
     }
 
-    private fun addHistoryPreview(parent: LinearLayout) {
-        val history = AppHistoryStore.get(this).take(3)
+    private fun addHistoryButton(parent: LinearLayout) {
+        val history = AppHistoryStore.get(this)
         if (history.isEmpty()) return
 
         parent.addView(TextView(this).apply {
-            text = "Recent replies"
-            textSize = 12f
+            text = "📋 History (${history.size})"
+            textSize = 13f
             setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.text_muted, null))
+            setTextColor(resources.getColor(R.color.accent_violet, null))
             textAlignment = TextView.TEXT_ALIGNMENT_CENTER
+            setPadding(dp(18), dp(10), dp(18), dp(10))
+            val bg = GradientDrawable().apply {
+                cornerRadius = dp(20).toFloat()
+                setColor(resources.getColor(R.color.bg_surface, null))
+                setStroke(dp(1), resources.getColor(R.color.glass_border, null))
+            }
+            background = bg
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { gravity = Gravity.CENTER; topMargin = dp(24) }
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                startActivity(Intent(this@ChatActivity, HistoryActivity::class.java))
+            }
         })
-
-        history.forEach { item ->
-            parent.addView(TextView(this).apply {
-                text = "${item.type}: ${item.suggestions.firstOrNull()?.text ?: item.preview}"
-                textSize = 12f
-                setTextColor(resources.getColor(R.color.text_secondary, null))
-                maxLines = 2
-                setPadding(dp(14), dp(8), dp(14), dp(8))
-                background = GradientDrawable().apply {
-                    cornerRadius = dp(14).toFloat()
-                    setColor(resources.getColor(R.color.bg_surface, null))
-                    setStroke(1, resources.getColor(R.color.glass_border, null))
-                }
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    leftMargin = dp(28)
-                    rightMargin = dp(28)
-                    topMargin = dp(8)
-                }
-            })
-        }
     }
 
     private fun analyzeText(text: String) {

@@ -222,25 +222,37 @@ class ApiClient(context: Context) {
             )
 
             val json = gson.toJson(requestBody)
+            val url = "${getBaseUrl()}/api/v1/chat/draft"
+            android.util.Log.d("ApiClient", "POST $url text='${userText.take(50)}' tone=$tone")
             val reqBuilder = Request.Builder()
-                .url("${getBaseUrl()}/api/v1/chat/draft")
+                .url(url)
                 .post(json.toRequestBody(JSON))
                 .addHeader("Content-Type", "application/json")
 
             val response = client.newCall(reqBuilder.build()).execute()
-            if (!response.isSuccessful) return null
+            android.util.Log.d("ApiClient", "Response code=${response.code}")
+            if (!response.isSuccessful) {
+                val errBody = response.body?.string()?.take(200) ?: "no body"
+                android.util.Log.e("ApiClient", "Text draft failed: HTTP ${response.code} - $errBody")
+                return null
+            }
 
             val responseBody = response.body?.string() ?: return null
             val result = gson.fromJson(responseBody, Map::class.java)
             val optionsRaw = result["options"] as? List<Map<String, Any>> ?: return null
 
-            optionsRaw.mapNotNull { opt ->
+            val suggestions = optionsRaw.mapNotNull { opt ->
                 val text = opt["text"] as? String ?: return@mapNotNull null
                 val optTone = opt["tone"] as? String ?: tone
                 val confidence = (opt["confidence"] as? Number)?.toInt() ?: 90
                 SuggestionOption(text, confidence, optTone)
             }
-        } catch (_: Exception) { null }
+            android.util.Log.d("ApiClient", "Got ${suggestions.size} suggestions")
+            suggestions
+        } catch (e: Exception) {
+            android.util.Log.e("ApiClient", "getSuggestionsWithContext exception: ${e.message}", e)
+            null
+        }
     }
 
     // ── NEW: Upload screenshot for analysis ──
