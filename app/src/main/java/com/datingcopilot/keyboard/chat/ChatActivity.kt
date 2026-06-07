@@ -20,7 +20,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
-import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -175,23 +174,7 @@ class ChatActivity : AppCompatActivity() {
         }
         topBar.addView(titleText)
 
-        val hinglishSwitch = Switch(this).apply {
-            text = "Hinglish"
-            textSize = 11f
-            setTextColor(resources.getColor(R.color.text_secondary, null))
-            val sp = this@ChatActivity.getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
-            isChecked = sp.getBoolean("hinglish_mode", false)
-            setOnCheckedChangeListener { _, isChecked ->
-                sp.edit().putBoolean("hinglish_mode", isChecked).apply()
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                marginEnd = (8 * resources.displayMetrics.density).toInt()
-            }
-        }
-        topBar.addView(hinglishSwitch)
+        // Hinglish toggle removed
 
         val profileBtn = TextView(this).apply {
             text = "⚙️"
@@ -759,46 +742,36 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun handleImageSelected(uri: Uri) {
-        // Show screenshot preview and hide input row
-        findViewById<View>(android.R.id.content)?.findViewWithTag<ImageView>("screenshot_preview")?.let {
-            it.visibility = View.VISIBLE
-            it.setImageURI(uri)
-        }
-        findViewById<View>(android.R.id.content)?.findViewWithTag<View>("input_row")?.visibility = View.GONE
-        showLoading(true, uri)
-        
-        lifecycleScope.launch {
-            try {
-                val response = withContext(Dispatchers.IO) {
-                    apiClient.uploadScreenshot(
-                        uri,
-                        currentPersona,
-                        this@ChatActivity,
-                        currentIntent,
-                        currentPlatform
-                    )
-                }
-                showLoading(false)
-                if (response != null) {
-                    if (returnToKeyboardAfterScreenshot) {
+        if (returnToKeyboardAfterScreenshot) {
+            // Keyboard screenshot flow — analyze here, save for keyboard
+            showLoading(true, uri)
+            lifecycleScope.launch {
+                try {
+                    val response = withContext(Dispatchers.IO) {
+                        apiClient.uploadScreenshot(uri, currentPersona, this@ChatActivity, currentIntent, currentPlatform)
+                    }
+                    showLoading(false)
+                    if (response != null) {
                         saveKeyboardHandoff(response)
                         Toast.makeText(this@ChatActivity, "Replies ready. Open RizzSe keyboard", Toast.LENGTH_SHORT).show()
                         finish()
                     } else {
-                        val intent = Intent(this@ChatActivity, ScreenshotAnalysisActivity::class.java).apply {
-                            data = uri
-                            putExtra("conversation", gson.toJson(response.conversation.orEmpty()))
-                            putExtra("suggestions", gson.toJson(response.suggestions.orEmpty()))
-                        }
-                        startActivity(intent)
+                        Toast.makeText(this@ChatActivity, "Failed to analyze screenshot", Toast.LENGTH_LONG).show()
                     }
-                } else {
-                    Toast.makeText(this@ChatActivity, "Failed to analyze screenshot", Toast.LENGTH_LONG).show()
+                } catch (e: Exception) {
+                    showLoading(false)
+                    Toast.makeText(this@ChatActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
-            } catch (e: Exception) {
-                showLoading(false)
-                Toast.makeText(this@ChatActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
             }
+        } else {
+            // Launch analysis page immediately with the screenshot visible
+            val intent = Intent(this@ChatActivity, ScreenshotAnalysisActivity::class.java).apply {
+                data = uri
+                putExtra("persona", currentPersona)
+                putExtra("intent", currentIntent)
+                putExtra("platform", currentPlatform)
+            }
+            startActivity(intent)
         }
     }
 
