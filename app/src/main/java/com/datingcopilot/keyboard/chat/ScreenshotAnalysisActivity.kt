@@ -1,14 +1,16 @@
 package com.datingcopilot.keyboard.chat
 
+import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.Context
-import android.content.Intent
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -53,11 +55,11 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
                 (16 * resources.displayMetrics.density).toInt(),
                 (48 * resources.displayMetrics.density).toInt(),
                 (16 * resources.displayMetrics.density).toInt(),
-                (32 * resources.displayMetrics.density).toInt()
+                (40 * resources.displayMetrics.density).toInt()
             )
         }
 
-        // Top bar
+        // ── Top bar ──
         val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -68,9 +70,24 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         }
 
         val backBtn = TextView(this).apply {
-            text = "← Back"
-            textSize = 16f
-            setTextColor(resources.getColor(R.color.accent_violet, null))
+            text = "←"
+            textSize = 20f
+            setTextColor(resources.getColor(R.color.white, null))
+            gravity = Gravity.CENTER
+            setPadding(
+                (10 * resources.displayMetrics.density).toInt(),
+                (6 * resources.displayMetrics.density).toInt(),
+                (10 * resources.displayMetrics.density).toInt(),
+                (6 * resources.displayMetrics.density).toInt()
+            )
+            val bg = GradientDrawable()
+            bg.cornerRadius = 12 * resources.displayMetrics.density
+            bg.setColor(resources.getColor(R.color.bg_surface, null))
+            background = bg
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
             setOnClickListener { finish() }
         }
         topBar.addView(backBtn)
@@ -85,13 +102,13 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         topBar.addView(title)
         root.addView(topBar)
 
-        // Screenshot
+        // ── Screenshot ──
         val imageView = ImageView(this).apply {
             scaleType = ImageView.ScaleType.FIT_CENTER
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 (300 * resources.displayMetrics.density).toInt()
-            ).apply { bottomMargin = (20 * resources.displayMetrics.density).toInt() }
+            ).apply { bottomMargin = (16 * resources.displayMetrics.density).toInt() }
         }
         if (imageUri != null) {
             imageView.setImageURI(imageUri)
@@ -100,34 +117,68 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         }
         root.addView(imageView)
 
+        // ── Animated analyzing overlay ──
         val loadView = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (200 * resources.displayMetrics.density).toInt()
+                (180 * resources.displayMetrics.density).toInt()
             )
+            setPadding(
+                (32 * resources.displayMetrics.density).toInt(),
+                (24 * resources.displayMetrics.density).toInt(),
+                (32 * resources.displayMetrics.density).toInt(),
+                (24 * resources.displayMetrics.density).toInt()
+            )
+            val bg = GradientDrawable()
+            bg.cornerRadius = 20 * resources.displayMetrics.density
+            bg.setColor(resources.getColor(R.color.bg_card, null))
+            bg.setStroke(1, resources.getColor(R.color.glass_border, null))
+            background = bg
         }
         loadingState = loadView
 
-        val spinner = ProgressBar(this, null, android.R.attr.progressBarStyleLarge).apply {
-            isIndeterminate = true
+        val loaderDots = TextView(this).apply {
+            text = ". . ."
+            textSize = 32f
+            setTextColor(resources.getColor(R.color.accent_violet, null))
             layoutParams = LinearLayout.LayoutParams(
-                (48 * resources.displayMetrics.density).toInt(),
-                (48 * resources.displayMetrics.density).toInt()
-            ).apply { bottomMargin = (16 * resources.displayMetrics.density).toInt() }
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (12 * resources.displayMetrics.density).toInt() }
         }
-        loadView.addView(spinner)
+        // Pulsing animation for dots
+        val pulseAnim = ObjectAnimator.ofFloat(loaderDots, "alpha", 0.3f, 1f).apply {
+            duration = 800
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator()
+        }
+        pulseAnim.start()
+        loadView.addView(loaderDots)
 
-        val loadingText = TextView(this).apply {
-            text = "Analyzing your conversation..."
+        val analyzingText = TextView(this).apply {
+            text = "Reading your chat..."
             textSize = 15f
-            setTextColor(resources.getColor(R.color.text_secondary, null))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.text_primary, null))
         }
-        loadView.addView(loadingText)
+        loadView.addView(analyzingText)
+
+        val subText = TextView(this).apply {
+            text = "Generating rizz replies"
+            textSize = 12f
+            setTextColor(resources.getColor(R.color.text_muted, null))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = (4 * resources.displayMetrics.density).toInt() }
+        }
+        loadView.addView(subText)
         root.addView(loadView)
 
-        // Results containers (initially hidden)
+        // ── Results containers ──
         convoSection = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -143,38 +194,28 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         scrollView.addView(root)
         setContentView(scrollView)
 
-        // Start analysis
         if (imageUri != null) {
             runAnalysis(imageUri, persona, intentType, platform, root)
         }
     }
 
-    private fun runAnalysis(uri: Uri, persona: String, intentType: String, platform: String, root: LinearLayout) {
+    private fun runAnalysis(uri: Uri, persona: String, intentType: String, platform: String, rootView: LinearLayout) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = apiClient.uploadScreenshot(uri, persona, this@ScreenshotAnalysisActivity, intentType, platform)
                 withContext(Dispatchers.Main) {
-                    if (response != null) {
-                        showResults(root, response)
-                    } else {
-                        showError(root, "Analysis failed")
-                    }
+                    if (response != null) showResults(response, rootView) else showError("Analysis failed")
                 }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    showError(root, "Error: ${e.message?.take(50)}")
-                }
+                withContext(Dispatchers.Main) { showError("Error: ${e.message?.take(50)}") }
             }
         }
     }
 
-    private fun showResults(root: LinearLayout, response: AnalyzeResponse) {
+    private fun showResults(response: AnalyzeResponse, rootView: LinearLayout) {
         val density = resources.displayMetrics.density
-
-        // Hide loading
         loadingState.visibility = View.GONE
 
-        // Conversation section
         response.conversation?.forEachIndexed { i, msg ->
             val isYou = msg.sender == "you"
             val bubble = TextView(this).apply {
@@ -195,115 +236,119 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
                     gravity = if (isYou) Gravity.END else Gravity.START
                     topMargin = (6 * density).toInt()
                 }
-                translationY = 40f
+                translationY = 30f
                 alpha = 0f
             }
-            convoSection?.addView(bubble)
+            convoSection.addView(bubble)
             bubble.postDelayed({
-                bubble.animate().translationY(0f).alpha(1f).setDuration(400)
-                    .setStartDelay((i * 150).toLong()).start()
-            }, 300)
+                bubble.animate().translationY(0f).alpha(1f).setDuration(350)
+                    .setStartDelay((i * 120).toLong()).start()
+            }, 200)
+            convoSection.visibility = View.VISIBLE
         }
-        convoSection?.visibility = View.VISIBLE
 
-        // Suggestions section (delayed)
-        root.postDelayed({
-            showSuggestions(root, response.suggestions.orEmpty())
-        }, ((response.conversation?.size ?: 0) * 150L + 500L))
+        val delay = ((response.conversation?.size ?: 0) * 120L + 600L)
+        rootView.postDelayed({ showSuggestions(response.suggestions.orEmpty()) }, delay)
     }
 
-    private fun showSuggestions(root: LinearLayout, suggestions: List<SuggestionOption>) {
+    private fun showSuggestions(suggestions: List<SuggestionOption>) {
         val density = resources.displayMetrics.density
-
         val label = TextView(this).apply {
-            text = "Suggestions"
+            text = "Try these replies"
             textSize = 13f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(resources.getColor(R.color.text_secondary, null))
-            setPadding(0, (20 * density).toInt(), 0, (8 * density).toInt())
+            setPadding(0, (20 * density).toInt(), 0, (10 * density).toInt())
         }
         suggSection.addView(label)
 
         suggestions.forEachIndexed { i, sug ->
-            val card = createCard(sug)
+            val card = createCard(sug, density)
             card.alpha = 0f
-            card.translationY = 30f
+            card.translationY = 20f
             suggSection.addView(card)
             card.postDelayed({
-                card.animate().alpha(1f).translationY(0f).setDuration(400)
-                    .setStartDelay((i * 200).toLong()).start()
+                card.animate().alpha(1f).translationY(0f).setDuration(350)
+                    .setStartDelay((i * 150).toLong()).start()
             }, 100)
         }
         suggSection.visibility = View.VISIBLE
     }
 
-    private fun createCard(sug: SuggestionOption): LinearLayout {
-        val density = resources.displayMetrics.density
-        return LinearLayout(this).apply {
+    private fun createCard(sug: SuggestionOption, density: Float): LinearLayout {
+        val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { bottomMargin = (10 * density).toInt() }
-            setPadding((16 * density).toInt(), (14 * density).toInt(), (16 * density).toInt(), (14 * density).toInt())
+            setPadding((16 * density).toInt(), (12 * density).toInt(), (16 * density).toInt(), (12 * density).toInt())
             val bg = GradientDrawable()
             bg.cornerRadius = 16 * density
             bg.setColor(resources.getColor(R.color.bg_card, null))
             bg.setStroke(1, resources.getColor(R.color.glass_border, null))
             background = bg
-
-            addView(LinearLayout(this.context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                addView(TextView(this.context).apply {
-                    text = sug.persona.replaceFirstChar { it.uppercase() }
-                    textSize = 10f
-                    setTypeface(null, android.graphics.Typeface.BOLD)
-                    setTextColor(resources.getColor(R.color.accent_violet, null))
-                    setPadding((8 * density).toInt(), (3 * density).toInt(), (8 * density).toInt(), (3 * density).toInt())
-                    val bg2 = GradientDrawable()
-                    bg2.cornerRadius = 8 * density
-                    bg2.setColor(resources.getColor(R.color.bg_surface, null))
-                    background = bg2
-                })
-                addView(View(this.context).apply { layoutParams = LinearLayout.LayoutParams(0, 0, 1f) })
-                addView(TextView(this.context).apply {
-                    text = "${sug.confidence}%"
-                    textSize = 11f
-                    setTextColor(resources.getColor(R.color.text_muted, null))
-                })
-            })
-            addView(TextView(this.context).apply {
-                text = sug.text
-                textSize = 15f
-                setTextColor(resources.getColor(R.color.text_primary, null))
-                setLineSpacing(4f, 1.0f)
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                    .apply { topMargin = (10 * density).toInt() }
-            })
-            addView(TextView(this.context).apply {
-                text = "📋 Copy"
-                textSize = 12f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(resources.getColor(R.color.accent_violet, null))
-                gravity = Gravity.CENTER
-                setPadding((12 * density).toInt(), (6 * density).toInt(), (12 * density).toInt(), (6 * density).toInt())
-                val bg3 = GradientDrawable()
-                bg3.cornerRadius = 14 * density
-                bg3.setColor(resources.getColor(R.color.bg_surface, null))
-                background = bg3
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                    .apply { gravity = Gravity.END; topMargin = (10 * density).toInt() }
-                setOnClickListener {
-                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("RizzSe", sug.text))
-                    Toast.makeText(this@ScreenshotAnalysisActivity, "Copied!", Toast.LENGTH_SHORT).show()
-                }
-            })
         }
+
+        // Top row: badge + confidence + copy icon
+        val topRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (8 * density).toInt() }
+        }
+
+        topRow.addView(TextView(this).apply {
+            text = sug.persona.replaceFirstChar { it.uppercase() }
+            textSize = 10f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.accent_violet, null))
+            setPadding((8 * density).toInt(), (2 * density).toInt(), (8 * density).toInt(), (2 * density).toInt())
+            val bg = GradientDrawable()
+            bg.cornerRadius = 6 * density
+            bg.setColor(resources.getColor(R.color.bg_surface, null))
+            background = bg
+        })
+
+        topRow.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(0, 0, 1f) })
+
+        topRow.addView(TextView(this).apply {
+            text = "${sug.confidence}%"
+            textSize = 10f
+            setTextColor(resources.getColor(R.color.text_muted, null))
+            setPadding(0, 0, (8 * density).toInt(), 0)
+        })
+
+        // Copy icon only — small, inline on top-right
+        topRow.addView(TextView(this).apply {
+            text = "📋"
+            textSize = 14f
+            setOnClickListener {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("RizzSe", sug.text))
+                Toast.makeText(this@ScreenshotAnalysisActivity, "Copied!", Toast.LENGTH_SHORT).show()
+            }
+        })
+        card.addView(topRow)
+
+        // Suggestion text — more readable, tighter
+        card.addView(TextView(this).apply {
+            text = sug.text
+            textSize = 14f
+            setTextColor(resources.getColor(R.color.text_primary, null))
+            setLineSpacing(3f, 1.0f)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        })
+
+        return card
     }
 
-    private fun showError(root: LinearLayout, msg: String) {
+    private fun showError(msg: String) {
         loadingState.visibility = View.GONE
         Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
         finish()

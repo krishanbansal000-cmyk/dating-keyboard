@@ -13,7 +13,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.DisplayMetrics
+import android.view.Gravity
 import android.view.inputmethod.InputMethodManager
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -45,7 +47,21 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null && !launchedCapturePrompt) {
+        // Show explanation before system permission dialog
+        val explanation = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setBackgroundColor(0x00000000)
+            setOnClickListener {
+                if (!launchedCapturePrompt) {
+                    launchedCapturePrompt = true
+                    requestScreenCapture.launch(projectionManager.createScreenCaptureIntent())
+                }
+            }
+        }
+        setContentView(explanation)
+        // Launch the system permission dialog immediately
+        if (!launchedCapturePrompt) {
             launchedCapturePrompt = true
             requestScreenCapture.launch(projectionManager.createScreenCaptureIntent())
         }
