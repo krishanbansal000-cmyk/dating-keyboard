@@ -568,7 +568,7 @@ class ChatActivity : AppCompatActivity() {
             savePreference("persona", persona)
             savePreference("intent", intent)
             selectedToneChip = updateSelectedChip(selectedToneChip, view as TextView)
-            if (suggestionsRecyclerView.visibility == View.VISIBLE) regenerateSuggestions()
+            regenerateSuggestions()
         }
         if (selected) selectedToneChip = chip
         return chip
