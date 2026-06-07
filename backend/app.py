@@ -60,7 +60,8 @@ app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB max
 
 SYSTEM_PROMPT = (
     "Output exactly 3 dating replies under 100 chars: >>> Safe:, >>> Smooth:, >>> Bold:. "
-    "No extras. Emojis are allowed sparingly only when they fit the user's tone/context."
+    "No extras. Be respectful, context-aware, and never insult, neg, pressure, or dismiss them. "
+    "Emojis are allowed sparingly only when they fit the user's tone/context."
 )
 
 PERSONA_PROMPTS = {
@@ -94,7 +95,8 @@ PLATFORM_PROMPTS = {
 STYLE_RULES = (
     "Indian Gen-Z style. Reply to latest message. Safe=low-risk, Smooth=witty/flirty, "
     "Bold=high-risk rizz. Emojis may be used if natural, but never force them. "
-    "Avoid vulgarity, uncle jokes, fake deep lines, chemistry jokes, generic templates."
+    "Always stay respectful and match their energy. Avoid insults, negging, pressure, vulgarity, "
+    "uncle jokes, fake deep lines, chemistry jokes, generic templates."
 )
 
 OPENER_PROMPTS = {
@@ -126,13 +128,13 @@ MOCK_SUGGESTIONS = {
     ],
     "witty": [
         "I can quit anytime, but you're making a strong case",
-        "Only if you admit I recovered from the cringe",
-        "Not quitting, just waiting for my redemption arc"
+        "Only if you let me recover with a better answer",
+        "Not quitting, just saving my best reply for you"
     ],
     "playful": [
         "Not when the conversation is this fun",
-        "I can quit, but this is clearly my best bad decision today",
-        "Only if you stop making it this entertaining"
+        "I can quit, but I like where this is going",
+        "Only if you stop making this so easy to enjoy"
     ],
     "chill": [
         "Fair, I'll slow down. Still enjoying this though",
@@ -140,9 +142,9 @@ MOCK_SUGGESTIONS = {
         "Noted. I'll keep the confidence, reduce the drama"
     ],
     "direct": [
-        "Then let me prove I'm less cringe over coffee",
-        "One coffee and I'll retire the dramatic lines",
-        "Give me one plan and I'll stop freelancing the future"
+        "Then let me prove the vibe over coffee",
+        "One coffee and I'll keep the charm simple",
+        "Give me one plan and I'll bring the good energy"
     ],
     "flirty": [
         "Only because you're making quitting difficult",
@@ -171,7 +173,7 @@ MOCK_CONVERSATIONS = {
 }
 
 
-def encode_image(image_file, max_side=900, quality=75):
+def encode_image(image_file, max_side=720, quality=68):
     """Encode a compact JPEG for faster vision requests."""
     image = Image.open(image_file)
     if image.mode in ('RGBA', 'LA', 'P'):
@@ -276,21 +278,21 @@ def fallback_suggestions(persona, intent="keep_going", key="persona", hinglish=F
     latest = latest_text.lower()
     if "first step to what" in latest:
         lines = [
-            ("safe", "To me pretending I had a plan all along"),
-            ("smooth", "To me becoming your best bad decision"),
-            ("bold", "Deleting this app together, obviously")
+            ("safe", "To me suggesting coffee without overthinking it"),
+            ("smooth", "To me turning this into a good plan"),
+            ("bold", "To us making this conversation even better")
         ]
     elif "getting way ahead" in latest or "way ahead of yourself" in latest:
         lines = [
             ("safe", "Fine, I'll downgrade us to one coffee for now"),
-            ("smooth", "True, but the view from ahead is pretty good"),
-            ("bold", "I call it confidence, HR would call it forecasting")
+            ("smooth", "Fair, I'll slow down and enjoy this properly"),
+            ("bold", "Noted. I'll keep it charming and present")
         ]
     elif "don't quit" in latest or "dont quit" in latest:
         lines = [
-            ("safe", "Not when you're this fun to annoy"),
+            ("safe", "Not when this conversation is this fun"),
             ("smooth", "I quit bad conversations, not good ones"),
-            ("bold", "Only after you admit the cringe worked")
+            ("bold", "Only after I earn one more smile")
         ]
     elif intent == "first_message":
         if hinglish:
@@ -309,7 +311,7 @@ def fallback_suggestions(persona, intent="keep_going", key="persona", hinglish=F
         lines = [
             ("safe", "Fine, I'll pause the flirting. Coffee instead?"),
             ("smooth", "One coffee and I'll retire the dramatic lines"),
-            ("bold", "Let me prove I'm less cringe in person")
+            ("bold", "Let me prove the vibe in person")
         ]
     else:
         raw_lines = MOCK_SUGGESTIONS.get(persona, MOCK_SUGGESTIONS["playful"])
@@ -511,8 +513,8 @@ def analyze_screenshot():
                 response = call_ai_fast(
                     messages,
                     model=OPENAI_MODEL,
-                    max_tokens=900,
-                    temperature=0.65,
+                    max_tokens=220,
+                    temperature=0.55,
                     timeout_seconds=30
                 )
                 
@@ -616,7 +618,7 @@ def chat_draft():
             
             response = call_ai_fast(
                 [{"role": "user", "content": f"{input_hint}\n\n{context_prompt} Write 3 short replies as Safe, Smooth, Bold (under 100 chars each).\n\n>>> Safe:\n>>> Smooth:\n>>> Bold:"}],
-                max_tokens=90, temperature=0.65
+                max_tokens=80, temperature=0.55
             )
             
             if response:
