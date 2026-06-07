@@ -58,7 +58,8 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB max
 
 SYSTEM_PROMPT = (
-    "Output exactly 3 dating replies under 100 chars: >>> Safe:, >>> Smooth:, >>> Bold:. No extras."
+    "Output exactly 3 dating replies under 100 chars: >>> Safe:, >>> Smooth:, >>> Bold:. "
+    "No extras. Emojis are allowed sparingly only when they fit the user's tone/context."
 )
 
 PERSONA_PROMPTS = {
@@ -91,7 +92,8 @@ PLATFORM_PROMPTS = {
 
 STYLE_RULES = (
     "Indian Gen-Z style. Reply to latest message. Safe=low-risk, Smooth=witty/flirty, "
-    "Bold=high-risk rizz. Avoid vulgarity, uncle jokes, fake deep lines, chemistry jokes, generic templates."
+    "Bold=high-risk rizz. Emojis may be used if natural, but never force them. "
+    "Avoid vulgarity, uncle jokes, fake deep lines, chemistry jokes, generic templates."
 )
 
 OPENER_PROMPTS = {
@@ -352,7 +354,7 @@ def build_context_prompt(persona, intent="keep_going", platform="whatsapp", hing
     persona_prompt = PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["playful"])
     intent_prompt = INTENT_PROMPTS.get(intent, INTENT_PROMPTS["keep_going"])
     platform_prompt = PLATFORM_PROMPTS.get(platform, PLATFORM_PROMPTS["whatsapp"])
-    lang_hint = "Natural Hinglish." if hinglish else "English, Indian-friendly."
+    lang_hint = "Match the user's language from the text or screenshot; use natural Hinglish only when the chat does."
     return f"{STYLE_RULES} {platform_prompt} {intent_prompt} {persona_prompt} {lang_hint}"
 
 

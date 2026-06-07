@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Keyboard xmlns:android="http://schemas.android.com/apk/res/android"
+    android:keyWidth="12%p"
+    android:keyHeight="34dp"
+    android:horizontalGap="1%p"
+    android:verticalGap="2dp">
+
+    <Row>
+        <Key android:codes="-101" android:keyLabel="❤️" android:keyEdgeFlags="left" />
+        <Key android:codes="-102" android:keyLabel="😍" />
+        <Key android:codes="-103" android:keyLabel="😘" />
+        <Key android:codes="-104" android:keyLabel="🥰" />
+        <Key android:codes="-105" android:keyLabel="😉" />
+        <Key android:codes="-106" android:keyLabel="💕" />
+        <Key android:codes="-107" android:keyLabel="🔥" android:keyEdgeFlags="right" />
+    </Row>
+
+    <Row>
+        <Key android:codes="-108" android:keyLabel="😂" android:keyEdgeFlags="left" />
+        <Key android:codes="-109" android:keyLabel="😊" />
+        <Key android:codes="-110" android:keyLabel="🤭" />
+        <Key android:codes="-111" android:keyLabel="😌" />
+        <Key android:codes="-112" android:keyLabel="😏" />
+        <Key android:codes="-113" android:keyLabel="✨" />
+        <Key android:codes="-114" android:keyLabel="🙈" android:keyEdgeFlags="right" />
+    </Row>
+
+    <Row>
+        <Key android:codes="-1" android:keyLabel="ABC" android:keyWidth="18%p" android:keyEdgeFlags="left" />
+        <Key android:codes="32" android:keyLabel=" " android:keyWidth="45%p" />
+        <Key android:codes="-5" android:keyLabel="Del" android:keyWidth="18%p" android:keyEdgeFlags="right" />
+    </Row>
+</Keyboard>

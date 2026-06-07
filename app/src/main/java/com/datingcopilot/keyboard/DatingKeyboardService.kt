@@ -26,6 +26,8 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
     private var currentTone = "playful"
     private var currentIntent = "keep_going"
     private var currentPlatform = "whatsapp"
+    private var showingEmojiKeyboard = false
+    private var generatingScreenshotPath: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -163,9 +165,9 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
             prefs.edit().remove("pending_keyboard_screenshot_path").apply()
             return
         }
-        suggestionBar.showScreenshotToneOptions { persona, intent ->
-            generateFromPendingScreenshot(path, persona, intent)
-        }
+        if (generatingScreenshotPath == path) return
+        generatingScreenshotPath = path
+        generateFromPendingScreenshot(path, currentTone, currentIntent)
     }
 
     private fun generateFromPendingScreenshot(path: String, persona: String, intent: String) {
@@ -208,6 +210,8 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
                 android.util.Log.e("KeyboardService", "screenshot exception: ${e.message}", e)
                 Toast.makeText(this@DatingKeyboardService, "Error: ${e.message?.take(50)}", Toast.LENGTH_LONG).show()
                 suggestionBar.showError()
+            } finally {
+                generatingScreenshotPath = null
             }
         }
     }
@@ -227,6 +231,7 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
             32 -> ic.commitText(" ", 1)
             44 -> ic.commitText(",", 1)
             46 -> ic.commitText(".", 1)
+            -2 -> switchKeyboard(showEmoji = true)
             -101 -> ic.commitText("❤️", 1)
             -102 -> ic.commitText("😍", 1)
             -103 -> ic.commitText("😘", 1)
@@ -234,9 +239,22 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
             -105 -> ic.commitText("😉", 1)
             -106 -> ic.commitText("💕", 1)
             -107 -> ic.commitText("🔥", 1)
-            -1 -> {}
+            -108 -> ic.commitText("😂", 1)
+            -109 -> ic.commitText("😊", 1)
+            -110 -> ic.commitText("🤭", 1)
+            -111 -> ic.commitText("😌", 1)
+            -112 -> ic.commitText("😏", 1)
+            -113 -> ic.commitText("✨", 1)
+            -114 -> ic.commitText("🙈", 1)
+            -1 -> if (showingEmojiKeyboard) switchKeyboard(showEmoji = false)
             else -> ic.commitText(primaryCode.toChar().toString(), 1)
         }
+    }
+
+    private fun switchKeyboard(showEmoji: Boolean) {
+        showingEmojiKeyboard = showEmoji
+        keyboardView.keyboard = Keyboard(this, if (showEmoji) R.xml.emoji else R.xml.qwerty)
+        keyboardView.invalidateAllKeys()
     }
 
     override fun onPress(code: Int) {}

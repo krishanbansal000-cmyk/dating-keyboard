@@ -6,16 +6,6 @@
     android:verticalGap="2dp">
 
     <Row>
-        <Key android:codes="-101" android:keyLabel="❤️" android:keyWidth="13%p" android:keyEdgeFlags="left" />
-        <Key android:codes="-102" android:keyLabel="😍" android:keyWidth="13%p" />
-        <Key android:codes="-103" android:keyLabel="😘" android:keyWidth="13%p" />
-        <Key android:codes="-104" android:keyLabel="🥰" android:keyWidth="13%p" />
-        <Key android:codes="-105" android:keyLabel="😉" android:keyWidth="13%p" />
-        <Key android:codes="-106" android:keyLabel="💕" android:keyWidth="13%p" />
-        <Key android:codes="-107" android:keyLabel="🔥" android:keyWidth="13%p" android:keyEdgeFlags="right" />
-    </Row>
-
-    <Row>
         <Key android:codes="49" android:keyLabel="1" android:keyEdgeFlags="left" />
         <Key android:codes="50" android:keyLabel="2" />
         <Key android:codes="51" android:keyLabel="3" />
@@ -64,7 +54,8 @@
     </Row>
     <Row>
         <Key android:codes="44" android:keyLabel="," android:keyWidth="10%p" android:keyEdgeFlags="left" />
-        <Key android:codes="32" android:keyLabel=" " android:keyWidth="50%p" />
+        <Key android:codes="-2" android:keyLabel="😊" android:keyWidth="10%p" />
+        <Key android:codes="32" android:keyLabel=" " android:keyWidth="40%p" />
         <Key android:codes="46" android:keyLabel="." android:keyWidth="10%p" />
         <Key android:codes="10" android:keyLabel="Enter" android:keyEdgeFlags="right" android:keyWidth="14%p" />
     </Row>
