@@ -20,6 +20,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -55,12 +56,9 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var loadingView: FrameLayout
     private lateinit var loadingTextView: TextView
     private lateinit var loadingPreviewImage: ImageView
+    private lateinit var screenshotPreview: ImageView
+    private lateinit var inputRow: LinearLayout
     private lateinit var emptyStateView: LinearLayout
-    private lateinit var screenshotFlowView: FrameLayout
-    private lateinit var screenshotFlowImage: ImageView
-    private lateinit var screenshotFlowStatus: TextView
-    private lateinit var screenshotFlowProgress: ProgressBar
-    private lateinit var screenshotFlowSuggestions: LinearLayout
 
     private val messages = mutableListOf<ChatMessage>()
     private var currentPersona = "playful"
@@ -177,6 +175,24 @@ class ChatActivity : AppCompatActivity() {
         }
         topBar.addView(titleText)
 
+        val hinglishSwitch = Switch(this).apply {
+            text = "Hinglish"
+            textSize = 11f
+            setTextColor(resources.getColor(R.color.text_secondary, null))
+            val sp = this@ChatActivity.getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+            isChecked = sp.getBoolean("hinglish_mode", false)
+            setOnCheckedChangeListener { _, isChecked ->
+                sp.edit().putBoolean("hinglish_mode", isChecked).apply()
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginEnd = (8 * resources.displayMetrics.density).toInt()
+            }
+        }
+        topBar.addView(hinglishSwitch)
+
         val profileBtn = TextView(this).apply {
             text = "⚙️"
             textSize = 20f
@@ -256,6 +272,15 @@ class ChatActivity : AppCompatActivity() {
             }
             addView(pill)
 
+            val emptyTitle = TextView(this@ChatActivity).apply {
+                text = "Make the next text hit"
+                textSize = 24f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(resources.getColor(R.color.text_primary, null))
+                textAlignment = TextView.TEXT_ALIGNMENT_CENTER
+            }
+            addView(emptyTitle)
+
             val emptySubtitle = TextView(this@ChatActivity).apply {
                 text = "Paste or type below. Leave it empty for opener ideas."
                 textSize = 14f
@@ -270,8 +295,45 @@ class ChatActivity : AppCompatActivity() {
                 maxLines = 3
             }
             addView(emptySubtitle)
+
+            val uploadHint = TextView(this@ChatActivity).apply {
+                text = "📸 Upload Screenshot"
+                textSize = 14f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(resources.getColor(R.color.accent_violet, null))
+                textAlignment = TextView.TEXT_ALIGNMENT_CENTER
+                setPadding(
+                    (24 * resources.displayMetrics.density).toInt(),
+                    (12 * resources.displayMetrics.density).toInt(),
+                    (24 * resources.displayMetrics.density).toInt(),
+                    (12 * resources.displayMetrics.density).toInt()
+                )
+                val outlineBg = android.graphics.drawable.GradientDrawable()
+                outlineBg.cornerRadius = 32 * resources.displayMetrics.density
+                outlineBg.setColor(resources.getColor(R.color.bg_surface, null))
+                outlineBg.setStroke(1, resources.getColor(R.color.accent_violet, null))
+                background = outlineBg
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { gravity = Gravity.CENTER; topMargin = (24 * resources.displayMetrics.density).toInt() }
+                isClickable = true
+                setOnClickListener { showImagePicker() }
+            }
+            addView(uploadHint)
         }
         chatContainer.addView(emptyStateView)
+
+        // Screenshot preview
+        screenshotPreview = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                (200 * resources.displayMetrics.density).toInt()
+            ).apply { gravity = Gravity.TOP }
+            visibility = View.GONE
+        }
+        chatContainer.addView(screenshotPreview)
 
         // Chat RecyclerView
         chatRecyclerView = RecyclerView(this).apply {
@@ -453,6 +515,7 @@ class ChatActivity : AppCompatActivity() {
                 (16 * resources.displayMetrics.density).toInt()
             )
         }
+        inputRow.tag = "input_row"
 
         messageInput = android.widget.EditText(this).apply {
             hint = "Paste chat or leave empty"
@@ -504,109 +567,7 @@ class ChatActivity : AppCompatActivity() {
         mainLayout.addView(inputRow)
 
         root.addView(mainLayout)
-        root.addView(createScreenshotFlowView())
         setContentView(root)
-    }
-
-    private fun createScreenshotFlowView(): View {
-        screenshotFlowView = FrameLayout(this).apply {
-            visibility = View.GONE
-            setBackgroundColor(resources.getColor(R.color.bg_dark, null))
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-        }
-
-        val scroll = ScrollView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            fillViewport = true
-        }
-
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(24))
-            layoutParams = ScrollView.LayoutParams(
-                ScrollView.LayoutParams.MATCH_PARENT,
-                ScrollView.LayoutParams.WRAP_CONTENT
-            )
-        }
-
-        val topRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-        topRow.addView(TextView(this).apply {
-            text = "Screenshot replies"
-            textSize = 22f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.text_primary, null))
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        })
-        topRow.addView(TextView(this).apply {
-            text = "Close"
-            textSize = 13f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.text_secondary, null))
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-            isClickable = true
-            setOnClickListener { screenshotFlowView.visibility = View.GONE }
-        })
-        content.addView(topRow)
-
-        screenshotFlowImage = ImageView(this).apply {
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(240)
-            ).apply { topMargin = dp(18) }
-            background = GradientDrawable().apply {
-                cornerRadius = dp(22).toFloat()
-                setColor(resources.getColor(R.color.bg_surface, null))
-                setStroke(1, resources.getColor(R.color.accent_violet, null))
-            }
-            clipToOutline = true
-        }
-        content.addView(screenshotFlowImage)
-
-        val statusRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(18), 0, dp(12))
-        }
-        screenshotFlowProgress = ProgressBar(this).apply {
-            isIndeterminate = true
-            layoutParams = LinearLayout.LayoutParams(dp(30), dp(30)).apply { marginEnd = dp(10) }
-        }
-        statusRow.addView(screenshotFlowProgress)
-        screenshotFlowStatus = TextView(this).apply {
-            text = "Reading screenshot..."
-            textSize = 15f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.accent_violet, null))
-        }
-        statusRow.addView(screenshotFlowStatus)
-        content.addView(statusRow)
-
-        screenshotFlowSuggestions = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-        content.addView(screenshotFlowSuggestions)
-
-        scroll.addView(content)
-        screenshotFlowView.addView(scroll)
-        return screenshotFlowView
     }
 
     private fun sectionLabel(text: String): TextView {
@@ -798,8 +759,13 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun handleImageSelected(uri: Uri) {
-        emptyStateView.visibility = View.GONE
-        showScreenshotFlowLoading(uri)
+        // Show screenshot preview and hide input row
+        findViewById<View>(android.R.id.content)?.findViewWithTag<ImageView>("screenshot_preview")?.let {
+            it.visibility = View.VISIBLE
+            it.setImageURI(uri)
+        }
+        findViewById<View>(android.R.id.content)?.findViewWithTag<View>("input_row")?.visibility = View.GONE
+        showLoading(true, uri)
         
         lifecycleScope.launch {
             try {
@@ -812,73 +778,26 @@ class ChatActivity : AppCompatActivity() {
                         currentPlatform
                     )
                 }
+                showLoading(false)
                 if (response != null) {
                     if (returnToKeyboardAfterScreenshot) {
                         saveKeyboardHandoff(response)
                         Toast.makeText(this@ChatActivity, "Replies ready. Open RizzSe keyboard", Toast.LENGTH_SHORT).show()
                         finish()
                     } else {
-                        handleAnalyzeResponse(response)
-                        showScreenshotFlowResults(response.suggestions.orEmpty())
+                        val intent = Intent(this@ChatActivity, ScreenshotAnalysisActivity::class.java).apply {
+                            data = uri
+                            putExtra("conversation", gson.toJson(response.conversation.orEmpty()))
+                            putExtra("suggestions", gson.toJson(response.suggestions.orEmpty()))
+                        }
+                        startActivity(intent)
                     }
                 } else {
-                    showScreenshotFlowError()
                     Toast.makeText(this@ChatActivity, "Failed to analyze screenshot", Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
-                showScreenshotFlowError()
+                showLoading(false)
                 Toast.makeText(this@ChatActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-    private fun showScreenshotFlowLoading(uri: Uri) {
-        screenshotFlowView.visibility = View.VISIBLE
-        screenshotFlowImage.setImageURI(uri)
-        screenshotFlowStatus.text = "Reading screenshot..."
-        screenshotFlowProgress.visibility = View.VISIBLE
-        screenshotFlowSuggestions.removeAllViews()
-        startLoadingPulse()
-    }
-
-    private fun showScreenshotFlowResults(suggestions: List<SuggestionOption>) {
-        stopLoadingPulse()
-        screenshotFlowProgress.visibility = View.GONE
-        screenshotFlowStatus.text = if (suggestions.isEmpty()) "Could not find replies" else "Pick a reply"
-        screenshotFlowSuggestions.removeAllViews()
-
-        suggestions.forEach { suggestion ->
-            screenshotFlowSuggestions.addView(createScreenshotSuggestionCard(suggestion))
-        }
-    }
-
-    private fun showScreenshotFlowError() {
-        stopLoadingPulse()
-        screenshotFlowView.visibility = View.VISIBLE
-        screenshotFlowProgress.visibility = View.GONE
-        screenshotFlowStatus.text = "Could not read screenshot. Try a clearer one."
-        screenshotFlowSuggestions.removeAllViews()
-    }
-
-    private fun createScreenshotSuggestionCard(suggestion: SuggestionOption): View {
-        return TextView(this).apply {
-            text = suggestion.text
-            textSize = 16f
-            setTextColor(resources.getColor(R.color.text_primary, null))
-            setPadding(dp(16), dp(14), dp(16), dp(14))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(18).toFloat()
-                setColor(resources.getColor(R.color.bg_card, null))
-                setStroke(1, resources.getColor(R.color.glass_border, null))
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(10) }
-            isClickable = true
-            setOnClickListener {
-                copyToClipboard(suggestion.text)
-                Toast.makeText(this@ChatActivity, "Reply copied", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -968,7 +887,6 @@ class ChatActivity : AppCompatActivity() {
 
     private fun handleAnalyzeResponse(response: AnalyzeResponse) {
         android.util.Log.d("ChatActivity", "handleAnalyzeResponse: conversation=${response.conversation?.size}, suggestions=${response.suggestions?.size}")
-        emptyStateView.visibility = View.GONE
         response.conversation?.let { convo ->
             messages.clear()
             messages.addAll(convo)
@@ -982,6 +900,7 @@ class ChatActivity : AppCompatActivity() {
     private fun updateChatUI() {
         if (messages.isEmpty()) return
         
+        findViewById<View>(android.R.id.content)?.findViewWithTag<View>("input_row")?.visibility = View.GONE
         emptyStateView.visibility = View.GONE
         chatRecyclerView.visibility = View.VISIBLE
         chatAdapter.updateMessages(messages)
@@ -1046,13 +965,8 @@ class ChatActivity : AppCompatActivity() {
 
     private fun startLoadingPulse() {
         loadingPulseAnimator?.cancel()
-        val target = if (::screenshotFlowView.isInitialized && screenshotFlowView.visibility == View.VISIBLE) {
-            screenshotFlowView
-        } else {
-            loadingView
-        }
-        target.alpha = 0.95f
-        loadingPulseAnimator = ObjectAnimator.ofFloat(target, View.ALPHA, 0.88f, 1f).apply {
+        loadingView.alpha = 0.95f
+        loadingPulseAnimator = ObjectAnimator.ofFloat(loadingView, View.ALPHA, 0.88f, 1f).apply {
             duration = 850
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.REVERSE
@@ -1064,7 +978,6 @@ class ChatActivity : AppCompatActivity() {
         loadingPulseAnimator?.cancel()
         loadingPulseAnimator = null
         loadingView.alpha = 0.95f
-        if (::screenshotFlowView.isInitialized) screenshotFlowView.alpha = 1f
     }
 
     private fun copyToClipboard(text: String) {
@@ -1087,9 +1000,5 @@ class ChatActivity : AppCompatActivity() {
             }
         }
         return null
-    }
-
-    private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
     }
 }

@@ -56,5 +56,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".chat.ScreenshotAnalysisActivity"
+            android:exported="false"
+            android:parentActivityName=".chat.ChatActivity" />
+
     </application>
 </manifest>
