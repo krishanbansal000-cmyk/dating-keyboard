@@ -28,7 +28,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.datingcopilot.keyboard.R
-import com.datingcopilot.keyboard.image.ImagePickerBottomSheet
 import com.datingcopilot.keyboard.SettingsSheet
 import com.datingcopilot.keyboard.ChatContextService
 import com.google.gson.Gson
@@ -632,21 +631,8 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun showImagePicker() {
-        val bottomSheet = ImagePickerBottomSheet()
-        bottomSheet.listener = object : ImagePickerBottomSheet.ImagePickerListener {
-            override fun onCameraSelected() {
-                pickImage.launch("image/*")
-            }
-
-            override fun onGallerySelected() {
-                pickImage.launch("image/*")
-            }
-
-            override fun onPasteTextSelected() {
-                showPasteTextDialog()
-            }
-        }
-        bottomSheet.show(supportFragmentManager, "picker")
+        // Directly open system photo picker — shows recent images
+        pickImage.launch("image/*")
     }
 
     private fun showPasteTextDialog() {
