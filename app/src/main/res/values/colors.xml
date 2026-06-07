@@ -21,29 +21,29 @@
     <color name="red_400">#FFF87171</color>
     <color name="red_50">#FFFEF2F2</color>
 
-    <!-- Neutral Slate Theme -->
-    <color name="bg_dark">#FF0F172A</color>
-    <color name="bg_card">#FF1E293B</color>
-    <color name="bg_surface">#FF334155</color>
-    <color name="bg_input">#FF0F172A</color>
-    <color name="accent_violet">#FF818CF8</color>
+    <!-- Purple-Slate Theme -->
+    <color name="bg_dark">#FF130F24</color>
+    <color name="bg_card">#FF1E1835</color>
+    <color name="bg_surface">#FF2D2548</color>
+    <color name="bg_input">#FF130F24</color>
+    <color name="accent_violet">#FF8B5CF6</color>
     <color name="accent_purple">#FFA78BFA</color>
     <color name="accent_magenta">#FFF472B6</color>
     <color name="accent_pink">#FFFB7185</color>
     <color name="text_primary">#FFF1F5F9</color>
-    <color name="text_secondary">#FF94A3B8</color>
-    <color name="text_muted">#FF64748B</color>
-    <color name="glass_border">#FF475569</color>
-    <color name="glass_border_light">#FF64748B</color>
-    <color name="bubble_them">#FF1E293B</color>
-    <color name="bubble_you">#FF6366F1</color>
-    <color name="chip_selected">#FF6366F1</color>
+    <color name="text_secondary">#FFC4B5FD</color>
+    <color name="text_muted">#FF9483B8</color>
+    <color name="glass_border">#FF4B3D6A</color>
+    <color name="glass_border_light">#FF6B5A8A</color>
+    <color name="bubble_them">#FF1E1835</color>
+    <color name="bubble_you">#FF7C3AED</color>
+    <color name="chip_selected">#FF7C3AED</color>
     <color name="chip_selected_text">#FFFFFFFF</color>
     <color name="chip_unselected_bg">#00000000</color>
-    <color name="chip_unselected_border">#FF475569</color>
-    <color name="chip_unselected_text">#FF94A3B8</color>
-    <color name="divider">#FF334155</color>
+    <color name="chip_unselected_border">#FF4B3D6A</color>
+    <color name="chip_unselected_text">#FFC4B5FD</color>
+    <color name="divider">#FF2D2548</color>
     <color name="success">#FF34D399</color>
     <color name="error">#FFF87171</color>
-    <color name="shimmer">#FF334155</color>
+    <color name="shimmer">#FF2D2548</color>
 </resources>

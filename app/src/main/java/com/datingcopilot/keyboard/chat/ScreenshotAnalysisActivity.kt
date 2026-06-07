@@ -101,6 +101,10 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         })
         topBar.addView(backBtn)
 
+        topBar.addView(View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(12), 0)
+        })
+
         val title = TextView(this).apply {
             text = "RizzSe"
             textSize = 18f

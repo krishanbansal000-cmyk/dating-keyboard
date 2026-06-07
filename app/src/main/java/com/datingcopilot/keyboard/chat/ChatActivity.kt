@@ -231,14 +231,6 @@ class ChatActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
 
-            val emptyEmoji = TextView(this@ChatActivity).apply {
-                text = "⚡"
-                textSize = 48f
-                textAlignment = TextView.TEXT_ALIGNMENT_CENTER
-                setPadding(0, 0, 0, (12 * resources.displayMetrics.density).toInt())
-            }
-            addView(emptyEmoji)
-
             val emptyTitle = TextView(this@ChatActivity).apply {
                 text = "Make the next text hit"
                 textSize = 24f
