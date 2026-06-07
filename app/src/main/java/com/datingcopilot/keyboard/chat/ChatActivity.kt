@@ -415,14 +415,15 @@ class ChatActivity : AppCompatActivity() {
         suggestionsRecyclerView = RecyclerView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            layoutManager = LinearLayoutManager(this@ChatActivity, LinearLayoutManager.HORIZONTAL, false)
-            setPadding(
-                (8 * resources.displayMetrics.density).toInt(),
                 0,
-                (8 * resources.displayMetrics.density).toInt(),
-                0
+                1f
+            )
+            layoutManager = LinearLayoutManager(this@ChatActivity, LinearLayoutManager.VERTICAL, false)
+            setPadding(
+                (12 * resources.displayMetrics.density).toInt(),
+                (4 * resources.displayMetrics.density).toInt(),
+                (12 * resources.displayMetrics.density).toInt(),
+                (4 * resources.displayMetrics.density).toInt()
             )
             clipToPadding = false
             visibility = View.GONE
