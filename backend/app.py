@@ -190,6 +190,15 @@ def encode_image(image_file, max_side=720, quality=68):
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
 
+def image_debug_info(image_file):
+    pos = image_file.tell()
+    image_file.seek(0)
+    image = Image.open(image_file)
+    info = f"{image.size[0]}x{image.size[1]} {image.mode}"
+    image_file.seek(pos)
+    return info
+
+
 def get_mock_suggestions(persona, count=3):
     """Return mock suggestions for the given persona."""
     suggestions = MOCK_SUGGESTIONS.get(persona, MOCK_SUGGESTIONS["playful"])
@@ -474,6 +483,8 @@ def analyze_screenshot():
         conversation = []
         suggestions = None
         source = "none"
+        raw_model_text = ""
+        image_info = "unknown"
 
         if "image" in request.files:
             image_file = request.files["image"]
@@ -483,6 +494,8 @@ def analyze_screenshot():
             
             have_client = not USE_MOCK and (openai_client is not None or anthropic_client is not None)
             if have_client:
+                image_file.seek(0)
+                image_info = image_debug_info(image_file)
                 image_file.seek(0)
                 base64_image = encode_image(image_file)
                 
@@ -519,9 +532,42 @@ def analyze_screenshot():
                 )
                 
                 if response:
-                    suggestions = parse_suggestions(get_response_text(response), persona)
+                    raw_model_text = get_response_text(response)
+                    suggestions = parse_suggestions(raw_model_text, persona)
                     if suggestions:
                         source = "vision_ai"
+
+                if not suggestions and response:
+                    app.logger.warning(
+                        "screenshot parse failed: image=%s response_len=%d response=%r",
+                        image_info,
+                        len(raw_model_text),
+                        raw_model_text[:500]
+                    )
+
+                    retry_prompt = f"""Read this chat screenshot carefully. If it contains a chat, write 3 respectful replies to the latest incoming message. Return exactly this format and nothing else. {context_prompt}
+
+>>> Safe: <reply>
+>>> Smooth: <reply>
+>>> Bold: <reply>"""
+                    retry_messages = [
+                        {"role": "user", "content": [
+                            {"type": "text", "text": retry_prompt},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "auto"}}
+                        ]}
+                    ]
+                    retry_response = call_ai_fast(
+                        retry_messages,
+                        model=OPENAI_MODEL,
+                        max_tokens=420,
+                        temperature=0.45,
+                        timeout_seconds=30
+                    )
+                    if retry_response:
+                        raw_model_text = get_response_text(retry_response)
+                        suggestions = parse_suggestions(raw_model_text, persona)
+                        if suggestions:
+                            source = "vision_ai_retry"
             
             if os.path.exists(filepath):
                 os.remove(filepath)
@@ -532,9 +578,12 @@ def analyze_screenshot():
 
         if not suggestions:
             app.logger.warning(
-                "screenshot failed: model=%s source=%s duration=%.2fs",
+                "screenshot failed: model=%s source=%s image=%s response_len=%d response=%r duration=%.2fs",
                 OPENAI_MODEL,
                 source,
+                image_info,
+                len(raw_model_text),
+                raw_model_text[:500],
                 time.monotonic() - started_at
             )
             return jsonify({
