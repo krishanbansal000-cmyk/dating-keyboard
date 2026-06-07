@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.DisplayMetrics
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -33,7 +34,7 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode != RESULT_OK || result.data == null) {
-            finish()
+            finishAndShowKeyboard()
         } else {
             moveTaskToBack(true)
             Handler(Looper.getMainLooper()).postDelayed({
@@ -70,9 +71,9 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
         imageReader = reader
         reader.setOnImageAvailableListener({ imageReader ->
             if (captured) return@setOnImageAvailableListener
-            captured = true
 
             val image = imageReader.acquireLatestImage() ?: return@setOnImageAvailableListener
+            captured = true
             try {
                 val plane = image.planes[0]
                 val buffer = plane.buffer
@@ -99,6 +100,14 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
                 image.close()
             }
         }, Handler(Looper.getMainLooper()))
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (!captured) {
+                cleanupCapture()
+                Toast.makeText(this, "Screenshot failed. Try again", Toast.LENGTH_SHORT).show()
+                finishAndShowKeyboard()
+            }
+        }, 2500)
 
         virtualDisplay = projection.createVirtualDisplay(
             "RizzSeKeyboardCapture",
@@ -136,6 +145,15 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
             .putString("pending_keyboard_screenshot_path", file.absolutePath)
             .apply()
         Toast.makeText(this, "Screenshot captured. Pick tone in RizzSe keyboard", Toast.LENGTH_LONG).show()
+        finishAndShowKeyboard()
+    }
+
+    private fun finishAndShowKeyboard() {
         finish()
+        Handler(Looper.getMainLooper()).postDelayed({
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            @Suppress("DEPRECATION")
+            imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0)
+        }, 250)
     }
 }
