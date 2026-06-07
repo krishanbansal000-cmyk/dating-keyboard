@@ -11,6 +11,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
 import android.widget.Toast
+import com.datingcopilot.keyboard.chat.AppHistoryStore
 import com.datingcopilot.keyboard.chat.SuggestionOption
 import com.google.gson.Gson
 import kotlinx.coroutines.*
@@ -106,6 +107,13 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
         }
     }
 
+    override fun onWindowShown() {
+        super.onWindowShown()
+        if (::suggestionBar.isInitialized) {
+            loadPendingKeyboardState()
+        }
+    }
+
     private fun fetchSuggestions() {
         val text = currentInputConnection?.getTextBeforeCursor(500, 0)?.toString() ?: ""
 
@@ -123,6 +131,7 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
             }
             suggestionBar.showLoading(false)
             if (result != null) {
+                AppHistoryStore.add(this@DatingKeyboardService, "Keyboard", text.ifBlank { chatCtx }, result)
                 suggestionBar.showSuggestions(result)
             } else {
                 suggestionBar.showError()
@@ -197,6 +206,7 @@ class DatingKeyboardService : InputMethodService(), KeyboardView.OnKeyboardActio
                         .edit()
                         .remove("pending_keyboard_screenshot_path")
                         .apply()
+                    AppHistoryStore.add(this@DatingKeyboardService, "Keyboard screenshot", "Screenshot analysis", suggestions)
                     suggestionBar.showSuggestions(suggestions)
                     android.util.Log.d("KeyboardService", "screenshot analysis OK, ${suggestions.size} suggestions")
                 } else {

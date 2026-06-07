@@ -173,8 +173,6 @@ class ChatActivity : AppCompatActivity() {
         }
         topBar.addView(titleText)
 
-        // Hinglish toggle removed
-
         val profileBtn = TextView(this).apply {
             text = "⚙️"
             textSize = 20f
@@ -303,6 +301,8 @@ class ChatActivity : AppCompatActivity() {
                 setOnClickListener { showImagePicker() }
             }
             addView(uploadHint)
+
+            addHistoryPreview(this)
         }
         chatContainer.addView(emptyStateView)
 
@@ -776,6 +776,46 @@ class ChatActivity : AppCompatActivity() {
             .apply()
     }
 
+    private fun addHistoryPreview(parent: LinearLayout) {
+        val history = AppHistoryStore.get(this).take(3)
+        if (history.isEmpty()) return
+
+        parent.addView(TextView(this).apply {
+            text = "Recent replies"
+            textSize = 12f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.text_muted, null))
+            textAlignment = TextView.TEXT_ALIGNMENT_CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = Gravity.CENTER; topMargin = dp(24) }
+        })
+
+        history.forEach { item ->
+            parent.addView(TextView(this).apply {
+                text = "${item.type}: ${item.suggestions.firstOrNull()?.text ?: item.preview}"
+                textSize = 12f
+                setTextColor(resources.getColor(R.color.text_secondary, null))
+                maxLines = 2
+                setPadding(dp(14), dp(8), dp(14), dp(8))
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(14).toFloat()
+                    setColor(resources.getColor(R.color.bg_surface, null))
+                    setStroke(1, resources.getColor(R.color.glass_border, null))
+                }
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    leftMargin = dp(28)
+                    rightMargin = dp(28)
+                    topMargin = dp(8)
+                }
+            })
+        }
+    }
+
     private fun analyzeText(text: String) {
         showLoading(true)
         lastInputText = text
@@ -813,6 +853,7 @@ class ChatActivity : AppCompatActivity() {
                             runOnUiThread {
                                 showLoading(false)
                                 if (options != null && options.isNotEmpty()) {
+                                    AppHistoryStore.add(this@ChatActivity, "Text", text.ifBlank { "First-message ideas" }, options)
                                     messages.clear()
                                     messages.addAll(conversation)
                                     updateChatUI()
@@ -852,6 +893,12 @@ class ChatActivity : AppCompatActivity() {
             updateChatUI()
         }
         response.suggestions?.let { suggestions ->
+            AppHistoryStore.add(
+                this,
+                "Screenshot",
+                response.conversation?.lastOrNull()?.text ?: "Screenshot analysis",
+                suggestions
+            )
             showSuggestions(suggestions)
         }
     }
@@ -897,6 +944,7 @@ class ChatActivity : AppCompatActivity() {
                 }
                 showLoading(false)
                 if (response != null) {
+                    AppHistoryStore.add(this@ChatActivity, "Text", convoText, response)
                     showSuggestions(response)
                 } else {
                     android.util.Log.e("ChatActivity", "regenerateSuggestions: API returned null")
@@ -959,5 +1007,9 @@ class ChatActivity : AppCompatActivity() {
             }
         }
         return null
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density).toInt()
     }
 }

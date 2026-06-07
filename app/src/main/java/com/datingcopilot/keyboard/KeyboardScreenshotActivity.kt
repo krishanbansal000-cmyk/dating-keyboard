@@ -113,16 +113,19 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
         prefs.getString("pending_keyboard_screenshot_path", null)?.let { File(it).delete() }
         prefs.edit().putString("pending_keyboard_screenshot_path", file.absolutePath).apply()
-        Toast.makeText(this, "Screenshot captured! Open keyboard to continue", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "Screenshot captured. Generating in keyboard...", Toast.LENGTH_SHORT).show()
         finishAndShowKeyboard()
     }
 
     private fun finishAndShowKeyboard() {
         finish()
-        Handler(Looper.getMainLooper()).postDelayed({
+        val handler = Handler(Looper.getMainLooper())
+        val showKeyboard = {
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
             @Suppress("DEPRECATION")
             imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0)
-        }, 250)
+        }
+        handler.postDelayed(showKeyboard, 250)
+        handler.postDelayed(showKeyboard, 900)
     }
 }

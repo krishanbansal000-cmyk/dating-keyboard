@@ -51,10 +51,10 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(resources.getColor(R.color.bg_dark, null))
             setPadding(
-                (16 * resources.displayMetrics.density).toInt(),
-                (48 * resources.displayMetrics.density).toInt(),
-                (16 * resources.displayMetrics.density).toInt(),
-                (40 * resources.displayMetrics.density).toInt()
+                dp(18),
+                dp(44),
+                dp(18),
+                dp(32)
             )
         }
 
@@ -65,7 +65,7 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = (16 * resources.displayMetrics.density).toInt() }
+            ).apply { bottomMargin = dp(18) }
         }
 
         val backBtn = LinearLayout(this).apply {
@@ -116,8 +116,8 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             scaleType = ImageView.ScaleType.FIT_CENTER
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (300 * resources.displayMetrics.density).toInt()
-            ).apply { bottomMargin = (16 * resources.displayMetrics.density).toInt() }
+                dp(292)
+            ).apply { bottomMargin = dp(18) }
         }
         if (imageUri != null) {
             imageView.setImageURI(imageUri)
@@ -277,6 +277,12 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         val density = resources.displayMetrics.density
         stopLoadingAnimations()
         loadingState.visibility = View.GONE
+        AppHistoryStore.add(
+            this,
+            "Screenshot",
+            response.conversation?.lastOrNull()?.text ?: "Screenshot analysis",
+            response.suggestions.orEmpty()
+        )
 
         response.conversation?.forEachIndexed { i, msg ->
             val isYou = msg.sender == "you"
@@ -296,7 +302,7 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
                     (280 * density).toInt(), LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
                     gravity = if (isYou) Gravity.END else Gravity.START
-                    topMargin = (6 * density).toInt()
+                    topMargin = (8 * density).toInt()
                 }
                 translationY = 30f
                 alpha = 0f
@@ -320,7 +326,7 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             textSize = 13f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(resources.getColor(R.color.text_secondary, null))
-            setPadding(0, (20 * density).toInt(), 0, (10 * density).toInt())
+            setPadding(0, (22 * density).toInt(), 0, (12 * density).toInt())
         }
         suggSection.addView(label)
 
@@ -343,8 +349,8 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = (10 * density).toInt() }
-            setPadding((16 * density).toInt(), (12 * density).toInt(), (16 * density).toInt(), (12 * density).toInt())
+            ).apply { bottomMargin = (12 * density).toInt() }
+            setPadding((16 * density).toInt(), (14 * density).toInt(), (16 * density).toInt(), (14 * density).toInt())
             val bg = GradientDrawable()
             bg.cornerRadius = 16 * density
             bg.setColor(resources.getColor(R.color.bg_card, null))
