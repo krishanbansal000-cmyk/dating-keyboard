@@ -7,12 +7,14 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -22,6 +24,7 @@ import android.widget.Toast
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.abs
+import kotlin.math.min
 
 class ScreenshotCaptureService : Service() {
 
@@ -93,9 +96,8 @@ class ScreenshotCaptureService : Service() {
         frameHashes.clear()
 
         val projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        val projection = projectionManager.getMediaProjection(resultCode, data)
-        mediaProjection = projection
-        projection.registerCallback(object : MediaProjection.Callback() {
+        mediaProjection = projectionManager.getMediaProjection(resultCode, data)
+        mediaProjection?.registerCallback(object : MediaProjection.Callback() {
             override fun onStop() { cleanupCapture() }
         }, handler)
 
@@ -174,7 +176,7 @@ class ScreenshotCaptureService : Service() {
             }
         }, captureDurationMs + 500)
 
-        virtualDisplay = projection.createVirtualDisplay(
+        virtualDisplay = mediaProjection?.createVirtualDisplay(
             "RizzSeCapture", width, height, density,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
             reader.surface, null, handler
@@ -230,18 +232,23 @@ class ScreenshotCaptureService : Service() {
                 return@post
             }
 
-            val imageUris = mutableListOf<String>()
-            for ((i, bitmap) in capturedFrames.withIndex()) {
-                val file = File(cacheDir, "kb_ss_${System.currentTimeMillis()}_$i.jpg")
-                FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 80, it) }
-                imageUris.add(file.absolutePath)
-                bitmap.recycle()
-            }
+            val stitched = stitchFrames(capturedFrames)
+            capturedFrames.forEach { if (!it.isRecycled) it.recycle() }
             capturedFrames.clear()
+
+            if (stitched == null) {
+                Toast.makeText(this, "Failed to stitch screenshots", Toast.LENGTH_SHORT).show()
+                stopSelf()
+                return@post
+            }
+
+            val file = File(cacheDir, "kb_long_ss_${System.currentTimeMillis()}.jpg")
+            FileOutputStream(file).use { stitched.compress(Bitmap.CompressFormat.JPEG, 80, it) }
+            stitched.recycle()
 
             val prefs = getSharedPreferences("dating_copilot", Context.MODE_MULTI_PROCESS)
             prefs.edit()
-                .putString("pending_screenshot_paths", imageUris.joinToString("|"))
+                .putString("pending_screenshot_paths", file.absolutePath)
                 .putString("pending_chat_context", chatContext)
                 .apply()
 
@@ -251,7 +258,7 @@ class ScreenshotCaptureService : Service() {
 
             val intent = Intent(this, com.datingcopilot.keyboard.chat.ScreenshotAnalysisActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                putExtra("image_paths", imageUris.toTypedArray())
+                data = Uri.fromFile(file)
                 putExtra("chat_context", ctx)
                 putExtra("persona", prefs.getString("persona", "playful") ?: "playful")
                 putExtra("intent", prefs.getString("intent", "keep_going") ?: "keep_going")
@@ -260,6 +267,83 @@ class ScreenshotCaptureService : Service() {
             startActivity(intent)
             stopSelf()
         }
+    }
+
+    private fun stitchFrames(frames: List<Bitmap>): Bitmap? {
+        if (frames.isEmpty()) return null
+        if (frames.size == 1) return frames[0]
+
+        val width = frames[0].width
+        val offsets = mutableListOf<Int>()
+        offsets.add(0)
+
+        for (i in 1 until frames.size) {
+            val overlap = findOverlapRows(frames[i - 1], frames[i])
+            offsets.add(overlap)
+        }
+
+        var totalHeight = 0
+        for (i in frames.indices) {
+            totalHeight += frames[i].height - offsets[i]
+        }
+
+        if (totalHeight <= 0) return frames[0]
+
+        val result = Bitmap.createBitmap(width, totalHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(result)
+        var y = 0
+        for (i in frames.indices) {
+            val frame = frames[i]
+            val skip = offsets[i]
+            val srcH = frame.height - skip
+            val src = Bitmap.createBitmap(frame, 0, skip, width, srcH)
+            canvas.drawBitmap(src, 0f, y.toFloat(), null)
+            src.recycle()
+            y += srcH
+        }
+        return result
+    }
+
+    private fun findOverlapRows(prev: Bitmap, next: Bitmap): Int {
+        val w = min(prev.width, next.width)
+        val h = min(prev.height, next.height)
+        val templateH = 40
+        if (templateH >= h || templateH >= prev.height) return 0
+
+        val sampleCols = (2 until w - 2 step (w / 9).coerceAtLeast(4)).toList()
+        val maxSlide = h - templateH
+
+        var bestSlide = 0
+        var bestMatch = Double.MAX_VALUE
+
+        for (slide in 0 until maxSlide step 2) {
+            val prevStartY = prev.height - templateH - slide
+            if (prevStartY < 0) break
+            var totalDiff = 0L
+            var count = 0
+            for (row in 0 until templateH) {
+                val prevY = prevStartY + row
+                val nextY = row
+                for (col in sampleCols) {
+                    val tp = prev.getPixel(col, prevY)
+                    val np = next.getPixel(col, nextY)
+                    val dr = abs((tp shr 16 and 0xFF) - (np shr 16 and 0xFF))
+                    val dg = abs((tp shr 8 and 0xFF) - (np shr 8 and 0xFF))
+                    val db = abs((tp and 0xFF) - (np and 0xFF))
+                    totalDiff += (dr + dg + db) / 3
+                    count++
+                }
+            }
+            if (count == 0) continue
+            val avgDiff = totalDiff.toDouble() / count
+            if (avgDiff < bestMatch) {
+                bestMatch = avgDiff
+                bestSlide = slide
+            }
+        }
+
+        val overlap = templateH + bestSlide
+        return if (bestMatch < 40.0) overlap else 0
     }
 
     private fun cleanupCapture() {

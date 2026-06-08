@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="KeyboardViewPreviewState">
+        <attr name="state_long_pressable" format="boolean" />
+    </declare-styleable>
+
+    <declare-styleable name="MyKeyboardView">
+        <attr name="keyTextSize" format="dimension" />
+    </declare-styleable>
+
+    <declare-styleable name="MyKeyboard">
+        <attr name="keyWidth" format="fraction" />
+        <attr name="horizontalGap" format="fraction" />
+        <attr name="isNumbersRow" format="boolean" />
+    </declare-styleable>
+
+    <!-- Nboard color attrs -->
+    <attr name="colorKeyboardBg" format="color" />
+    <attr name="colorKeyBg" format="color" />
+    <attr name="colorKeySpecialBg" format="color" />
+    <attr name="colorKeyText" format="color" />
+    <attr name="colorSpaceText" format="color" />
+    <attr name="colorSendBg" format="color" />
+    <attr name="colorSendText" format="color" />
+    <attr name="colorPopupShadow" format="color" />
+
+    <declare-styleable name="MyKeyboard_Key">
+        <!-- The unicode value that this key outputs. -->
+        <attr name="code" format="integer" />
+        <!-- The XML keyboard layout of any popup keyboard. -->
+        <attr name="popupKeyboard" format="reference" />
+        <!-- The characters to display in the popup keyboard. -->
+        <attr name="popupCharacters" format="string" />
+        <!-- Key edge flags. -->
+        <attr name="keyEdgeFlags">
+            <!-- Key is anchored to the left of the keyboard. -->
+            <flag name="left" value="1" />
+            <!-- Key is anchored to the right of the keyboard. -->
+            <flag name="right" value="2" />
+        </attr>
+        <!-- Whether long-pressing on this key will make it repeat. -->
+        <attr name="isRepeatable" format="boolean" />
+        <!-- The label to display on the key. -->
+        <attr name="keyLabel" format="string" />
+        <!-- The icon to display on the key instead of the label. -->
+        <attr name="keyIcon" format="reference" />
+        <!-- The icon to display on the top left of a key with icon. -->
+        <attr name="secondaryKeyIcon" format="reference" />
+        <!-- Top small number shown above letters of the first row. -->
+        <attr name="topSmallNumber" format="string" />
+        <!-- Role identifier for special keys (e.g., "tools" for the tools popup host key). -->
+        <attr name="keyRole" format="string" />
+    </declare-styleable>
+</resources>

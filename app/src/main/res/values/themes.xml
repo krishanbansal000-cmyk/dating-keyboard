@@ -19,4 +19,7 @@
         <item name="android:windowAnimationStyle">@null</item>
         <item name="android:colorAccent">#A855F7</item>
     </style>
+
+    <style name="Theme.Nboard" parent="Theme.AppCompat.Light.NoActionBar" />
+    <style name="Theme.Nboard.Amoled" parent="Theme.AppCompat.Light.NoActionBar" />
 </resources>

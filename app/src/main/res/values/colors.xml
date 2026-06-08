@@ -46,4 +46,24 @@
     <color name="success">#FF34D399</color>
     <color name="error">#FFF87171</color>
     <color name="shimmer">#FF2D2548</color>
+    <color name="key_press_color">#11ffffff</color>
+
+    <!-- Nboard colors -->
+    <color name="space_text">#B8B8B8</color>
+    <color name="send_bg">#C8C8C8</color>
+    <color name="send_text">#1E1E1E</color>
+    <color name="ai_bg">#F7BE00</color>
+    <color name="ai_text">#1E1E1E</color>
+    <color name="ai_hint">#66321D</color>
+    <color name="ai_text_shine">#FFE082</color>
+    <color name="popup_shadow">#BABABA</color>
+    <color name="popup_selected_dark">#E3AE00</color>
+    <color name="amoled_keyboard_bg">#000000</color>
+    <color name="amoled_key_bg">#0A0A0A</color>
+    <color name="amoled_key_special_bg">#151515</color>
+    <color name="amoled_key_text">#FFFFFF</color>
+    <color name="amoled_space_text">#9A9A9A</color>
+    <color name="amoled_send_bg">#151515</color>
+    <color name="amoled_send_text">#FFFFFF</color>
+    <color name="amoled_popup_shadow">#000000</color>
 </resources>

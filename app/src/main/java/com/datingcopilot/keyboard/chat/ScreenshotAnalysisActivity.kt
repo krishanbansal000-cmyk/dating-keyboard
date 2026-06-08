@@ -119,7 +119,7 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         // Screenshot strip (horizontal scroll if multiple)
         if (imagePaths.isNotEmpty()) {
             val stripLabel = TextView(this).apply {
-                text = "${imagePaths.size} screenshot${if (imagePaths.size > 1) "s" else ""} captured"
+                text = if (imagePaths.size == 1) "Long screenshot captured" else "${imagePaths.size} screenshots captured"
                 textSize = 12f
                 setTextColor(resources.getColor(R.color.text_muted, null))
                 layoutParams = LinearLayout.LayoutParams(
