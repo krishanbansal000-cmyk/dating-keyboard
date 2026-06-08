@@ -15,6 +15,9 @@ import android.view.MotionEvent
 import android.view.View
 import androidx.core.content.ContextCompat
 import com.datingcopilot.keyboard.R
+import com.mikepenz.iconics.IconicsDrawable
+import com.mikepenz.iconics.dsl.iconicsDrawable
+import com.mikepenz.iconics.typeface.library.googlematerial.GoogleMaterial
 
 class RizzseKeyboardView(context: Context, private val callback: KeyboardActionCallback) : View(context) {
 
@@ -45,6 +48,36 @@ class RizzseKeyboardView(context: Context, private val callback: KeyboardActionC
 
     private val keys = mutableListOf<KeyRect>()
     private var pressedKeyIndex = -1
+
+    private var iconCamera: IconicsDrawable? = null
+    private var iconVideocam: IconicsDrawable? = null
+    private var iconMagic: IconicsDrawable? = null
+    private var iconBackspace: IconicsDrawable? = null
+    private var iconCopy: IconicsDrawable? = null
+    private var iconReturn: IconicsDrawable? = null
+
+    private fun ensureIcons() {
+        if (iconCamera != null) return
+        val ctx = context
+        iconCamera = ctx.iconicsDrawable(GoogleMaterial.Icon.gmd_camera_alt) {
+            color = colorInt(Color.WHITE); size = sizeDp(20)
+        }.also { it.setBounds(0, 0, it.intrinsicWidth, it.intrinsicHeight) }
+        iconVideocam = ctx.iconicsDrawable(GoogleMaterial.Icon.gmd_videocam) {
+            color = colorInt(Color.WHITE); size = sizeDp(20)
+        }.also { it.setBounds(0, 0, it.intrinsicWidth, it.intrinsicHeight) }
+        iconMagic = ctx.iconicsDrawable(GoogleMaterial.Icon.gmd_auto_awesome) {
+            color = colorInt(Color.WHITE); size = sizeDp(20)
+        }.also { it.setBounds(0, 0, it.intrinsicWidth, it.intrinsicHeight) }
+        iconBackspace = ctx.iconicsDrawable(GoogleMaterial.Icon.gmd_backspace) {
+            color = colorInt(Color.WHITE); size = sizeDp(20)
+        }.also { it.setBounds(0, 0, it.intrinsicWidth, it.intrinsicHeight) }
+        iconCopy = ctx.iconicsDrawable(GoogleMaterial.Icon.gmd_content_copy) {
+            color = colorInt(Color.WHITE); size = sizeDp(18)
+        }.also { it.setBounds(0, 0, it.intrinsicWidth, it.intrinsicHeight) }
+        iconReturn = ctx.iconicsDrawable(GoogleMaterial.Icon.gmd_keyboard_return) {
+            color = colorInt(Color.WHITE); size = sizeDp(20)
+        }.also { it.setBounds(0, 0, it.intrinsicWidth, it.intrinsicHeight) }
+    }
 
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = ContextCompat.getColor(context, R.color.bg_dark)
@@ -179,9 +212,9 @@ class RizzseKeyboardView(context: Context, private val callback: KeyboardActionC
         val btnY = barTop + (actionBarHeight - btnHeight) / 2
 
         val actionDefs = listOf(
-            "\uD83D\uDCF7 Shot" to "screenshot",
-            "\uD83C\uDFAC Record" to "record",
-            "\u2728 Rizz" to "magic"
+            "Shot" to "screenshot",
+            "Record" to "record",
+            "Rizz" to "magic"
         )
 
         for ((i, pair) in actionDefs.withIndex()) {
@@ -331,6 +364,7 @@ class RizzseKeyboardView(context: Context, private val callback: KeyboardActionC
 
         actionButtonTextPaint.textSize = 12f * density
         actionButtonTextPaint.color = Color.WHITE
+        ensureIcons()
 
         for ((i, key) in keys.withIndex()) {
             if (key.action != KeyAction.RIZZSE_ACTION) continue
@@ -341,10 +375,23 @@ class RizzseKeyboardView(context: Context, private val callback: KeyboardActionC
                 fillPaint.color = ContextCompat.getColor(context, R.color.accent_magenta)
             }
             canvas.drawRoundRect(rectF, btnRadius, btnRadius, fillPaint)
+
+            val icon = when (key.primary) {
+                "screenshot" -> iconCamera; "record" -> iconVideocam; "magic" -> iconMagic; else -> null
+            }
+            if (icon != null) {
+                val iconSize = dp(18f).toInt()
+                val iconX = rectF.left.toInt() + dp(8f).toInt()
+                val iconY = rectF.centerY().toInt() - iconSize / 2
+                icon.setBounds(iconX, iconY, iconX + iconSize, iconY + iconSize)
+                icon.draw(canvas)
+            }
+
+            val labelStart = rectF.left + dp(30f)
             actionButtonTextPaint.getTextBounds(key.display, 0, key.display.length, tempRect)
             canvas.drawText(
                 key.display,
-                rectF.centerX(),
+                labelStart,
                 rectF.centerY() - tempRect.exactCenterY(),
                 actionButtonTextPaint
             )
@@ -357,6 +404,7 @@ class RizzseKeyboardView(context: Context, private val callback: KeyboardActionC
 
     private fun drawKeyboard(canvas: Canvas) {
         textPaint.typeface = Typeface.DEFAULT_BOLD
+        ensureIcons()
 
         for ((i, key) in keys.withIndex()) {
             if (key.action == KeyAction.SUGGESTION || key.action == KeyAction.RIZZSE_ACTION) continue
@@ -388,18 +436,10 @@ class RizzseKeyboardView(context: Context, private val callback: KeyboardActionC
                 canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, strokePaint)
             }
 
-            val isSpecialText = key.action == KeyAction.BACKSPACE || key.action == KeyAction.SYMBOL_TOGGLE || key.action == KeyAction.ENTER
+            val isSpecialText = key.action == KeyAction.SYMBOL_TOGGLE
             if (isSpecialText) {
                 textPaint.color = ContextCompat.getColor(context, R.color.text_secondary)
                 textPaint.textSize = 14f * density
-            } else if (key.action == KeyAction.SPACE) {
-                continue
-            } else {
-                textPaint.color = ContextCompat.getColor(context, R.color.text_primary)
-                textPaint.textSize = 18f * density
-            }
-
-            if (key.display.isNotEmpty()) {
                 textPaint.getTextBounds(key.display, 0, key.display.length, tempRect)
                 canvas.drawText(
                     key.display,
@@ -407,6 +447,40 @@ class RizzseKeyboardView(context: Context, private val callback: KeyboardActionC
                     rectF.centerY() - tempRect.exactCenterY(),
                     textPaint
                 )
+            } else if (key.action == KeyAction.BACKSPACE) {
+                val icon = iconBackspace ?: continue
+                val iconSize = dp(22f).toInt()
+                icon.setBounds(
+                    rectF.centerX().toInt() - iconSize / 2,
+                    rectF.centerY().toInt() - iconSize / 2,
+                    rectF.centerX().toInt() + iconSize / 2,
+                    rectF.centerY().toInt() + iconSize / 2
+                )
+                icon.draw(canvas)
+            } else if (key.action == KeyAction.ENTER) {
+                val icon = iconReturn ?: continue
+                val iconSize = dp(22f).toInt()
+                icon.setBounds(
+                    rectF.centerX().toInt() - iconSize / 2,
+                    rectF.centerY().toInt() - iconSize / 2,
+                    rectF.centerX().toInt() + iconSize / 2,
+                    rectF.centerY().toInt() + iconSize / 2
+                )
+                icon.draw(canvas)
+            } else if (key.action == KeyAction.SPACE) {
+                // nothing, space is unstyled
+            } else if (key.action == KeyAction.LETTER) {
+                textPaint.color = ContextCompat.getColor(context, R.color.text_primary)
+                textPaint.textSize = 18f * density
+                if (key.display.isNotEmpty()) {
+                    textPaint.getTextBounds(key.display, 0, key.display.length, tempRect)
+                    canvas.drawText(
+                        key.display,
+                        rectF.centerX(),
+                        rectF.centerY() - tempRect.exactCenterY(),
+                        textPaint
+                    )
+                }
             }
         }
     }

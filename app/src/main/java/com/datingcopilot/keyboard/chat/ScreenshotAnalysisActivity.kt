@@ -18,8 +18,11 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.datingcopilot.keyboard.ApiClient
 import com.datingcopilot.keyboard.R
+import com.mikepenz.iconics.dsl.iconicsDrawable
+import com.mikepenz.iconics.typeface.library.googlematerial.GoogleMaterial
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -633,9 +636,14 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             setPadding(0, 0, (8 * density).toInt(), 0)
         })
 
-        topRow.addView(TextView(this).apply {
-            text = "📋"
-            textSize = 14f
+        topRow.addView(ImageView(this).apply {
+            setImageDrawable(
+                this@ScreenshotAnalysisActivity.iconicsDrawable(GoogleMaterial.Icon.gmd_content_copy) {
+                    color = colorInt(ContextCompat.getColor(this@ScreenshotAnalysisActivity, R.color.text_muted))
+                    size = sizeDp(18)
+                }
+            )
+            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
             setOnClickListener {
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                 clipboard.setPrimaryClip(android.content.ClipData.newPlainText("RizzSe", sug.text))
