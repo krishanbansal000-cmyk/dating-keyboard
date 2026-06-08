@@ -13,9 +13,19 @@ data class SuggestionOption(
     val persona: String = "playful"
 )
 
+data class ConversationInsights(
+    val herEnergy: String = "",
+    val conversationScore: Int = 0,
+    val comments: List<String> = emptyList(),
+    val greenFlags: List<String> = emptyList(),
+    val redFlags: List<String> = emptyList(),
+    val nextMove: String = ""
+)
+
 data class AnalyzeResponse(
     val conversation: List<ChatMessage>? = null,
     val suggestions: List<SuggestionOption>? = null,
+    val insights: ConversationInsights? = null,
     val detectedApp: String? = null,
     val persona: String? = null
 )

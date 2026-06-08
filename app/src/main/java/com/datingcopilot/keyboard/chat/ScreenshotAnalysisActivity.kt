@@ -29,6 +29,7 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
 
     private val apiClient by lazy { ApiClient(this) }
     private lateinit var loadingState: View
+    private lateinit var insightsSection: LinearLayout
     private lateinit var convoSection: LinearLayout
     private lateinit var suggSection: LinearLayout
     private val loadingAnimators = mutableListOf<ValueAnimator>()
@@ -136,20 +137,57 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
                 orientation = LinearLayout.HORIZONTAL
             }
             for (path in imagePaths) {
-                val imgView = ImageView(this).apply {
-                    scaleType = ImageView.ScaleType.FIT_CENTER
+                val frame = FrameLayout(this).apply {
                     layoutParams = LinearLayout.LayoutParams(
                         dp(140),
                         dp(260)
                     ).apply { marginEnd = dp(8) }
-                    setImageURI(Uri.fromFile(java.io.File(path)))
                     val bg = GradientDrawable()
                     bg.cornerRadius = dp(8).toFloat()
                     bg.setColor(resources.getColor(R.color.bg_surface, null))
                     bg.setStroke(dp(1), resources.getColor(R.color.glass_border, null))
-                    clipToOutline = true
+                    background = bg
+                    clipChildren = true
+                    clipToPadding = true
                 }
-                stripInner.addView(imgView)
+                val imgView = ImageView(this).apply {
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                    setImageURI(Uri.fromFile(java.io.File(path)))
+                }
+                val scanBar = View(this).apply {
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(12).toFloat()
+                        setColor(resources.getColor(R.color.accent_pink, null))
+                    }
+                    alpha = 0.82f
+                    layoutParams = FrameLayout.LayoutParams(dp(126), dp(14), Gravity.TOP or Gravity.CENTER_HORIZONTAL)
+                }
+                frame.addView(imgView)
+                frame.addView(View(this).apply {
+                    background = GradientDrawable().apply {
+                        setColor(0x22000000)
+                    }
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                })
+                frame.addView(scanBar)
+                stripInner.addView(frame)
+                frame.post {
+                    val travel = (frame.height - dp(30)).coerceAtLeast(dp(110))
+                    loadingAnimators += ObjectAnimator.ofFloat(scanBar, View.TRANSLATION_Y, 0f, travel.toFloat()).apply {
+                        duration = 1700
+                        repeatCount = ValueAnimator.INFINITE
+                        repeatMode = ValueAnimator.REVERSE
+                        interpolator = LinearInterpolator()
+                        start()
+                    }
+                }
             }
             strip.addView(stripInner)
             root.addView(strip)
@@ -280,6 +318,12 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         }
         root.addView(convoSection)
 
+        insightsSection = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+        }
+        root.addView(insightsSection)
+
         suggSection = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -303,14 +347,15 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
                 val response = apiClient.uploadScreenshots(uris, chatContext, this@ScreenshotAnalysisActivity, persona, intentType, platform)
                 withContext(Dispatchers.Main) {
                     if (response != null && response.suggestions?.isNotEmpty() == true) {
-                        showSuggestions(response.suggestions!!)
+                        val suggestions = response.suggestions.orEmpty()
+                        showResults(response)
                         AppHistoryStore.add(
                             this@ScreenshotAnalysisActivity,
                             "Screenshots",
                             chatContext.ifBlank { "Multi-screenshot analysis" },
-                            response.suggestions!!
+                            suggestions
                         )
-                        saveToKeyboardSuggestions(response.suggestions!!)
+                        saveToKeyboardSuggestions(suggestions)
                     } else {
                         showError("Analysis failed")
                     }
@@ -355,12 +400,17 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         val density = resources.displayMetrics.density
         stopLoadingAnimations()
         loadingState.visibility = View.GONE
+        convoSection.removeAllViews()
+        insightsSection.removeAllViews()
+        suggSection.removeAllViews()
         AppHistoryStore.add(
             this,
             "Screenshot",
             response.conversation?.lastOrNull()?.text ?: "Screenshot analysis",
             response.suggestions.orEmpty()
         )
+
+        response.insights?.let { showInsights(it) }
 
         response.conversation?.forEachIndexed { i, msg ->
             val isYou = msg.sender == "you"
@@ -390,8 +440,126 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             convoSection.visibility = View.VISIBLE
         }
 
-        val delay = ((response.conversation?.size ?: 0) * 120L + 600L)
+        val delay = ((response.conversation?.size ?: 0) * 120L + 500L)
         convoSection.postDelayed({ showSuggestions(response.suggestions.orEmpty()) }, delay)
+    }
+
+    private fun showInsights(insights: ConversationInsights) {
+        val header = TextView(this).apply {
+            text = "Her energy"
+            textSize = 13f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.text_secondary, null))
+            setPadding(0, dp(18), 0, dp(10))
+        }
+        insightsSection.addView(header)
+
+        insightsSection.addView(makeInsightCard("Energy", insights.herEnergy.ifBlank { "No clear read yet" }, "score ${insights.conversationScore}/100"))
+        if (insights.comments.isNotEmpty()) {
+            insights.comments.forEach { comment ->
+                insightsSection.addView(makeInsightCard("Comment", comment, ""))
+            }
+        }
+        if (insights.greenFlags.isNotEmpty()) {
+            insightsSection.addView(makeChipCard("Green flags", insights.greenFlags, R.color.accent_pink))
+        }
+        if (insights.redFlags.isNotEmpty()) {
+            insightsSection.addView(makeChipCard("Watch outs", insights.redFlags, R.color.error))
+        }
+        if (insights.nextMove.isNotBlank()) {
+            insightsSection.addView(makeInsightCard("Next move", insights.nextMove, ""))
+        }
+        insightsSection.visibility = View.VISIBLE
+    }
+
+    private fun makeInsightCard(title: String, body: String, meta: String): LinearLayout {
+        val density = resources.displayMetrics.density
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (10 * density).toInt() }
+            setPadding((16 * density).toInt(), (14 * density).toInt(), (16 * density).toInt(), (14 * density).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = 16 * density
+                setColor(resources.getColor(R.color.bg_card, null))
+                setStroke(1, resources.getColor(R.color.glass_border, null))
+            }
+            addView(TextView(this@ScreenshotAnalysisActivity).apply {
+                text = title
+                textSize = 11f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(resources.getColor(R.color.accent_pink, null))
+            })
+            addView(TextView(this@ScreenshotAnalysisActivity).apply {
+                text = body
+                textSize = 14f
+                setTextColor(resources.getColor(R.color.text_primary, null))
+                setLineSpacing(3f, 1.0f)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = (6 * density).toInt() }
+            })
+            if (meta.isNotBlank()) {
+                addView(TextView(this@ScreenshotAnalysisActivity).apply {
+                    text = meta
+                    textSize = 10f
+                    setTextColor(resources.getColor(R.color.text_muted, null))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = (6 * density).toInt() }
+                })
+            }
+        }
+    }
+
+    private fun makeChipCard(title: String, items: List<String>, accent: Int): LinearLayout {
+        val density = resources.displayMetrics.density
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (10 * density).toInt() }
+            setPadding((16 * density).toInt(), (14 * density).toInt(), (16 * density).toInt(), (14 * density).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = 16 * density
+                setColor(resources.getColor(R.color.bg_card, null))
+                setStroke(1, resources.getColor(R.color.glass_border, null))
+            }
+            addView(TextView(this@ScreenshotAnalysisActivity).apply {
+                text = title
+                textSize = 11f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(resources.getColor(accent, null))
+            })
+            addView(LinearLayout(this@ScreenshotAnalysisActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, (8 * density).toInt(), 0, 0)
+                items.take(3).forEachIndexed { index, item ->
+                    addView(TextView(this@ScreenshotAnalysisActivity).apply {
+                        text = item
+                        textSize = 12f
+                        setTextColor(resources.getColor(R.color.text_primary, null))
+                        setPadding((10 * density).toInt(), (6 * density).toInt(), (10 * density).toInt(), (6 * density).toInt())
+                        background = GradientDrawable().apply {
+                            cornerRadius = 999f
+                            setColor(resources.getColor(R.color.bg_surface, null))
+                        }
+                        layoutParams = LinearLayout.LayoutParams(
+                            0,
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            1f
+                        ).apply {
+                            if (index > 0) leftMargin = (8 * density).toInt()
+                        }
+                    })
+                }
+            })
+        }
     }
 
     private fun showSuggestions(suggestions: List<SuggestionOption>) {

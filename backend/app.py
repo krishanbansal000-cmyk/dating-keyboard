@@ -374,6 +374,125 @@ def truthy(value):
     return str(value).lower() in {"1", "true", "yes", "on"}
 
 
+def extract_json_object(text):
+    if not text:
+        return None
+    clean = text.strip()
+    if clean.startswith("```"):
+        clean = re.sub(r"^```(?:json)?\s*", "", clean, flags=re.IGNORECASE).strip()
+        clean = re.sub(r"\s*```$", "", clean).strip()
+    start = clean.find("{")
+    end = clean.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    try:
+        parsed = json.loads(clean[start:end + 1])
+        return parsed if isinstance(parsed, dict) else None
+    except Exception:
+        return None
+
+
+def sanitize_insights(parsed):
+    parsed = parsed or {}
+    def string_value(key, limit=180):
+        value = parsed.get(key, "")
+        return str(value).strip()[:limit] if value is not None else ""
+    def list_value(key, limit=4):
+        value = parsed.get(key, [])
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            return []
+        return [str(item).strip()[:180] for item in value if str(item).strip()][:limit]
+    try:
+        score = int(float(parsed.get("conversation_score", 0)))
+    except Exception:
+        score = 0
+    score = max(0, min(100, score))
+    return {
+        "her_energy": string_value("her_energy", 120),
+        "conversation_score": score,
+        "comments": list_value("comments", 4),
+        "green_flags": list_value("green_flags", 3),
+        "red_flags": list_value("red_flags", 3),
+        "next_move": string_value("next_move", 180)
+    }
+
+
+def call_ai_for_task(messages, system_prompt, model=None, max_tokens=420, temperature=0.4, timeout_seconds=30):
+    model_name = model or OPENAI_MODEL
+    def invoke():
+        if model_name in ANTHROPIC_MODELS and anthropic_client is not None:
+            return anthropic_client.messages.create(
+                model=model_name,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system=system_prompt,
+                messages=messages
+            )
+        if openai_client is not None:
+            return openai_client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "system", "content": system_prompt}] + messages,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
+        raise RuntimeError("No AI client configured. Check OPENAI_API_KEY in .env")
+
+    future = ai_executor.submit(invoke)
+    try:
+        return future.result(timeout=timeout_seconds), None
+    except TimeoutError:
+        return None, f"AI call timed out after {timeout_seconds:.1f}s"
+    except Exception as e:
+        return None, str(e)
+
+
+def generate_conversation_insights(chat_context="", encoded_images=None, persona="playful", intent="keep_going", platform="whatsapp", hinglish=False):
+    encoded_images = encoded_images or []
+    if USE_MOCK or (openai_client is None and anthropic_client is None):
+        return {}, "No AI client"
+
+    context_prompt = build_context_prompt(persona, intent, platform, hinglish)
+    prompt = f"""Analyze the dating chat for the user. Be concise, specific, and respectful. {context_prompt}
+
+Return ONLY valid JSON with exactly these keys:
+{{
+  "her_energy": "short read on her vibe/interest level",
+  "conversation_score": 0-100,
+  "comments": ["2-4 brief comments on the conversation"],
+  "green_flags": ["signals that help"],
+  "red_flags": ["risks or weak signals; empty if none"],
+  "next_move": "one tactical recommendation"
+}}
+
+Chat text context:
+{chat_context[:1200] if chat_context else "Use the screenshot(s) only."}"""
+
+    is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
+    contents = [{"type": "text", "text": prompt}]
+    for enc in encoded_images[:5]:
+        if is_anthropic:
+            contents.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": enc}})
+        else:
+            contents.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{enc}", "detail": "low"}})
+
+    response, error = call_ai_for_task(
+        [{"role": "user", "content": contents}],
+        system_prompt="You are RizzSe, a dating conversation analyst. Return strict JSON only. Never invent private facts.",
+        model=OPENAI_MODEL,
+        max_tokens=420,
+        temperature=0.35,
+        timeout_seconds=35
+    )
+    if error:
+        return {}, error
+    parsed = extract_json_object(get_response_text(response))
+    if not parsed:
+        return {}, "Could not parse insights JSON"
+    return sanitize_insights(parsed), None
+
+
 def call_ai(messages, model=None, max_tokens=90, temperature=0.65):
     """Call AI model. Raises on failure — no mock fallback."""
     model_name = model or OPENAI_MODEL
@@ -496,10 +615,12 @@ def analyze_screenshot():
         hinglish = truthy(request.form.get("hinglish", "false"))
         conversation = []
         suggestions = None
+        insights = {}
         source = "none"
         raw_model_text = ""
         image_info = "unknown"
         failure_reason = "No image file was provided"
+        base64_image = None
 
         if "image" in request.files:
             image_file = request.files["image"]
@@ -623,10 +744,22 @@ def analyze_screenshot():
             len(suggestions),
             time.monotonic() - started_at
         )
+
+        if base64_image:
+            insights, insights_error = generate_conversation_insights(
+                encoded_images=[base64_image],
+                persona=persona,
+                intent=intent,
+                platform=platform,
+                hinglish=hinglish
+            )
+            if insights_error:
+                app.logger.warning("screenshot insights failed: %s", insights_error)
         
         return jsonify({
             "conversation": conversation,
             "suggestions": suggestions,
+            "insights": insights,
             "detected_app": "Dating App",
             "persona": persona,
             "source": source
@@ -654,12 +787,13 @@ def analyze_screenshots():
 
         have_client = not USE_MOCK and (openai_client is not None or anthropic_client is not None)
         suggestions = None
+        insights = {}
         source = "none"
         raw_model_text = ""
         failure_reason = "No AI client"
+        encoded_images = []
 
         if have_client:
-            encoded_images = []
             for img_file in image_files:
                 if img_file.filename == "":
                     continue
@@ -784,12 +918,64 @@ def analyze_screenshots():
             "analyze-screenshots ok: model=%s source=%s suggestions=%d images=%d duration=%.2fs",
             OPENAI_MODEL, source, len(suggestions), len(image_files), time.monotonic() - started_at
         )
+        insights, insights_error = generate_conversation_insights(
+            chat_context=chat_context,
+            encoded_images=encoded_images,
+            persona=persona,
+            intent=intent,
+            platform=platform,
+            hinglish=hinglish
+        )
+        if insights_error:
+            app.logger.warning("analyze-screenshots insights failed: %s", insights_error)
         return jsonify({
             "suggestions": suggestions,
+            "insights": insights,
             "persona": persona,
             "source": source
         })
 
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/v1/analyze-conversation-insights", methods=["POST"])
+def analyze_conversation_insights():
+    """Text-only conversation comments/energy analysis endpoint."""
+    started_at = time.monotonic()
+    try:
+        data = request.get_json() or {}
+        persona = data.get("persona", data.get("tone", "playful"))
+        intent = data.get("intent", "keep_going")
+        platform = data.get("platform", "whatsapp")
+        hinglish = truthy(data.get("hinglish", "false"))
+        chat_context = data.get("chat_context", "")
+        conversation = data.get("conversation", [])
+        if not chat_context and conversation:
+            lines = []
+            for msg in conversation[-16:]:
+                sender = str(msg.get("sender", "them")).strip() or "them"
+                text = str(msg.get("text", "")).strip()
+                if text:
+                    lines.append(f"{sender}: {text}")
+            chat_context = "\n".join(lines)
+
+        if not chat_context:
+            return jsonify({"error": "chat_context or conversation is required"}), 400
+
+        insights, error = generate_conversation_insights(
+            chat_context=chat_context,
+            persona=persona,
+            intent=intent,
+            platform=platform,
+            hinglish=hinglish
+        )
+        if error or not insights:
+            return jsonify({"error": "Conversation insights failed", "reason": error or "empty insights", "model": OPENAI_MODEL}), 502
+
+        app.logger.info("conversation insights ok: model=%s duration=%.2fs", OPENAI_MODEL, time.monotonic() - started_at)
+        return jsonify({"insights": insights, "persona": persona, "source": "ai"})
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
 import com.datingcopilot.keyboard.chat.AnalyzeResponse
+import com.datingcopilot.keyboard.chat.ConversationInsights
 import com.datingcopilot.keyboard.chat.ChatMessage
 import com.datingcopilot.keyboard.chat.SuggestionOption
 import com.google.gson.Gson
@@ -46,6 +47,21 @@ class ApiClient(context: Context) {
         .build()
     private val gson = Gson()
     private val JSON = "application/json".toMediaType()
+
+    private fun parseInsights(result: Map<*, *>): ConversationInsights? {
+        val raw = result["insights"] as? Map<*, *> ?: return null
+        val comments = (raw["comments"] as? List<*>)?.mapNotNull { it?.toString()?.trim() } ?: emptyList()
+        val greenFlags = (raw["green_flags"] as? List<*>)?.mapNotNull { it?.toString()?.trim() } ?: emptyList()
+        val redFlags = (raw["red_flags"] as? List<*>)?.mapNotNull { it?.toString()?.trim() } ?: emptyList()
+        return ConversationInsights(
+            herEnergy = raw["her_energy"] as? String ?: "",
+            conversationScore = (raw["conversation_score"] as? Number)?.toInt() ?: 0,
+            comments = comments,
+            greenFlags = greenFlags,
+            redFlags = redFlags,
+            nextMove = raw["next_move"] as? String ?: ""
+        )
+    }
 
     // ── User Profile ──
     fun saveProfile(profile: UserProfile) {
@@ -336,6 +352,7 @@ class ApiClient(context: Context) {
             AnalyzeResponse(
                 conversation = emptyList(),
                 suggestions = suggestions,
+                insights = parseInsights(result),
                 detectedApp = result["detected_app"] as? String,
                 persona = result["persona"] as? String
             )
@@ -437,6 +454,7 @@ class ApiClient(context: Context) {
             AnalyzeResponse(
                 conversation = conversation,
                 suggestions = suggestions,
+                insights = parseInsights(result),
                 detectedApp = result["detected_app"] as? String,
                 persona = result["persona"] as? String
             )
@@ -638,6 +656,40 @@ class ApiClient(context: Context) {
         } catch (e: Exception) {
             android.util.Log.e("ApiClient", "Stream exception: ${e.message}", e)
             onComplete(null)
+        }
+    }
+
+    fun getConversationInsights(
+        chatContext: String,
+        persona: String = "playful",
+        intent: String = "keep_going",
+        platform: String = "whatsapp"
+    ): ConversationInsights? {
+        return try {
+            val requestBody = mapOf(
+                "chat_context" to chatContext,
+                "persona" to persona,
+                "intent" to intent,
+                "platform" to platform,
+                "hinglish" to if (prefs.getBoolean("hinglish_mode", false)) "true" else "false"
+            )
+
+            val json = gson.toJson(requestBody)
+            val request = Request.Builder()
+                .url("${getBaseUrl()}/api/v1/analyze-conversation-insights")
+                .post(json.toRequestBody(JSON))
+                .addHeader("Content-Type", "application/json")
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) return null
+
+            val responseBody = response.body?.string() ?: return null
+            val result = gson.fromJson(responseBody, Map::class.java)
+            parseInsights(result)
+        } catch (e: Exception) {
+            android.util.Log.e("ApiClient", "Conversation insights exception: ${e.message}", e)
+            null
         }
     }
 }
