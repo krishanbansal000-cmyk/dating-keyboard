@@ -301,6 +301,7 @@ internal fun NboardImeService.isBottomModeSelected(mode: BottomKeyMode): Boolean
 }
 
 internal fun NboardImeService.setGenerating(generating: Boolean) {
+    if (!isAiPromptInputInitialized()) return
     isGenerating = generating
     val aiAllowed = isAiAllowedInCurrentContext()
     val gboardLayout = isGboardLayoutActive()
