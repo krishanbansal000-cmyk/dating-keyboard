@@ -3,6 +3,7 @@ package com.datingcopilot.keyboard.chat
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.Intent
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -340,7 +341,14 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         getSharedPreferences("dating_copilot", Context.MODE_MULTI_PROCESS)
             .edit()
             .putString("pending_keyboard_suggestions", json)
-            .apply()
+            .commit()
+
+        val handoff = Intent("com.datingcopilot.keyboard.RIZZSE_SUGGESTIONS").apply {
+            setPackage("helium314.keyboard.debug")
+            putExtra("pending_keyboard_suggestions", json)
+            putExtra("pending_keyboard_context", getSharedPreferences("dating_copilot", Context.MODE_PRIVATE).getString("pending_chat_context", "") ?: "")
+        }
+        sendBroadcast(handoff)
     }
 
     private fun showResults(response: AnalyzeResponse) {

@@ -5,6 +5,7 @@ import android.animation.ValueAnimator
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -113,7 +114,6 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun generateFromKeyboard(chatContext: String) {
-        val prefs = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
         val text = messageInput.text.toString().trim()
         val ctx = if (chatContext.isNotBlank()) chatContext else ChatContextService.getChatContext(this)
 
@@ -153,6 +153,10 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun buildUI() {
+        buildDashboardUI()
+    }
+
+    private fun buildLegacyUI() {
         val root = FrameLayout(this).apply {
             setBackgroundColor(resources.getColor(R.color.bg_dark, null))
         }
@@ -291,26 +295,21 @@ class ChatActivity : AppCompatActivity() {
             addView(emptySubtitle)
 
             val uploadHint = TextView(this@ChatActivity).apply {
-                text = "📸 Upload Screenshot"
+                text = "Upload Screenshot"
                 textSize = 14f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(resources.getColor(R.color.accent_violet, null))
                 textAlignment = TextView.TEXT_ALIGNMENT_CENTER
-                setPadding(
-                    (24 * resources.displayMetrics.density).toInt(),
-                    (12 * resources.displayMetrics.density).toInt(),
-                    (24 * resources.displayMetrics.density).toInt(),
-                    (12 * resources.displayMetrics.density).toInt()
-                )
-                val outlineBg = android.graphics.drawable.GradientDrawable()
-                outlineBg.cornerRadius = 32 * resources.displayMetrics.density
+                setPadding(dp(24), dp(12), dp(24), dp(12))
+                val outlineBg = GradientDrawable()
+                outlineBg.cornerRadius = dp(32).toFloat()
                 outlineBg.setColor(resources.getColor(R.color.bg_surface, null))
                 outlineBg.setStroke(1, resources.getColor(R.color.accent_violet, null))
                 background = outlineBg
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { gravity = Gravity.CENTER; topMargin = (24 * resources.displayMetrics.density).toInt() }
+                ).apply { gravity = Gravity.CENTER; topMargin = dp(24) }
                 isClickable = true
                 setOnClickListener { showImagePicker() }
             }
@@ -563,6 +562,404 @@ class ChatActivity : AppCompatActivity() {
 
         root.addView(mainLayout)
         setContentView(root)
+    }
+
+    private fun buildDashboardUI() {
+        val root = FrameLayout(this).apply {
+            setBackgroundColor(resources.getColor(R.color.bg_dark, null))
+        }
+
+        val bg = View(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0xFF0A0211.toInt(), 0xFF21002F.toInt(), 0xFF12001E.toInt())
+            )
+        }
+        root.addView(bg)
+
+        val mainLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        val scroll = ScrollView(this).apply {
+            isFillViewport = false
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        }
+
+        emptyStateView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(10), dp(14), dp(18))
+        }
+
+        val topBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(12))
+        }
+        topBar.addView(TextView(this).apply {
+            text = "RizzSe"
+            textSize = 22f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(0xFFFF38F8.toInt())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        topBar.addView(TextView(this).apply {
+            text = "i"
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.text_primary, null))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(0xFF231331.toInt())
+                setStroke(dp(1), 0xFFE9D5FF.toInt())
+            }
+            layoutParams = LinearLayout.LayoutParams(dp(30), dp(30))
+            setOnClickListener { SettingsSheet().show(supportFragmentManager, "settings") }
+        })
+        emptyStateView.addView(topBar)
+
+        emptyStateView.addView(personaCard())
+
+        emptyStateView.addView(TextView(this).apply {
+            text = "Select Your Vibe"
+            textSize = 16f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.text_primary, null))
+            setPadding(dp(4), dp(18), 0, dp(10))
+        })
+
+        val vibeGrid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        vibeGrid.addView(vibeRow(
+            vibeTile("Funny", "playful", "flirt", true),
+            vibeTile("Chill", "chill", "keep_going", false)
+        ))
+        vibeGrid.addView(vibeRow(
+            vibeTile("Direct", "direct", "ask_date", false),
+            vibeTile("Flirty", "witty", "recover_dry", false)
+        ))
+        emptyStateView.addView(vibeGrid)
+
+        emptyStateView.addView(analyzeCard())
+
+        val quickHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(4), dp(18), dp(4), dp(8))
+        }
+        quickHeader.addView(TextView(this).apply {
+            text = "Quick Starters"
+            textSize = 15f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.text_primary, null))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        quickHeader.addView(TextView(this).apply {
+            text = "See all"
+            textSize = 12f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(0xFFFF38F8.toInt())
+        })
+        emptyStateView.addView(quickHeader)
+
+        emptyStateView.addView(quickStarter("Are you a Wi-Fi router? Because I'm feeling a connection..."))
+        emptyStateView.addView(quickStarter("I usually wait for a few days but you're too interesting."))
+
+        emptyStateView.addView(proCard())
+        scroll.addView(emptyStateView)
+        mainLayout.addView(scroll)
+
+        chatRecyclerView = RecyclerView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+            layoutManager = LinearLayoutManager(this@ChatActivity)
+            visibility = View.GONE
+        }
+        chatAdapter = ChatAdapter()
+        chatRecyclerView.adapter = chatAdapter
+        mainLayout.addView(chatRecyclerView)
+
+        suggestionsLabel = TextView(this).apply {
+            text = "Pick a reply"
+            textSize = 14f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.text_secondary, null))
+            setPadding(dp(16), dp(12), dp(16), dp(8))
+            visibility = View.GONE
+        }
+        mainLayout.addView(suggestionsLabel)
+
+        suggestionsRecyclerView = RecyclerView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+            layoutManager = LinearLayoutManager(this@ChatActivity, LinearLayoutManager.VERTICAL, false)
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+            clipToPadding = false
+            visibility = View.GONE
+        }
+        suggestionAdapter = SuggestionCardAdapter { suggestion ->
+            copyToClipboard(suggestion.text)
+            Toast.makeText(this, "Reply copied. Paste it in your chat", Toast.LENGTH_SHORT).show()
+        }
+        suggestionsRecyclerView.adapter = suggestionAdapter
+        mainLayout.addView(suggestionsRecyclerView)
+
+        messageInput = android.widget.EditText(this).apply {
+            visibility = View.GONE
+            tag = "input_row"
+        }
+        mainLayout.addView(messageInput, LinearLayout.LayoutParams(1, 1))
+
+        mainLayout.addView(bottomNav())
+        root.addView(mainLayout)
+
+        screenshotPreview = ImageView(this).apply { visibility = View.GONE }
+        root.addView(screenshotPreview)
+
+        loadingView = FrameLayout(this).apply {
+            setBackgroundColor(0xEE0A0211.toInt())
+            visibility = View.GONE
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            val loadingContent = LinearLayout(this@ChatActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            }
+            loadingPreviewImage = ImageView(this@ChatActivity).apply { visibility = View.GONE }
+            loadingContent.addView(loadingPreviewImage, LinearLayout.LayoutParams(dp(92), dp(70)))
+            loadingTextView = TextView(this@ChatActivity).apply {
+                text = "Generating replies..."
+                textSize = 15f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(0xFFFF38F8.toInt())
+                gravity = Gravity.CENTER
+                setPadding(0, 0, 0, dp(14))
+            }
+            loadingContent.addView(loadingTextView)
+            loadingContent.addView(ProgressBar(this@ChatActivity).apply { isIndeterminate = true }, LinearLayout.LayoutParams(dp(32), dp(32)))
+            addView(loadingContent)
+        }
+        root.addView(loadingView)
+
+        setContentView(root)
+    }
+
+    private fun personaCard(): View {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(16), dp(18), dp(16))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(10).toFloat()
+                setColor(0xFF3A1648.toInt())
+                setStroke(dp(1), 0xFF5D2872.toInt())
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            addView(TextView(this@ChatActivity).apply {
+                text = "CURRENT PERSONA"
+                textSize = 12f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(0xFFC084FC.toInt())
+            })
+            addView(TextView(this@ChatActivity).apply {
+                text = "The Comedian"
+                textSize = 23f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(0xFFE9D5FF.toInt())
+            })
+            val row = LinearLayout(this@ChatActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(18), 0, 0)
+            }
+            row.addView(TextView(this@ChatActivity).apply {
+                text = "Daily Rizz Power"
+                textSize = 12f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(0xFFE9D5FF.toInt())
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            })
+            row.addView(TextView(this@ChatActivity).apply {
+                text = "69%"
+                textSize = 16f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(0xFFE9D5FF.toInt())
+            })
+            addView(row)
+            addView(View(this@ChatActivity).apply {
+                background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFFFF38F8.toInt(), 0xFFE11D8F.toInt()))
+                layoutParams = LinearLayout.LayoutParams(0, dp(5)).apply {
+                    width = dp(190)
+                    topMargin = dp(6)
+                }
+            })
+        }
+    }
+
+    private fun vibeRow(left: View, right: View): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(left)
+            addView(right)
+        }
+    }
+
+    private fun vibeTile(label: String, persona: String, intent: String, selected: Boolean): TextView {
+        return TextView(this).apply {
+            text = label
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(if (selected) 0xFFE9D5FF.toInt() else resources.getColor(R.color.text_secondary, null))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(8).toFloat()
+                setColor(0xFF2C1B35.toInt())
+                setStroke(dp(1), if (selected) 0xFFB112D6.toInt() else 0xFF3A2746.toInt())
+            }
+            layoutParams = LinearLayout.LayoutParams(0, dp(78), 1f).apply {
+                setMargins(dp(4), dp(5), dp(4), dp(5))
+            }
+            isClickable = true
+            setOnClickListener {
+                currentPersona = persona
+                currentIntent = intent
+                savePreference("persona", persona)
+                savePreference("intent", intent)
+                Toast.makeText(this@ChatActivity, "$label vibe selected", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun analyzeCard(): View {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(24), dp(16), dp(24))
+            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFFBE00FF.toInt(), 0xFFE41487.toInt())).apply {
+                cornerRadius = dp(12).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(132)
+            ).apply { topMargin = dp(18) }
+            isClickable = true
+            setOnClickListener { showImagePicker() }
+            addView(TextView(this@ChatActivity).apply {
+                text = "+"
+                textSize = 30f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(Color.WHITE)
+            })
+            addView(TextView(this@ChatActivity).apply {
+                text = "Analyze Chat"
+                textSize = 22f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(Color.WHITE)
+            })
+            addView(TextView(this@ChatActivity).apply {
+                text = "Upload screenshot for instant rizz"
+                textSize = 12f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(0xFFFFD6F2.toInt())
+            })
+        }
+    }
+
+    private fun quickStarter(textValue: String): TextView {
+        return TextView(this).apply {
+            text = "\"$textValue\""
+            textSize = 13f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(0xFFE9D5FF.toInt())
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(4).toFloat()
+                setColor(0xFF2D1D36.toInt())
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(8) }
+            isClickable = true
+            setOnClickListener {
+                messageInput.setText(textValue)
+                analyzeText(textValue)
+            }
+        }
+    }
+
+    private fun proCard(): View {
+        return TextView(this).apply {
+            text = "Unlock Pro Mode\nGet unlimited analysis and elite personas."
+            textSize = 18f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            gravity = Gravity.BOTTOM or Gravity.START
+            setPadding(dp(16), 0, dp(16), dp(18))
+            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFF090312.toInt(), 0xFF51115E.toInt(), 0xFFEE1AA8.toInt())).apply {
+                cornerRadius = dp(10).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(118)
+            ).apply { topMargin = dp(16) }
+        }
+    }
+
+    private fun bottomNav(): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(6), dp(8), dp(6), dp(8))
+            background = GradientDrawable().apply { setColor(0xFF1B0E23.toInt()) }
+            addView(navItem("Home", true) {})
+            addView(navItem("History", false) { startActivity(Intent(this@ChatActivity, HistoryActivity::class.java)) })
+            addView(navItem("Setup", false) { startActivity(Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS)) })
+            addView(navItem("Settings", false) { SettingsSheet().show(supportFragmentManager, "settings") })
+        }
+    }
+
+    private fun navItem(label: String, selected: Boolean, action: () -> Unit): TextView {
+        return TextView(this).apply {
+            text = label
+            textSize = 11f
+            gravity = Gravity.CENTER
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(if (selected) Color.WHITE else 0xFFC4B5FD.toInt())
+            background = if (selected) GradientDrawable().apply {
+                cornerRadius = dp(20).toFloat()
+                setColor(0xFF5B1173.toInt())
+            } else null
+            layoutParams = LinearLayout.LayoutParams(0, dp(42), 1f).apply { marginEnd = dp(4) }
+            isClickable = true
+            setOnClickListener { action() }
+        }
     }
 
     private fun sectionLabel(text: String): TextView {

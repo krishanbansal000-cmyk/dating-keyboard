@@ -22,9 +22,17 @@ class RizzseActionReceiver : BroadcastReceiver() {
             .putString("rizzse_chat_context", chatContext)
             .apply()
 
-        val launchIntent = Intent(context, com.datingcopilot.keyboard.KeyboardScreenshotActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            putExtra("chat_context", chatContext)
+        val launchIntent = if (action == "screenshot") {
+            Intent(context, com.datingcopilot.keyboard.chat.ChatActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                putExtra(com.datingcopilot.keyboard.chat.ChatActivity.EXTRA_OPEN_IMAGE_PICKER, true)
+                putExtra("rizzse_chat_context", chatContext)
+            }
+        } else {
+            Intent(context, com.datingcopilot.keyboard.KeyboardScreenshotActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                putExtra("chat_context", chatContext)
+            }
         }
         context.startActivity(launchIntent)
     }
