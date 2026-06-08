@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">RizzSe</string>
+    <string name="keyboard_name">RizzSe</string>
     <string name="settings_title">RizzSe Settings</string>
     <string name="backend_url_label">Backend URL</string>
     <string name="tone_label">Tone</string>

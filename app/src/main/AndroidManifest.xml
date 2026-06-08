@@ -17,18 +17,13 @@
         android:usesCleartextTraffic="true"
         android:enableOnBackInvokedCallback="true">
 
-        <!-- Keyboard IME Service -->
-        <service
-            android:name=".DatingKeyboardService"
-            android:exported="true"
-            android:permission="android.permission.BIND_INPUT_METHOD">
+        <receiver
+            android:name=".RizzseActionReceiver"
+            android:exported="true">
             <intent-filter>
-                <action android:name="android.view.InputMethod" />
+                <action android:name="com.datingcopilot.keyboard.RIZZSE_ACTION" />
             </intent-filter>
-            <meta-data
-                android:name="android.view.im"
-                android:resource="@xml/method" />
-        </service>
+        </receiver>
 
         <activity
             android:name=".onboarding.OnboardingActivity"

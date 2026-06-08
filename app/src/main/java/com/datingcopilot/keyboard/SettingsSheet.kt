@@ -1,13 +1,16 @@
 package com.datingcopilot.keyboard
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.datingcopilot.keyboard.R
+import android.view.inputmethod.InputMethodManager
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 
 class SettingsSheet : BottomSheetDialogFragment() {
@@ -34,6 +37,16 @@ class SettingsSheet : BottomSheetDialogFragment() {
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(resources.getColor(R.color.text_primary, null))
             setPadding(0, 0, 0, (20 * resources.displayMetrics.density).toInt())
+        })
+
+        // Keyboard actions
+        root.addView(sectionLabel(context, "Keyboard"))
+        root.addView(actionButton(context, "Choose Keyboard") {
+            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showInputMethodPicker()
+        })
+        root.addView(actionButton(context, "Open Keyboard Settings") {
+            startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
         })
 
         // Backend URL
@@ -126,6 +139,32 @@ class SettingsSheet : BottomSheetDialogFragment() {
             textSize = 13f
             setTextColor(resources.getColor(R.color.text_secondary, null))
             setPadding(0, 0, 0, (6 * resources.displayMetrics.density).toInt())
+        }
+    }
+
+    private fun actionButton(context: android.content.Context, text: String, onClick: () -> Unit): TextView {
+        return TextView(context).apply {
+            this.text = text
+            textSize = 15f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.text_primary, null))
+            gravity = android.view.Gravity.CENTER
+            setPadding(
+                (18 * resources.displayMetrics.density).toInt(),
+                (12 * resources.displayMetrics.density).toInt(),
+                (18 * resources.displayMetrics.density).toInt(),
+                (12 * resources.displayMetrics.density).toInt()
+            )
+            val bg = android.graphics.drawable.GradientDrawable()
+            bg.cornerRadius = 24 * resources.displayMetrics.density
+            bg.setColor(resources.getColor(R.color.bg_input, null))
+            bg.setStroke(1, resources.getColor(R.color.glass_border, null))
+            background = bg
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (10 * resources.displayMetrics.density).toInt() }
+            setOnClickListener { onClick() }
         }
     }
 }

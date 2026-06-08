@@ -35,7 +35,9 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val imagePaths = intent.getStringArrayExtra("image_paths") ?: arrayOf()
         val imageUri = intent.data
+        val chatContext = intent.getStringExtra("chat_context") ?: ""
         val persona = intent.getStringExtra("persona") ?: "playful"
         val intentType = intent.getStringExtra("intent") ?: "keep_going"
         val platform = intent.getStringExtra("platform") ?: "whatsapp"
@@ -50,15 +52,9 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(resources.getColor(R.color.bg_dark, null))
-            setPadding(
-                dp(18),
-                dp(44),
-                dp(18),
-                dp(32)
-            )
+            setPadding(dp(18), dp(44), dp(18), dp(32))
         }
 
-        // ── Top bar ──
         val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -115,33 +111,66 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         topBar.addView(title)
         root.addView(topBar)
 
-        // ── Screenshot ──
-        val imageView = ImageView(this).apply {
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(292)
-            ).apply { bottomMargin = dp(18) }
-        }
-        if (imageUri != null) {
-            imageView.setImageURI(imageUri)
-            imageView.alpha = 0f
-            imageView.postDelayed({ imageView.animate().alpha(1f).setDuration(400).start() }, 100)
-        }
-        root.addView(imageView)
+        // Screenshot strip (horizontal scroll if multiple)
+        if (imagePaths.isNotEmpty()) {
+            val stripLabel = TextView(this).apply {
+                text = "${imagePaths.size} screenshot${if (imagePaths.size > 1) "s" else ""} captured"
+                textSize = 12f
+                setTextColor(resources.getColor(R.color.text_muted, null))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = dp(8) }
+            }
+            root.addView(stripLabel)
 
-        // ── Animated analyzing panel ──
+            val strip = android.widget.HorizontalScrollView(this).apply {
+                isHorizontalScrollBarEnabled = false
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = dp(12) }
+            }
+            val stripInner = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+            }
+            for (path in imagePaths) {
+                val imgView = ImageView(this).apply {
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    layoutParams = LinearLayout.LayoutParams(
+                        dp(140),
+                        dp(260)
+                    ).apply { marginEnd = dp(8) }
+                    setImageURI(Uri.fromFile(java.io.File(path)))
+                    val bg = GradientDrawable()
+                    bg.cornerRadius = dp(8).toFloat()
+                    bg.setColor(resources.getColor(R.color.bg_surface, null))
+                    bg.setStroke(dp(1), resources.getColor(R.color.glass_border, null))
+                    clipToOutline = true
+                }
+                stripInner.addView(imgView)
+            }
+            strip.addView(stripInner)
+            root.addView(strip)
+        } else if (imageUri != null) {
+            val imageView = ImageView(this).apply {
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(292)
+                ).apply { bottomMargin = dp(18) }
+                setImageURI(imageUri)
+            }
+            root.addView(imageView)
+        }
+
+        // Loading panel
         val loadView = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 (180 * resources.displayMetrics.density).toInt()
             )
-            setPadding(
-                dp(18),
-                dp(20),
-                dp(18),
-                dp(20)
-            )
+            setPadding(dp(18), dp(20), dp(18), dp(20))
             background = GradientDrawable().apply {
                 cornerRadius = dp(24).toFloat()
                 setColor(resources.getColor(R.color.bg_card, null))
@@ -210,8 +239,9 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             setTextColor(resources.getColor(R.color.text_primary, null))
         })
 
+        val imageCount = imagePaths.size
         copy.addView(TextView(this).apply {
-            text = "Reading the screenshot and crafting replies"
+            text = if (imageCount > 1) "Reading $imageCount screenshots..." else "Reading the screenshot and crafting replies"
             textSize = 12f
             setTextColor(resources.getColor(R.color.text_muted, null))
             layoutParams = LinearLayout.LayoutParams(
@@ -243,7 +273,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         startGeminiStyleLoading(glow, orbit, shimmerSweep)
         root.addView(loadView)
 
-        // ── Results containers ──
         convoSection = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
@@ -259,17 +288,46 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         scrollView.addView(root)
         setContentView(scrollView)
 
-        if (imageUri != null) {
-            runAnalysis(imageUri, persona, intentType, platform, root)
+        if (imagePaths.isNotEmpty()) {
+            runMultiImageAnalysis(imagePaths.toList(), chatContext, persona, intentType, platform)
+        } else if (imageUri != null) {
+            runAnalysis(imageUri, persona, intentType, platform)
         }
     }
 
-    private fun runAnalysis(uri: Uri, persona: String, intentType: String, platform: String, rootView: LinearLayout) {
+    private fun runMultiImageAnalysis(imagePaths: List<String>, chatContext: String, persona: String, intentType: String, platform: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val uris = imagePaths.map { Uri.fromFile(java.io.File(it)) }
+                val response = apiClient.uploadScreenshots(uris, chatContext, this@ScreenshotAnalysisActivity, persona, intentType, platform)
+                withContext(Dispatchers.Main) {
+                    if (response != null && response.suggestions?.isNotEmpty() == true) {
+                        showSuggestions(response.suggestions!!)
+                        AppHistoryStore.add(
+                            this@ScreenshotAnalysisActivity,
+                            "Screenshots",
+                            chatContext.ifBlank { "Multi-screenshot analysis" },
+                            response.suggestions!!
+                        )
+                        saveToKeyboardSuggestions(response.suggestions!!)
+                    } else {
+                        showError("Analysis failed")
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { showError("Error: ${e.message?.take(80)}") }
+            } finally {
+                imagePaths.forEach { java.io.File(it).delete() }
+            }
+        }
+    }
+
+    private fun runAnalysis(uri: Uri, persona: String, intentType: String, platform: String) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = apiClient.uploadScreenshot(uri, persona, this@ScreenshotAnalysisActivity, intentType, platform)
                 withContext(Dispatchers.Main) {
-                    if (response != null) showResults(response, rootView) else showError("Analysis failed")
+                    if (response != null) showResults(response) else showError("Analysis failed")
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { showError("Error: ${e.message?.take(50)}") }
@@ -277,7 +335,15 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         }
     }
 
-    private fun showResults(response: AnalyzeResponse, rootView: LinearLayout) {
+    private fun saveToKeyboardSuggestions(suggestions: List<SuggestionOption>) {
+        val json = com.google.gson.Gson().toJson(suggestions)
+        getSharedPreferences("dating_copilot", Context.MODE_MULTI_PROCESS)
+            .edit()
+            .putString("pending_keyboard_suggestions", json)
+            .apply()
+    }
+
+    private fun showResults(response: AnalyzeResponse) {
         val density = resources.displayMetrics.density
         stopLoadingAnimations()
         loadingState.visibility = View.GONE
@@ -294,10 +360,7 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
                 text = msg.text
                 textSize = 14f
                 setTextColor(resources.getColor(R.color.text_primary, null))
-                setPadding(
-                    (14 * density).toInt(), (10 * density).toInt(),
-                    (14 * density).toInt(), (10 * density).toInt()
-                )
+                setPadding(dp(14), dp(10), dp(14), dp(10))
                 val bg = GradientDrawable()
                 bg.cornerRadius = 16 * density
                 bg.setColor(resources.getColor(if (isYou) R.color.bubble_you else R.color.bubble_them, null))
@@ -320,17 +383,19 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         }
 
         val delay = ((response.conversation?.size ?: 0) * 120L + 600L)
-        rootView.postDelayed({ showSuggestions(response.suggestions.orEmpty()) }, delay)
+        convoSection.postDelayed({ showSuggestions(response.suggestions.orEmpty()) }, delay)
     }
 
     private fun showSuggestions(suggestions: List<SuggestionOption>) {
+        stopLoadingAnimations()
+        loadingState.visibility = View.GONE
         val density = resources.displayMetrics.density
         val label = TextView(this).apply {
             text = "Try these replies"
             textSize = 13f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(resources.getColor(R.color.text_secondary, null))
-            setPadding(0, (22 * density).toInt(), 0, (12 * density).toInt())
+            setPadding(0, dp(22), 0, dp(12))
         }
         suggSection.addView(label)
 
@@ -362,7 +427,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             background = bg
         }
 
-        // Top row: badge + confidence + copy icon
         val topRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -393,7 +457,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             setPadding(0, 0, (8 * density).toInt(), 0)
         })
 
-        // Copy icon only — small, inline on top-right
         topRow.addView(TextView(this).apply {
             text = "📋"
             textSize = 14f
@@ -405,7 +468,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         })
         card.addView(topRow)
 
-        // Suggestion text — more readable, tighter
         card.addView(TextView(this).apply {
             text = sug.text
             textSize = 14f
@@ -434,38 +496,24 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
 
     private fun startGeminiStyleLoading(glow: View, orbit: View, shimmerSweep: View) {
         loadingAnimators += ObjectAnimator.ofFloat(glow, View.SCALE_X, 0.82f, 1.08f).apply {
-            duration = 1200
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            interpolator = AccelerateDecelerateInterpolator()
-            start()
+            duration = 1200; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator(); start()
         }
         loadingAnimators += ObjectAnimator.ofFloat(glow, View.SCALE_Y, 0.82f, 1.08f).apply {
-            duration = 1200
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            interpolator = AccelerateDecelerateInterpolator()
-            start()
+            duration = 1200; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator(); start()
         }
         loadingAnimators += ObjectAnimator.ofFloat(glow, View.ALPHA, 0.18f, 0.46f).apply {
-            duration = 1200
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            interpolator = AccelerateDecelerateInterpolator()
-            start()
+            duration = 1200; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator(); start()
         }
         loadingAnimators += ObjectAnimator.ofFloat(orbit, View.ROTATION, 0f, 360f).apply {
-            duration = 1800
-            repeatCount = ValueAnimator.INFINITE
-            interpolator = LinearInterpolator()
-            start()
+            duration = 1800; repeatCount = ValueAnimator.INFINITE
+            interpolator = LinearInterpolator(); start()
         }
         loadingAnimators += ObjectAnimator.ofFloat(shimmerSweep, View.TRANSLATION_X, 0f, dp(96).toFloat()).apply {
-            duration = 950
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            interpolator = AccelerateDecelerateInterpolator()
-            start()
+            duration = 950; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator(); start()
         }
     }
 
@@ -474,7 +522,5 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         loadingAnimators.clear()
     }
 
-    private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
-    }
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }

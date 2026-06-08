@@ -64,7 +64,6 @@ class ChatActivity : AppCompatActivity() {
     private var currentPlatform = "whatsapp"
     private var selectedToneChip: TextView? = null
     private var lastInputText = ""
-    private var returnToKeyboardAfterScreenshot = false
     private var loadingPulseAnimator: ObjectAnimator? = null
 
     private val apiClient by lazy { com.datingcopilot.keyboard.ApiClient(this) }
@@ -92,6 +91,7 @@ class ChatActivity : AppCompatActivity() {
         buildUI()
         handleSendImage(intent)
         handleOpenImagePicker(intent)
+        handleRizzseAction(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -99,6 +99,42 @@ class ChatActivity : AppCompatActivity() {
         setIntent(intent)
         handleSendImage(intent)
         handleOpenImagePicker(intent)
+        handleRizzseAction(intent)
+    }
+
+    private fun handleRizzseAction(intent: Intent?) {
+        val action = intent?.getStringExtra("rizzse_action") ?: return
+        intent.removeExtra("rizzse_action")
+        val chatContext = intent.getStringExtra("rizzse_chat_context") ?: ""
+        intent.removeExtra("rizzse_chat_context")
+        if (action == "generate") {
+            Handler(Looper.getMainLooper()).postDelayed({ generateFromKeyboard(chatContext) }, 300)
+        }
+    }
+
+    private fun generateFromKeyboard(chatContext: String) {
+        val prefs = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+        val text = messageInput.text.toString().trim()
+        val ctx = if (chatContext.isNotBlank()) chatContext else ChatContextService.getChatContext(this)
+
+        if (text.isBlank() && ctx.isBlank()) {
+            android.widget.Toast.makeText(this, "Type something or open a chat to get suggestions", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            showLoading(true)
+            val result = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                apiClient.getSuggestionsWithContext(text, ctx, currentPersona, currentIntent, currentPlatform)
+            }
+            showLoading(false)
+            if (result != null) {
+                AppHistoryStore.add(this@ChatActivity, "Keyboard", text.ifBlank { ctx }, result)
+                showSuggestions(result)
+            } else {
+                android.widget.Toast.makeText(this@ChatActivity, "Generate failed. Try again.", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun handleSendImage(intent: Intent?) {
@@ -110,7 +146,6 @@ class ChatActivity : AppCompatActivity() {
 
     private fun handleOpenImagePicker(intent: Intent?) {
         if (intent?.getBooleanExtra(EXTRA_OPEN_IMAGE_PICKER, false) == true) {
-            returnToKeyboardAfterScreenshot = intent.getBooleanExtra(EXTRA_RETURN_TO_KEYBOARD, false)
             intent.removeExtra(EXTRA_OPEN_IMAGE_PICKER)
             intent.removeExtra(EXTRA_RETURN_TO_KEYBOARD)
             Handler(Looper.getMainLooper()).post { showImagePicker() }
@@ -706,52 +741,13 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun handleImageSelected(uri: Uri) {
-        if (returnToKeyboardAfterScreenshot) {
-            // Keyboard screenshot flow — analyze here, save for keyboard
-            showLoading(true, uri)
-            lifecycleScope.launch {
-                try {
-                    val response = withContext(Dispatchers.IO) {
-                        apiClient.uploadScreenshot(uri, currentPersona, this@ChatActivity, currentIntent, currentPlatform)
-                    }
-                    showLoading(false)
-                    if (response != null) {
-                        saveKeyboardHandoff(response)
-                        Toast.makeText(this@ChatActivity, "Replies ready. Open RizzSe keyboard", Toast.LENGTH_SHORT).show()
-                        finish()
-                    } else {
-                        Toast.makeText(this@ChatActivity, "Failed to analyze screenshot", Toast.LENGTH_LONG).show()
-                    }
-                } catch (e: Exception) {
-                    showLoading(false)
-                    Toast.makeText(this@ChatActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            }
-        } else {
-            // Launch analysis page immediately with the screenshot visible
-            val intent = Intent(this@ChatActivity, ScreenshotAnalysisActivity::class.java).apply {
-                data = uri
-                putExtra("persona", currentPersona)
-                putExtra("intent", currentIntent)
-                putExtra("platform", currentPlatform)
-            }
-            startActivity(intent)
+        val intent = Intent(this@ChatActivity, ScreenshotAnalysisActivity::class.java).apply {
+            data = uri
+            putExtra("persona", currentPersona)
+            putExtra("intent", currentIntent)
+            putExtra("platform", currentPlatform)
         }
-    }
-
-    private fun saveKeyboardHandoff(response: AnalyzeResponse) {
-        val suggestions = response.suggestions.orEmpty()
-        if (suggestions.isEmpty()) return
-
-        val contextText = response.conversation.orEmpty().joinToString("\n") {
-            "${if (it.sender == "you") "You" else "Them"}: ${it.text}"
-        }
-
-        getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
-            .edit()
-            .putString(PREF_PENDING_KEYBOARD_SUGGESTIONS, gson.toJson(suggestions))
-            .putString(PREF_PENDING_KEYBOARD_CONTEXT, contextText)
-            .apply()
+        startActivity(intent)
     }
 
     private fun analyzeText(text: String) {

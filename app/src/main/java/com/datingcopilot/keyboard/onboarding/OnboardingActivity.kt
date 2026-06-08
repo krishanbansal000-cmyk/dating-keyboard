@@ -14,7 +14,6 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import com.datingcopilot.keyboard.DatingKeyboardService
 import com.datingcopilot.keyboard.R
 import com.datingcopilot.keyboard.chat.ChatActivity
 
@@ -48,7 +47,7 @@ class OnboardingActivity : AppCompatActivity() {
         )
     )
 
-    private val keyboardComponent by lazy { ComponentName(this, DatingKeyboardService::class.java) }
+    private val keyboardComponent by lazy { ComponentName("helium314.keyboard.debug", "helium314.keyboard.latin.LatinIME") }
 
     private lateinit var root: FrameLayout
     private lateinit var contentLayout: LinearLayout
@@ -391,7 +390,9 @@ class OnboardingActivity : AppCompatActivity() {
     private fun isKeyboardEnabled(): Boolean {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
         return imm.enabledInputMethodList.any {
-            it.packageName == packageName || it.id == keyboardComponent.flattenToString()
+            it.packageName == packageName
+                    || it.id == keyboardComponent.flattenToString()
+                    || it.packageName == "helium314.keyboard.debug"
         }
     }
 

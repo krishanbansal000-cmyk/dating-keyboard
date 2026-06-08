@@ -637,6 +637,164 @@ def analyze_screenshot():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/v1/analyze-screenshots", methods=["POST"])
+def analyze_screenshots():
+    """Accept multiple images + chat_context, return suggestions. New multi-image endpoint."""
+    started_at = time.monotonic()
+    try:
+        persona = request.form.get("persona", "playful")
+        intent = request.form.get("intent", "keep_going")
+        platform = request.form.get("platform", "whatsapp")
+        hinglish = truthy(request.form.get("hinglish", "false"))
+        chat_context = request.form.get("chat_context", "")
+
+        image_files = request.files.getlist("images")
+        if not image_files or all(f.filename == "" for f in image_files):
+            return jsonify({"error": "No images provided"}), 400
+
+        have_client = not USE_MOCK and (openai_client is not None or anthropic_client is not None)
+        suggestions = None
+        source = "none"
+        raw_model_text = ""
+        failure_reason = "No AI client"
+
+        if have_client:
+            encoded_images = []
+            for img_file in image_files:
+                if img_file.filename == "":
+                    continue
+                img_file.seek(0)
+                image_info = image_debug_info(img_file)
+                img_file.seek(0)
+                app.logger.info("analyze-screenshots: processing image %s (%s)", img_file.filename, image_info)
+                encoded_images.append(encode_image(img_file))
+
+            if not encoded_images:
+                return jsonify({"error": "No valid images"}), 400
+
+            is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
+            context_prompt = build_context_prompt(persona, intent, platform, hinglish)
+
+            context_hint = ""
+            if chat_context:
+                lines = chat_context.split("\n")
+                clean_lines = [l.strip() for l in lines if len(l.strip()) > 3 and not l.strip().startswith(("Today", "Yesterday", "Online", "Typing", "Seen", "Delivered"))]
+                ctx_text = "\n".join(clean_lines[-10:])
+                if ctx_text:
+                    context_hint = f"\n\nAdditional text context from chat:\n{ctx_text[:600]}"
+
+            if len(encoded_images) == 1:
+                vision_prompt = f"""Read this chat screenshot carefully. Reply to the latest incoming message. Keep each reply under 100 chars. {context_prompt}{context_hint}
+
+>>> Safe:
+>>> Smooth:
+>>> Bold:"""
+                if is_anthropic:
+                    messages = [
+                        {"role": "user", "content": [
+                            {"type": "text", "text": vision_prompt},
+                            {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": encoded_images[0]}}
+                        ]}
+                    ]
+                else:
+                    messages = [
+                        {"role": "user", "content": [
+                            {"type": "text", "text": vision_prompt},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_images[0]}", "detail": "low"}}
+                        ]}
+                    ]
+            else:
+                image_contents = []
+                for idx, enc in enumerate(encoded_images):
+                    if is_anthropic:
+                        image_contents.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": enc}})
+                    else:
+                        image_contents.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{enc}", "detail": "low"}})
+
+                vision_prompt = f"""You are given {len(encoded_images)} screenshots of a chat conversation, captured as the user scrolled. These show different parts of the same conversation. Read all of them to understand the full context, then reply to the LATEST incoming message. Keep each reply under 100 chars. {context_prompt}{context_hint}
+
+>>> Safe:
+>>> Smooth:
+>>> Bold:"""
+                messages = [{"role": "user", "content": [{"type": "text", "text": vision_prompt}] + image_contents}]
+
+            response, first_error = call_ai_with_error(
+                messages,
+                model=OPENAI_MODEL,
+                max_tokens=280,
+                temperature=0.55,
+                timeout_seconds=45
+            )
+            if first_error:
+                failure_reason = f"Vision call failed: {first_error}"
+
+            if response:
+                raw_model_text = get_response_text(response)
+                suggestions = parse_suggestions(raw_model_text, persona)
+                if len(suggestions) == 3:
+                    source = "vision_ai"
+                else:
+                    failure_reason = f"Got {len(suggestions) if suggestions else 0} suggestions, need 3"
+                    suggestions = None
+
+            if not suggestions and encoded_images:
+                app.logger.warning("analyze-screenshots retry: model=%s images=%d reason=%s", OPENAI_MODEL, len(encoded_images), failure_reason)
+                retry_prompt = f"""Read this chat screenshot carefully. If it contains a chat, write exactly 3 respectful replies to the latest incoming message. You MUST include Safe, Smooth, and Bold. Return exactly this format and nothing else. {context_prompt}{context_hint}
+
+>>> Safe: <reply>
+>>> Smooth: <reply>
+>>> Bold: <reply>"""
+                retry_contents = []
+                for enc in encoded_images:
+                    if is_anthropic:
+                        retry_contents.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": enc}})
+                    else:
+                        retry_contents.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{enc}", "detail": "low"}})
+                retry_messages = [{"role": "user", "content": [{"type": "text", "text": retry_prompt}] + retry_contents}]
+                retry_response, retry_error = call_ai_with_error(
+                    retry_messages,
+                    model=OPENAI_MODEL,
+                    max_tokens=420,
+                    temperature=0.45,
+                    timeout_seconds=30
+                )
+                if retry_error:
+                    failure_reason = f"Retry failed: {retry_error}"
+                if retry_response:
+                    raw_model_text = get_response_text(retry_response)
+                    suggestions = parse_suggestions(raw_model_text, persona)
+                    if len(suggestions) == 3:
+                        source = "vision_ai_retry"
+                    else:
+                        failure_reason = f"Retry got {len(suggestions) if suggestions else 0} suggestions"
+
+        if not suggestions:
+            app.logger.warning(
+                "analyze-screenshots failed: model=%s source=%s images=%d reason=%s duration=%.2fs",
+                OPENAI_MODEL, source, len(image_files), failure_reason, time.monotonic() - started_at
+            )
+            return jsonify({
+                "error": "Screenshot analysis failed",
+                "reason": failure_reason,
+                "model": OPENAI_MODEL,
+                "source": source
+            }), 502
+
+        app.logger.info(
+            "analyze-screenshots ok: model=%s source=%s suggestions=%d images=%d duration=%.2fs",
+            OPENAI_MODEL, source, len(suggestions), len(image_files), time.monotonic() - started_at
+        )
+        return jsonify({
+            "suggestions": suggestions,
+            "persona": persona,
+            "source": source
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/v1/chat/draft", methods=["POST"])
 def chat_draft():
     """Text-based suggestions endpoint."""

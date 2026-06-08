@@ -255,7 +255,97 @@ class ApiClient(context: Context) {
         }
     }
 
-    // ── NEW: Upload screenshot for analysis ──
+    // ── NEW: Upload multiple screenshots for analysis ──
+    fun uploadScreenshots(
+        uris: List<Uri>,
+        chatContext: String,
+        context: Context,
+        persona: String = "playful",
+        intent: String = "keep_going",
+        platform: String = "whatsapp"
+    ): AnalyzeResponse? {
+        return try {
+            val requestBodyBuilder = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("persona", persona)
+                .addFormDataPart("intent", intent)
+                .addFormDataPart("platform", platform)
+                .addFormDataPart("chat_context", chatContext)
+                .addFormDataPart("user_gender", prefs.getString("user_gender", "male") ?: "male")
+                .addFormDataPart("hinglish", if (prefs.getBoolean("hinglish_mode", false)) "true" else "false")
+                .addFormDataPart("user_id", "user_001")
+
+            for (uri in uris) {
+                val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+                val extension = when {
+                    mimeType.contains("png") -> ".png"
+                    mimeType.contains("webp") -> ".webp"
+                    else -> ".jpg"
+                }
+                val tempFile = File(context.cacheDir, "upload_multi_${System.currentTimeMillis()}$extension")
+                val inputStream = context.contentResolver.openInputStream(uri)
+                if (inputStream == null) {
+                    android.util.Log.w("ApiClient", "Cannot open input stream for URI: $uri")
+                    continue
+                }
+                inputStream.use { input ->
+                    FileOutputStream(tempFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                val mediaType = mimeType.toMediaTypeOrNull()
+                val fileBody = tempFile.asRequestBody(mediaType)
+                requestBodyBuilder.addFormDataPart("images", tempFile.name, fileBody)
+            }
+
+            val request = Request.Builder()
+                .url("${getBaseUrl()}/api/v1/analyze-screenshots")
+                .post(requestBodyBuilder.build())
+                .build()
+
+            android.util.Log.d("ApiClient", "Uploading ${uris.size} screenshots with chat_context='${chatContext.take(50)}'")
+            val response = client.newCall(request).execute()
+
+            // Clean up temp files
+            context.cacheDir.listFiles()?.filter { it.name.startsWith("upload_multi_") }?.forEach { it.delete() }
+
+            if (!response.isSuccessful) {
+                val errorBody = response.body?.string() ?: "no body"
+                android.util.Log.e("ApiClient", "Multi-upload failed: HTTP ${response.code} - $errorBody")
+                return null
+            }
+
+            val responseBody = response.body?.string() ?: return null
+            android.util.Log.d("ApiClient", "Multi-upload response: ${responseBody.take(200)}")
+
+            val result = gson.fromJson(responseBody, Map::class.java)
+            val error = result["error"] as? String
+            if (error != null) {
+                android.util.Log.e("ApiClient", "Backend returned error: $error")
+                return null
+            }
+
+            val suggestionsRaw = result["suggestions"] as? List<Map<String, Any>>
+            val suggestions = suggestionsRaw?.mapNotNull { sug ->
+                val text = sug["text"] as? String ?: return@mapNotNull null
+                val confidence = (sug["confidence"] as? Number)?.toInt() ?: 90
+                val sugPersona = sug["persona"] as? String ?: persona
+                SuggestionOption(text, confidence, sugPersona)
+            } ?: emptyList()
+
+            AnalyzeResponse(
+                conversation = emptyList(),
+                suggestions = suggestions,
+                detectedApp = result["detected_app"] as? String,
+                persona = result["persona"] as? String
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("ApiClient", "Multi-upload exception: ${e.message}", e)
+            null
+        }
+    }
+
+    // ── NEW: Upload screenshot for analysis (single image) ──
     fun uploadScreenshot(
         uri: Uri,
         persona: String,
