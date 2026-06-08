@@ -562,6 +562,12 @@ class ChatActivity : AppCompatActivity() {
 
         root.addView(mainLayout)
         setContentView(root)
+
+        messageInput.postDelayed({
+            messageInput.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.showSoftInput(messageInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }, 500)
     }
 
     private fun buildDashboardUI() {

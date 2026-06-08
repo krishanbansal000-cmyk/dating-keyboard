@@ -147,7 +147,7 @@ class NboardImeService : InputMethodService() {
     internal lateinit var rightPunctuationButton: Button
     internal lateinit var clipboardButton: ImageButton
     internal lateinit var rizzseButton: ImageButton
-    internal lateinit var rizzseScreenshotButton: ImageButton
+    internal lateinit var rizzseRecordButton: Button
     internal lateinit var rizzseAiButton: ImageButton
     internal lateinit var actionButton: ImageButton
 
@@ -605,7 +605,7 @@ class NboardImeService : InputMethodService() {
         rightPunctuationButton = root.findViewById(R.id.rightPunctuationButton)
         clipboardButton = root.findViewById(R.id.clipboardButton)
         rizzseButton = root.findViewById(R.id.rizzseButton)
-        rizzseScreenshotButton = root.findViewById(R.id.rizzseScreenshotButton)
+        rizzseRecordButton = root.findViewById(R.id.rizzseRecordButton)
         rizzseAiButton = root.findViewById(R.id.rizzseAiButton)
         actionButton = root.findViewById(R.id.actionButton)
 
@@ -701,7 +701,7 @@ class NboardImeService : InputMethodService() {
         rightPunctuationButton.contentDescription = "Period key"
         clipboardButton.contentDescription = "Right mode key"
         rizzseButton.contentDescription = "RizzSe"
-        rizzseScreenshotButton.contentDescription = "Screenshot"
+        rizzseRecordButton.text = "RECORD"
         rizzseAiButton.contentDescription = "AI Assistant"
         actionButton.contentDescription = "Action"
         aiPromptToggleButton.contentDescription = "Toggle AI mode"
@@ -737,7 +737,7 @@ class NboardImeService : InputMethodService() {
         flattenView(aiModeButton)
         flattenView(clipboardButton)
         flattenView(rizzseButton)
-        flattenView(rizzseScreenshotButton)
+        flattenView(rizzseRecordButton)
         flattenView(rizzseAiButton)
         flattenView(actionButton)
         flattenView(emojiSearchIconButton)
@@ -937,8 +937,8 @@ class NboardImeService : InputMethodService() {
             true
         }
 
-        bindPressAction(rizzseScreenshotButton) { dispatchRizzseAction("screenshot") }
-        rizzseScreenshotButton.setOnLongClickListener {
+        bindPressAction(rizzseRecordButton) { dispatchRizzseAction("screenshot") }
+        rizzseRecordButton.setOnLongClickListener {
             dispatchRizzseAction("record")
             true
         }

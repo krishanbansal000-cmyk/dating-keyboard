@@ -392,31 +392,26 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <androidx.appcompat.widget.AppCompatImageButton
-            android:id="@+id/rizzseScreenshotButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_ai_button"
-            android:padding="8dp"
-            android:scaleType="center"
-            android:src="@drawable/ic_crop_rizzse" />
-
-        <TextView
-            android:id="@+id/rizzseSwipeLabel"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="SWIPE TO RECORD"
-            android:textColor="#AAAAAA"
-            android:textSize="11sp"
+        <Button
+            android:id="@+id/rizzseRecordButton"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:background="@drawable/bg_chip"
             android:fontFamily="@font/inter_variable"
-            android:letterSpacing="0.1" />
+            android:gravity="center"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="RECORD"
+            android:textAllCaps="false"
+            android:textColor="#F472B6"
+            android:textSize="11sp"
+            android:letterSpacing="0.08" />
 
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/rizzseAiButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
             android:background="@drawable/bg_ai_button"
             android:padding="8dp"
             android:scaleType="center"
