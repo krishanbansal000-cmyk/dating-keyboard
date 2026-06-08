@@ -383,6 +383,46 @@
             android:textSize="13sp" />
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/rizzseActionStrip"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/rizzseScreenshotButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_ai_button"
+            android:padding="8dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_crop_rizzse" />
+
+        <TextView
+            android:id="@+id/rizzseSwipeLabel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="SWIPE TO RECORD"
+            android:textColor="#AAAAAA"
+            android:textSize="11sp"
+            android:fontFamily="@font/inter_variable"
+            android:letterSpacing="0.1" />
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/rizzseAiButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_ai_button"
+            android:padding="8dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_sparkle_ai" />
+    </LinearLayout>
+
     <FrameLayout
         android:id="@+id/keyRowsContainer"
         android:layout_width="match_parent"

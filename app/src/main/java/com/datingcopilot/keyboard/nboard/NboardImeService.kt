@@ -147,6 +147,8 @@ class NboardImeService : InputMethodService() {
     internal lateinit var rightPunctuationButton: Button
     internal lateinit var clipboardButton: ImageButton
     internal lateinit var rizzseButton: ImageButton
+    internal lateinit var rizzseScreenshotButton: ImageButton
+    internal lateinit var rizzseAiButton: ImageButton
     internal lateinit var actionButton: ImageButton
 
     internal var isAiMode = false
@@ -603,6 +605,8 @@ class NboardImeService : InputMethodService() {
         rightPunctuationButton = root.findViewById(R.id.rightPunctuationButton)
         clipboardButton = root.findViewById(R.id.clipboardButton)
         rizzseButton = root.findViewById(R.id.rizzseButton)
+        rizzseScreenshotButton = root.findViewById(R.id.rizzseScreenshotButton)
+        rizzseAiButton = root.findViewById(R.id.rizzseAiButton)
         actionButton = root.findViewById(R.id.actionButton)
 
         keyboardRoot.clipChildren = false
@@ -697,6 +701,8 @@ class NboardImeService : InputMethodService() {
         rightPunctuationButton.contentDescription = "Period key"
         clipboardButton.contentDescription = "Right mode key"
         rizzseButton.contentDescription = "RizzSe"
+        rizzseScreenshotButton.contentDescription = "Screenshot"
+        rizzseAiButton.contentDescription = "AI Assistant"
         actionButton.contentDescription = "Action"
         aiPromptToggleButton.contentDescription = "Toggle AI mode"
         emojiSearchIconButton.contentDescription = "Search emoji"
@@ -731,6 +737,8 @@ class NboardImeService : InputMethodService() {
         flattenView(aiModeButton)
         flattenView(clipboardButton)
         flattenView(rizzseButton)
+        flattenView(rizzseScreenshotButton)
+        flattenView(rizzseAiButton)
         flattenView(actionButton)
         flattenView(emojiSearchIconButton)
         flattenView(recentClipboardChip)
@@ -927,6 +935,16 @@ class NboardImeService : InputMethodService() {
         rizzseButton.setOnLongClickListener {
             dispatchRizzseAction("record")
             true
+        }
+
+        bindPressAction(rizzseScreenshotButton) { dispatchRizzseAction("screenshot") }
+        rizzseScreenshotButton.setOnLongClickListener {
+            dispatchRizzseAction("record")
+            true
+        }
+
+        bindPressAction(rizzseAiButton) {
+            toggleAiMode()
         }
 
         configureKeyTouch(

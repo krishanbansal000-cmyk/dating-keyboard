@@ -20,6 +20,25 @@
         <item name="android:colorAccent">#A855F7</item>
     </style>
 
-    <style name="Theme.Nboard" parent="Theme.AppCompat.Light.NoActionBar" />
-    <style name="Theme.Nboard.Amoled" parent="Theme.AppCompat.Light.NoActionBar" />
+    <style name="Theme.Nboard" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorKeyboardBg">#1A1025</item>
+        <item name="colorKeyBg">#2D2548</item>
+        <item name="colorKeySpecialBg">#3D3060</item>
+        <item name="colorKeyText">#F1F5F9</item>
+        <item name="colorSpaceText">#9483B8</item>
+        <item name="colorSendBg">#F472B6</item>
+        <item name="colorSendText">#FFFFFF</item>
+        <item name="colorPopupShadow">#000000</item>
+    </style>
+
+    <style name="Theme.Nboard.Amoled" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorKeyboardBg">#000000</item>
+        <item name="colorKeyBg">#0A0A0A</item>
+        <item name="colorKeySpecialBg">#151515</item>
+        <item name="colorKeyText">#FFFFFF</item>
+        <item name="colorSpaceText">#9A9A9A</item>
+        <item name="colorSendBg">#151515</item>
+        <item name="colorSendText">#FFFFFF</item>
+        <item name="colorPopupShadow">#000000</item>
+    </style>
 </resources>
