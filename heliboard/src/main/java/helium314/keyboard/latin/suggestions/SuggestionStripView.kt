@@ -271,42 +271,43 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
-                cornerRadius = dp(18).toFloat()
-                setColor(0xFF2A1133.toInt())
-                setStroke(dp(1), 0xFF7C3AED.toInt())
+                cornerRadius = dp(16).toFloat()
+                setColor(0xFF1E0D28.toInt())
+                setStroke(dp(1), 0xFF4A2560.toInt())
             }
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.2f).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
                 marginEnd = dp(4)
-                topMargin = dp(3)
-                bottomMargin = dp(3)
+                topMargin = dp(2)
+                bottomMargin = dp(2)
             }
             isClickable = true
             isFocusable = true
             setOnClickListener { showVibePopup(this) }
         }
         
+        val label = TextView(context).apply {
+            text = vibeLabel
+            textSize = 11f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(0xFFC084FC.toInt())
+            gravity = Gravity.CENTER
+            setPadding(dp(10), 0, dp(4), 0)
+        }
+        container.addView(label)
+        
         val icon = ImageView(context).apply {
             setImageDrawable(
-                IconicsDrawable(context, GoogleMaterial.Icon.gmd_auto_awesome).apply {
-                    colorInt = 0xFFC084FC.toInt()
+                IconicsDrawable(context, GoogleMaterial.Icon.gmd_arrow_drop_down).apply {
+                    colorInt = 0xFF6B3A80.toInt()
                     sizeDp = 16
                 }
             )
             scaleType = ImageView.ScaleType.CENTER_INSIDE
-            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply {
-                marginEnd = dp(4)
+            layoutParams = LinearLayout.LayoutParams(dp(16), dp(16)).apply {
+                marginEnd = dp(6)
             }
         }
         container.addView(icon)
-        
-        val label = TextView(context).apply {
-            text = vibeLabel
-            textSize = 12f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(0xFFE9D5FF.toInt())
-            gravity = Gravity.CENTER
-        }
-        container.addView(label)
         
         return container
     }
@@ -383,44 +384,44 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
-                cornerRadius = dp(18).toFloat()
-                setColor(0xFF3A1648.toInt())
-                setStroke(dp(1), 0xFFE41487.toInt())
+                cornerRadius = dp(16).toFloat()
+                setColor(0xFF2A1133.toInt())
+                setStroke(dp(1), 0xFF7C3AED.toInt())
             }
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2f).apply {
                 marginEnd = dp(4)
-                topMargin = dp(3)
-                bottomMargin = dp(3)
+                topMargin = dp(2)
+                bottomMargin = dp(2)
             }
             isClickable = true
             isFocusable = true
             setOnClickListener { dispatchRizzseAction("record") }
         }
         
-        val icon = ImageView(context).apply {
-            setImageDrawable(
-                IconicsDrawable(context, GoogleMaterial.Icon.gmd_camera_alt).apply {
-                    colorInt = 0xFFFF38F8.toInt()
-                    sizeDp = 18
-                }
-            )
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
-            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply {
-                marginEnd = dp(5)
-            }
-        }
-        container.addView(icon)
-        
         val label = TextView(context).apply {
             text = "Long Shot"
-            textSize = 12f
-            letterSpacing = 0.04f
+            textSize = 11f
+            letterSpacing = 0.03f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(0xFFFFE6F4.toInt())
             gravity = Gravity.CENTER
-            setPadding(0, 0, dp(2), 0)
+            setPadding(dp(12), 0, dp(4), 0)
         }
         container.addView(label)
+        
+        val icon = ImageView(context).apply {
+            setImageDrawable(
+                IconicsDrawable(context, GoogleMaterial.Icon.gmd_camera_alt).apply {
+                    colorInt = 0xFFC084FC.toInt()
+                    sizeDp = 16
+                }
+            )
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).apply {
+                marginEnd = dp(8)
+            }
+        }
+        container.addView(icon)
         
         return container
     }
@@ -430,14 +431,14 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
-                cornerRadius = dp(14).toFloat()
-                setColor(0xFF2A1133.toInt())
-                setStroke(dp(1), 0xFF7C3AED.toInt())
+                cornerRadius = dp(16).toFloat()
+                setColor(0xFF1E0D28.toInt())
+                setStroke(dp(1), 0xFF4A2560.toInt())
             }
-            layoutParams = LinearLayout.LayoutParams(dp(46), LinearLayout.LayoutParams.MATCH_PARENT).apply {
-                marginEnd = dp(3)
-                topMargin = dp(3)
-                bottomMargin = dp(3)
+            layoutParams = LinearLayout.LayoutParams(dp(40), LinearLayout.LayoutParams.MATCH_PARENT).apply {
+                marginEnd = dp(2)
+                topMargin = dp(2)
+                bottomMargin = dp(2)
             }
             isClickable = true
             isFocusable = true
@@ -446,13 +447,13 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         
         val icon = ImageView(context).apply {
             setImageDrawable(
-                IconicsDrawable(context, GoogleMaterial.Icon.gmd_bolt).apply {
-                    colorInt = 0xFFFFD700.toInt()
-                    sizeDp = 22
+                IconicsDrawable(context, GoogleMaterial.Icon.gmd_auto_awesome).apply {
+                    colorInt = 0xFFC084FC.toInt()
+                    sizeDp = 18
                 }
             )
             scaleType = ImageView.ScaleType.CENTER_INSIDE
-            layoutParams = LinearLayout.LayoutParams(dp(26), dp(26))
+            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
         }
         container.addView(icon)
         
@@ -461,13 +462,19 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     private fun dispatchRizzseAction(action: String) {
         AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS)
-        (context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
-            ?.hideSoftInputFromWindow(windowToken, 0)
-        context.sendBroadcast(Intent("com.datingcopilot.keyboard.RIZZSE_ACTION").apply {
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(windowToken, 0)
+        context.sendBroadcast(Intent("com.datingcopilot.keyboard.HIDE_IME").apply {
             setPackage("com.datingcopilot.keyboard")
-            putExtra("action", action)
-            putExtra("chat_context", "")
         })
+        // Delay to ensure keyboard is fully dismissed before launching capture
+        postDelayed({
+            context.sendBroadcast(Intent("com.datingcopilot.keyboard.RIZZSE_ACTION").apply {
+                setPackage("com.datingcopilot.keyboard")
+                putExtra("action", action)
+                putExtra("chat_context", "")
+            })
+        }, 400)
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

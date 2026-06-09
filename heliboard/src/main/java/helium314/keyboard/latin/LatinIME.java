@@ -157,6 +157,13 @@ public class LatinIME extends InputMethodService implements
     private final BroadcastReceiver mDictionaryDumpBroadcastReceiver =
             new DictionaryDumpBroadcastReceiver(this);
 
+    private final BroadcastReceiver mRizzseHideImeReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(final Context context, final Intent intent) {
+            requestHideSelf(0);
+        }
+    };
+
     FoldableUtils.FoldableObserver foldableObserver;
 
     final static class RestartAfterDeviceUnlockReceiver extends BroadcastReceiver {
@@ -572,6 +579,10 @@ public class LatinIME extends InputMethodService implements
         dictDumpFilter.addAction(DictionaryDumpBroadcastReceiver.DICTIONARY_DUMP_INTENT_ACTION);
         ContextCompat.registerReceiver(this, mDictionaryDumpBroadcastReceiver, dictDumpFilter, ContextCompat.RECEIVER_NOT_EXPORTED);
 
+        final IntentFilter rizzseHideImeFilter = new IntentFilter();
+        rizzseHideImeFilter.addAction("com.datingcopilot.keyboard.HIDE_IME");
+        ContextCompat.registerReceiver(this, mRizzseHideImeReceiver, rizzseHideImeFilter, ContextCompat.RECEIVER_NOT_EXPORTED);
+
         final IntentFilter restartAfterUnlockFilter = new IntentFilter();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
             restartAfterUnlockFilter.addAction(Intent.ACTION_USER_UNLOCKED);
@@ -697,6 +708,7 @@ public class LatinIME extends InputMethodService implements
         unregisterReceiver(mRingerModeChangeReceiver);
         unregisterReceiver(mDictionaryPackInstallReceiver);
         unregisterReceiver(mDictionaryDumpBroadcastReceiver);
+        unregisterReceiver(mRizzseHideImeReceiver);
         unregisterReceiver(mRestartAfterDeviceUnlockReceiver);
         mStatsUtilsManager.onDestroy(this /* context */);
         super.onDestroy();

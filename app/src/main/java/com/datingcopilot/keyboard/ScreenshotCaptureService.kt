@@ -41,13 +41,17 @@ class ScreenshotCaptureService : Service() {
     private val frameHashes = mutableListOf<Long>()
     private val frameSamples = mutableListOf<IntArray>()
     private var captureStartTime: Long = 0
+    private var lastUniqueFrameTime: Long = 0
+    private var lastProcessedFrameTime: Long = 0
     private var frameCount: Long = 0
     private var captureFinished = false
-    private val maxFrames = 5
-    private val captureDurationMs = 5000L
+    private val maxFrames = 8
+    private val captureDurationMs = 8000L
+    private val minCaptureDurationMs = 1800L
+    private val stableStopMs = 1400L
     private val frameIntervalMs = 300L
     private val pixelCompareCount = 100
-    private val differThreshold = 0.15
+    private val differThreshold = 0.08
 
     companion object {
         private const val TAG = "ScreenshotCapture"
@@ -98,6 +102,8 @@ class ScreenshotCaptureService : Service() {
 
     private fun startMultiFrameCapture(resultCode: Int, data: Intent) {
         captureStartTime = System.currentTimeMillis()
+        lastUniqueFrameTime = captureStartTime
+        lastProcessedFrameTime = captureStartTime - frameIntervalMs
         frameCount = 0
         capturedFrames.clear()
         frameHashes.clear()
@@ -129,11 +135,13 @@ class ScreenshotCaptureService : Service() {
                 return@setOnImageAvailableListener
             }
 
-            frameCount++
-            if (frameCount % 2 != 0L) {
+            if (elapsed - lastProcessedFrameTime < frameIntervalMs) {
                 image.close()
                 return@setOnImageAvailableListener
             }
+            lastProcessedFrameTime = elapsed
+
+            frameCount++
 
             try {
                 val plane = image.planes[0]
@@ -152,10 +160,15 @@ class ScreenshotCaptureService : Service() {
                     capturedFrames.add(cropped)
                     frameHashes.add(hash)
                     frameSamples.add(sampleFrame(cropped))
+                    lastUniqueFrameTime = System.currentTimeMillis()
                     Log.d(TAG, "Captured frame ${capturedFrames.size}, elapsed=${elapsed}ms")
                 }
 
-                if (capturedFrames.size >= maxFrames || elapsed >= captureDurationMs) {
+                val hasSettled = capturedFrames.isNotEmpty() &&
+                    capturedFrames.size >= 2 &&
+                    elapsed >= minCaptureDurationMs &&
+                    System.currentTimeMillis() - lastUniqueFrameTime >= stableStopMs
+                if (capturedFrames.size >= maxFrames || elapsed >= captureDurationMs || hasSettled) {
                     imageReader?.setOnImageAvailableListener(null, null)
                     finishCapture(width, height)
                 }
@@ -166,6 +179,10 @@ class ScreenshotCaptureService : Service() {
 
         handler.postDelayed({
             if (captureFinished) {
+                return@postDelayed
+            }
+            if (capturedFrames.isNotEmpty()) {
+                finishCapture(width, height)
                 return@postDelayed
             }
             if (capturedFrames.isEmpty()) {
@@ -256,7 +273,8 @@ class ScreenshotCaptureService : Service() {
                 return@post
             }
 
-            val stitched = stitchFrames(capturedFrames)
+            val stitcher = LongScreenshotStitcher()
+            val stitched = stitcher.stitch(capturedFrames)
             if (stitched != null) {
                 Log.d(TAG, "Stitched image ${stitched.width}x${stitched.height} from ${capturedFrames.size} frames")
             }
@@ -298,149 +316,8 @@ class ScreenshotCaptureService : Service() {
     }
 
     private fun stitchFrames(frames: List<Bitmap>): Bitmap? {
-        if (frames.isEmpty()) return null
-        if (frames.size == 1) return frames[0].copy(Bitmap.Config.ARGB_8888, false)
-
-        val width = frames[0].width
-        val height = frames[0].height
-        val topChrome = (height * 0.14f).toInt()
-        val bottomChrome = (height * 0.16f).toInt()
-        val contentTop = topChrome.coerceIn(0, height / 2)
-        val contentBottom = (height - bottomChrome).coerceIn(contentTop + 1, height)
-        val contentHeight = contentBottom - contentTop
-        val features = frames.map { readLuminanceFeatures(it, contentTop, contentBottom) }
-        val appendSegments = mutableListOf(Rect(0, 0, width, height))
-
-        for (i in 1 until frames.size) {
-            val shift = findScrollShift(features[i - 1], features[i], contentHeight)
-            if (shift <= 0) {
-                Log.d(TAG, "Skipping frame $i while stitching; no reliable scroll shift")
-                appendSegments.add(Rect(0, 0, width, height))
-                continue
-            }
-
-            val srcTop = (contentBottom - shift).coerceIn(contentTop, contentBottom - 1)
-            val srcBottom = contentBottom.coerceAtLeast(srcTop + 1)
-            Log.d(TAG, "Stitch frame $i shift=$shift append=${srcBottom - srcTop}px")
-            appendSegments.add(Rect(0, srcTop, width, srcBottom))
-        }
-
-        val totalHeight = appendSegments.sumOf { it.height() }
-
-        if (totalHeight <= 0) return frames[0]
-
-        val result = Bitmap.createBitmap(width, totalHeight, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(result)
-        var y = 0
-        for (i in frames.indices) {
-            val frame = frames[i]
-            val src = appendSegments[i]
-            val dst = Rect(0, y, width, y + src.height())
-            canvas.drawBitmap(frame, src, dst, null)
-            y += src.height()
-        }
-        return result
-    }
-
-    private data class LuminanceFeatures(
-        val rows: Array<IntArray>,
-        val weights: DoubleArray
-    )
-
-    private fun readLuminanceFeatures(bitmap: Bitmap, top: Int, bottom: Int): LuminanceFeatures {
-        val sampleStep = 4
-        val sampleWidth = (bitmap.width + sampleStep - 1) / sampleStep
-        val rows = Array(bottom - top) { rowIndex ->
-            val y = top + rowIndex
-            IntArray(sampleWidth) { sampleIndex ->
-                val x = (sampleIndex * sampleStep).coerceAtMost(bitmap.width - 1)
-                val p = bitmap.getPixel(x, y)
-                val r = (p ushr 16) and 0xFF
-                val g = (p ushr 8) and 0xFF
-                val b = p and 0xFF
-                (r * 299 + g * 587 + b * 114) / 1000
-            }
-        }
-        return LuminanceFeatures(rows, rowStddevs(rows))
-    }
-
-    private fun findScrollShift(prev: LuminanceFeatures, next: LuminanceFeatures, contentHeight: Int): Int {
-        val maxShift = (contentHeight * 0.88f).toInt().coerceAtMost(contentHeight - 1)
-        val minShift = 24.coerceAtMost(maxShift)
-        if (maxShift < 1) return 0
-
-        var bestWeightedShift = -1
-        var bestWeightedScore = Double.POSITIVE_INFINITY
-        var bestPlainShift = minShift
-        var bestPlainScore = Double.POSITIVE_INFINITY
-
-        for (shift in minShift..maxShift step 4) {
-            val overlap = contentHeight - shift
-            if (overlap < 80) break
-
-            var weightSum = 0.0
-            var weightedCost = 0.0
-            var plainCost = 0.0
-            var comparedRows = 0
-            val rowStep = (overlap / 220).coerceAtLeast(1)
-
-            for (row in 0 until overlap step rowStep) {
-                val prevRowIndex = shift + row
-                val nextRowIndex = row
-                val weight = max(prev.weights[prevRowIndex], next.weights[nextRowIndex])
-                val sad = rowSad(prev.rows[prevRowIndex], next.rows[nextRowIndex])
-                plainCost += sad
-                comparedRows++
-                if (weight > 0.0) {
-                    weightedCost += weight * sad
-                    weightSum += weight
-                }
-            }
-
-            if (comparedRows == 0) continue
-            val plainScore = plainCost / comparedRows
-            if (plainScore < bestPlainScore) {
-                bestPlainScore = plainScore
-                bestPlainShift = shift
-            }
-            if (weightSum > 0.0) {
-                val weightedScore = weightedCost / weightSum
-                if (weightedScore < bestWeightedScore) {
-                    bestWeightedScore = weightedScore
-                    bestWeightedShift = shift
-                }
-            }
-        }
-
-        val shift = if (bestWeightedShift >= 0) bestWeightedShift else bestPlainShift
-        val score = if (bestWeightedShift >= 0) bestWeightedScore else bestPlainScore
-        return if (score < 9000.0) shift else 0
-    }
-
-    private fun rowStddevs(rows: Array<IntArray>): DoubleArray {
-        return DoubleArray(rows.size) { y ->
-            val row = rows[y]
-            if (row.isEmpty()) return@DoubleArray 0.0
-            var sum = 0L
-            for (v in row) sum += v
-            val mean = sum.toDouble() / row.size
-            var varianceSum = 0.0
-            for (v in row) {
-                val d = v - mean
-                varianceSum += d * d
-            }
-            sqrt(varianceSum / row.size)
-        }
-    }
-
-    private fun rowSad(a: IntArray, b: IntArray): Long {
-        val width = min(a.size, b.size)
-        var sum = 0L
-        for (i in 0 until width) {
-            val d = a[i] - b[i]
-            sum += if (d < 0) -d.toLong() else d.toLong()
-        }
-        return sum
+        val stitcher = LongScreenshotStitcher()
+        return stitcher.stitch(frames)
     }
 
     private fun cleanupCapture() {

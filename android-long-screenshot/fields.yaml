@@ -1,0 +1,202 @@
+field_definitions:
+  # === Identity ===
+  - name: name
+    category: Identity
+    description: Library, API, or tool name
+    detail_level: brief
+
+  - name: type
+    category: Identity
+    description: native_api, library, tool, research
+    detail_level: brief
+
+  - name: platform
+    category: Identity
+    description: Android API level, framework, or runtime supported
+    detail_level: brief
+
+  - name: license
+    category: Identity
+    description: Open source license (Apache 2.0, MIT, GPL, etc.) or proprietary
+    detail_level: brief
+
+  - name: version
+    category: Identity
+    description: Latest stable version
+    detail_level: brief
+
+  - name: project_status
+    category: Identity
+    description: Last release date, last commit, issue activity, maintenance health
+    detail_level: moderate
+
+  # === Capture Method ===
+  - name: capture_driver
+    category: Capture
+    description: How content is captured — user scroll, injected swipe, Accessibility, ScrollCapture render, offscreen view rendering, vendor/system UI
+    detail_level: detailed
+
+  - name: capture_method
+    category: Capture
+    description: MediaProjection, ScrollCapture API, Accessibility, Root/Vendor, offscreen render
+    detail_level: moderate
+
+  - name: compose_support
+    category: Capture
+    description: Whether it works with Jetpack Compose scroll containers (LazyColumn, verticalScroll)
+    detail_level: moderate
+
+  - name: view_support
+    category: Capture
+    description: View, RecyclerView, WebView, NestedScrollView, ListView, mixed
+    detail_level: moderate
+
+  # === Stitching Strategy ===
+  - name: stitching_strategy
+    category: Stitching
+    description: Vertical-only, content-aware shift, computer-vision feature matching, server-side
+    detail_level: detailed
+
+  - name: matching_algorithm
+    category: Stitching
+    description: SAD/MAD, NCC, SSIM, phase correlation, ORB/SIFT/FAST, edge maps, row-profile matching
+    detail_level: detailed
+
+  - name: scroll_offset_trust
+    category: Stitching
+    description: Whether the tool uses reported scroll delta, pixel-content verification, or hybrid
+    detail_level: moderate
+
+  - name: duplicate_frame_handling
+    category: Stitching
+    description: Whether the tool detects zero-motion / repeated frames and skips them
+    detail_level: moderate
+
+  - name: seam_selection_policy
+    category: Stitching
+    description: Fixed cut, lowest-difference seam, feature-consistent seam, fade/overlay blend
+    detail_level: moderate
+
+  - name: overlap_requirement
+    category: Stitching
+    description: Minimum overlap ratio or step size assumptions (e.g., 20% overlap)
+    detail_level: brief
+
+  - name: confidence_fallback
+    category: Stitching
+    description: Thresholds, retry windows, manual refinement, candidate generation
+    detail_level: moderate
+
+  # === Robustness / Edge Cases ===
+  - name: static_chrome_handling
+    category: Robustness
+    description: Status bar, nav bar, toolbars, FABs, sticky headers/footers, ad banners
+    detail_level: moderate
+
+  - name: dynamic_content_robustness
+    category: Robustness
+    description: Behavior with GIFs, blinking cursors, video, timestamps, lazy-loading, collapsing toolbars
+    detail_level: brief
+
+  - name: content_type_fitness
+    category: Robustness
+    description: Chat/thread, article/webview, table, long chart, map, subtitle
+    detail_level: brief
+
+  # === Performance ===
+  - name: memory_strategy
+    category: Performance
+    description: Full bitmap concat, tile-based assembly, streaming write, region decode, temp-file spill
+    detail_level: moderate
+
+  - name: stitching_speed
+    category: Performance
+    description: Approximate time to stitch N frames (e.g., 5 frames in <1s)
+    detail_level: brief
+
+  - name: max_output_constraints
+    category: Performance
+    description: Max bitmap dimensions, format limits (PNG/WebP/JPEG), OEM file-size limits
+    detail_level: brief
+
+  - name: frame_interval
+    category: Performance
+    description: How long to wait between frames during capture (e.g., 300ms)
+    detail_level: brief
+
+  # === Output ===
+  - name: output_format
+    category: Output
+    description: PNG, JPEG, WebP, Multi-image, PDF
+    detail_level: brief
+
+  - name: output_quality
+    category: Output
+    description: Lossless, Compressed, Lossy; quality parameters
+    detail_level: brief
+
+  # === Compatibility / Integration ===
+  - name: min_sdk
+    category: Compatibility
+    description: Minimum Android SDK version required
+    detail_level: brief
+
+  - name: oem_compatibility
+    category: Compatibility
+    description: OEM restrictions, vendor-specific limitations, MIUI/EMUI/OneUI behavior
+    detail_level: brief
+
+  - name: integration
+    category: Compatibility
+    description: AndroidX, Gradle dependency, NDK requirement, or external tool
+    detail_level: brief
+
+  - name: media_projection_compliance
+    category: Compatibility
+    description: Compliance with Android 14/15 MediaProjection rules (FGS type, token, status chip)
+    detail_level: moderate
+
+  - name: windowing_behavior
+    category: Compatibility
+    description: Full display vs app-window capture, split-screen, foldables, rotation, letterboxing
+    detail_level: brief
+
+  # === Privacy & Data ===
+  - name: data_path
+    category: Privacy
+    description: Fully offline on-device, local desktop post-process, or server-side upload
+    detail_level: moderate
+
+  - name: permissions_required
+    category: Privacy
+    description: MediaProjection, Accessibility, Foreground service, SYSTEM_ALERT_WINDOW
+    detail_level: moderate
+
+  # === AI / Modern Techniques ===
+  - name: ai_ml_capability
+    category: AI/ML
+    description: Semantic feature use, learned seam prediction, multimodal matching
+    detail_level: brief
+
+  - name: server_side_pipeline
+    category: AI/ML
+    description: On-device capture with off-device stitching, metadata/ordering requirements
+    detail_level: brief
+
+  # === Use Cases (especially chart vs chat) ===
+  - name: chart_stitching_fitness
+    category: UseCase
+    description: How well does this tool handle stitching long charts/graphs (with axis labels, legends, dense visuals)
+    detail_level: moderate
+
+  - name: chat_stitching_fitness
+    category: UseCase
+    description: How well does this tool handle stitching long chat threads (text bubbles, avatars, varied content)
+    detail_level: moderate
+
+  uncertain:
+    - project_status
+    - exact_matching_algorithm
+    - ai_ml_capability
+    - chart_stitching_fitness
+    - chat_stitching_fitness

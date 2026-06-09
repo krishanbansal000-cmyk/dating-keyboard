@@ -56,7 +56,7 @@ class HistoryActivity : AppCompatActivity() {
 
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(12), dp(18), dp(22))
+            setPadding(dp(18), statusBarHeight() + dp(12), dp(18), dp(22))
         }
 
         content.addView(topBar())
@@ -255,17 +255,8 @@ class HistoryActivity : AppCompatActivity() {
             background = GradientDrawable().apply { setColor(0xFF1B0E23.toInt()) }
             addView(navItem("Home", false) { finish() })
             addView(navItem("History", true) {})
-            if (!isRizzseKeyboardEnabled()) {
-                addView(navItem("Setup", false) { startActivity(Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS)) })
-            }
+            addView(navItem("Setup", false) { startActivity(Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS)) })
             addView(navItem("Settings", false) { SettingsSheet().show(supportFragmentManager, "settings") })
-        }
-    }
-
-    private fun isRizzseKeyboardEnabled(): Boolean {
-        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        return imm.enabledInputMethodList.any { info ->
-            info.packageName == packageName || info.id == "$packageName/.nboard.NboardImeService"
         }
     }
 
@@ -382,4 +373,9 @@ class HistoryActivity : AppCompatActivity() {
 
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    private fun statusBarHeight(): Int {
+        val id = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (id > 0) resources.getDimensionPixelSize(id) else dp(24)
+    }
 }

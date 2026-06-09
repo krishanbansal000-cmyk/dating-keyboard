@@ -619,7 +619,7 @@ class ChatActivity : AppCompatActivity() {
 
         emptyStateView = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(10), dp(14), dp(18))
+            setPadding(dp(14), statusBarHeight() + dp(10), dp(14), dp(18))
         }
 
         val topBar = LinearLayout(this).apply {
@@ -654,51 +654,41 @@ class ChatActivity : AppCompatActivity() {
 
         emptyStateView.addView(personaCard())
 
-        emptyStateView.addView(TextView(this).apply {
-            text = "Select Your Vibe"
+        val vibeHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(4), dp(18), 0, dp(10))
+        }
+        vibeHeader.addView(ImageView(this).apply {
+            setImageDrawable(
+                IconicsDrawable(this@ChatActivity, GoogleMaterial.Icon.gmd_auto_awesome).apply {
+                    colorInt = 0xFFFF38F8.toInt()
+                    sizeDp = 18
+                }
+            )
+            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { marginEnd = dp(6) }
+        })
+        vibeHeader.addView(TextView(this).apply {
+            text = "Your Vibe"
             textSize = 16f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(resources.getColor(R.color.text_primary, null))
-            setPadding(dp(4), dp(18), 0, dp(10))
         })
+        emptyStateView.addView(vibeHeader)
 
         val vibeGrid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         vibeGrid.addView(vibeRow(
-            vibeTile("Funny", "playful", "flirt", true),
-            vibeTile("Chill", "chill", "keep_going", false)
+            vibeTile("Funny", "playful", "flirt", currentPersona == "playful"),
+            vibeTile("Chill", "chill", "keep_going", currentPersona == "chill")
         ))
         vibeGrid.addView(vibeRow(
-            vibeTile("Direct", "direct", "ask_date", false),
-            vibeTile("Flirty", "witty", "recover_dry", false)
+            vibeTile("Direct", "direct", "ask_date", currentPersona == "direct"),
+            vibeTile("Flirty", "witty", "recover_dry", currentPersona == "witty")
         ))
         emptyStateView.addView(vibeGrid)
 
         emptyStateView.addView(analyzeCard())
 
-        val quickHeader = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(4), dp(18), dp(4), dp(8))
-        }
-        quickHeader.addView(TextView(this).apply {
-            text = "Quick Starters"
-            textSize = 15f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.text_primary, null))
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        })
-        quickHeader.addView(TextView(this).apply {
-            text = "See all"
-            textSize = 12f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(0xFFFF38F8.toInt())
-        })
-        emptyStateView.addView(quickHeader)
-
-        emptyStateView.addView(quickStarter("Are you a Wi-Fi router? Because I'm feeling a connection..."))
-        emptyStateView.addView(quickStarter("I usually wait for a few days but you're too interesting."))
-
-        emptyStateView.addView(proCard())
         scroll.addView(emptyStateView)
         mainLayout.addView(scroll)
 
@@ -832,22 +822,15 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun personaCard(): View {
-        val stats = personaManager.getAllPersonaStats()
-        val currentStats = stats.find { it.persona == currentPersona }
-        val effectiveness = currentStats?.let {
-            if (it.selectionCount > 0) (it.effectivenessScore * 100).toInt() else null
-        } ?: 0
-        val totalCopies = stats.sumOf { it.copyCount }
         val personaDisplay = currentPersona.replaceFirstChar { it.uppercase() }
-
-        val topPersonas = personaManager.getTopPersonas(3)
         val recommendedPersona = personaManager.getRecommendedPersona()
 
         return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(16), dp(18), dp(16))
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(12), dp(16), dp(12))
             background = GradientDrawable().apply {
-                cornerRadius = dp(10).toFloat()
+                cornerRadius = dp(14).toFloat()
                 setColor(0xFF3A1648.toInt())
                 setStroke(dp(1), 0xFF5D2872.toInt())
             }
@@ -855,58 +838,51 @@ class ChatActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            addView(TextView(this@ChatActivity).apply {
-                text = "CURRENT PERSONA"
-                textSize = 12f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(0xFFC084FC.toInt())
+            addView(ImageView(this@ChatActivity).apply {
+                setImageDrawable(
+                    IconicsDrawable(this@ChatActivity, GoogleMaterial.Icon.gmd_mood).apply {
+                        colorInt = 0xFFC084FC.toInt()
+                        sizeDp = 24
+                    }
+                )
+                layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginEnd = dp(12) }
             })
-            addView(TextView(this@ChatActivity).apply {
-                text = personaDisplay
-                textSize = 23f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(0xFFE9D5FF.toInt())
+            addView(LinearLayout(this@ChatActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                addView(TextView(this@ChatActivity).apply {
+                    text = personaDisplay
+                    textSize = 17f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setTextColor(0xFFE9D5FF.toInt())
+                })
+                if (recommendedPersona != null && recommendedPersona != currentPersona) {
+                    addView(TextView(this@ChatActivity).apply {
+                        text = "⭐ Try ${recommendedPersona.replaceFirstChar { it.uppercase() }}"
+                        textSize = 11f
+                        setTextColor(0xFFFFD700.toInt())
+                    })
+                }
             })
             if (recommendedPersona != null && recommendedPersona != currentPersona) {
                 addView(TextView(this@ChatActivity).apply {
-                    text = "⭐ Try ${recommendedPersona.replaceFirstChar { it.uppercase() }} — your most effective persona"
-                    textSize = 11f
-                    setTextColor(0xFFFFD700.toInt())
-                    setPadding(0, dp(4), 0, 0)
-                })
-            }
-            val row = LinearLayout(this@ChatActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, dp(18), 0, 0)
-            }
-            row.addView(TextView(this@ChatActivity).apply {
-                text = "Effectiveness"
-                textSize = 12f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(0xFFE9D5FF.toInt())
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            })
-            row.addView(TextView(this@ChatActivity).apply {
-                text = "${effectiveness}%"
-                textSize = 16f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(0xFFE9D5FF.toInt())
-            })
-            addView(row)
-            addView(View(this@ChatActivity).apply {
-                background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFFFF38F8.toInt(), 0xFFE11D8F.toInt()))
-                layoutParams = LinearLayout.LayoutParams(0, dp(5)).apply {
-                    width = dp(190)
-                    topMargin = dp(6)
-                }
-            })
-            if (totalCopies > 0) {
-                addView(TextView(this@ChatActivity).apply {
-                    text = "$totalCopies replies copied · ${topPersonas.joinToString(", ") { it.persona.replaceFirstChar { c -> c.uppercase() } }}"
-                    textSize = 10f
-                    setTextColor(0xFFC084FC.toInt())
-                    setPadding(0, dp(10), 0, 0)
+                    text = "Switch"
+                    textSize = 12f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setTextColor(0xFFFF38F8.toInt())
+                    setPadding(dp(12), dp(6), dp(12), dp(6))
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(12).toFloat()
+                        setColor(0xFF5B1173.toInt())
+                    }
+                    setOnClickListener {
+                        savePreference("persona", recommendedPersona)
+                        if (recommendedPersona == "playful") savePreference("intent", "flirt")
+                        else if (recommendedPersona == "witty") savePreference("intent", "recover_dry")
+                        else if (recommendedPersona == "chill") savePreference("intent", "keep_going")
+                        else if (recommendedPersona == "direct") savePreference("intent", "ask_date")
+                        recreate()
+                    }
                 })
             }
         }
@@ -1004,47 +980,6 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
-    private fun quickStarter(textValue: String): TextView {
-        return TextView(this).apply {
-            text = "\"$textValue\""
-            textSize = 13f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(0xFFE9D5FF.toInt())
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(4).toFloat()
-                setColor(0xFF2D1D36.toInt())
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(8) }
-            isClickable = true
-            setOnClickListener {
-                messageInput.setText(textValue)
-                analyzeText(textValue)
-            }
-        }
-    }
-
-    private fun proCard(): View {
-        return TextView(this).apply {
-            text = "Unlock Pro Mode\nGet unlimited analysis and elite personas."
-            textSize = 18f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(Color.WHITE)
-            gravity = Gravity.BOTTOM or Gravity.START
-            setPadding(dp(16), 0, dp(16), dp(18))
-            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFF090312.toInt(), 0xFF51115E.toInt(), 0xFFEE1AA8.toInt())).apply {
-                cornerRadius = dp(10).toFloat()
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(118)
-            ).apply { topMargin = dp(16) }
-        }
-    }
-
     private fun bottomNav(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -1053,35 +988,48 @@ class ChatActivity : AppCompatActivity() {
             background = GradientDrawable().apply { setColor(0xFF1B0E23.toInt()) }
             addView(navItem("Home", true) {})
             addView(navItem("History", false) { startActivity(Intent(this@ChatActivity, HistoryActivity::class.java)) })
-            if (!isRizzseKeyboardEnabled()) {
-                addView(navItem("Setup", false) { startActivity(Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS)) })
-            }
+            addView(navItem("Setup", false) { startActivity(Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS)) })
             addView(navItem("Settings", false) { SettingsSheet().show(supportFragmentManager, "settings") })
         }
     }
 
-    private fun isRizzseKeyboardEnabled(): Boolean {
-        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-        return imm.enabledInputMethodList.any { info ->
-            info.packageName == packageName || info.id == "$packageName/.nboard.NboardImeService"
-        }
-    }
-
-    private fun navItem(label: String, selected: Boolean, action: () -> Unit): TextView {
-        return TextView(this).apply {
-            text = label
-            textSize = 11f
+    private fun navItem(label: String, selected: Boolean, action: () -> Unit): LinearLayout {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(if (selected) Color.WHITE else 0xFFC4B5FD.toInt())
             background = if (selected) GradientDrawable().apply {
                 cornerRadius = dp(20).toFloat()
                 setColor(0xFF5B1173.toInt())
             } else null
-            layoutParams = LinearLayout.LayoutParams(0, dp(42), 1f).apply { marginEnd = dp(4) }
+            layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(4) }
             isClickable = true
             setOnClickListener { action() }
         }
+        val icon = when (label) {
+            "Home" -> GoogleMaterial.Icon.gmd_home
+            "History" -> GoogleMaterial.Icon.gmd_history
+            "Setup" -> GoogleMaterial.Icon.gmd_keyboard
+            "Settings" -> GoogleMaterial.Icon.gmd_settings
+            else -> GoogleMaterial.Icon.gmd_circle
+        }
+        container.addView(ImageView(this).apply {
+            setImageDrawable(
+                IconicsDrawable(this@ChatActivity, icon).apply {
+                    colorInt = if (selected) Color.WHITE else 0xFFC4B5FD.toInt()
+                    sizeDp = 22
+                }
+            )
+            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
+        })
+        container.addView(TextView(this@ChatActivity).apply {
+            text = label
+            textSize = 10f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setTextColor(if (selected) Color.WHITE else 0xFFC4B5FD.toInt())
+            setPadding(0, dp(2), 0, 0)
+        })
+        return container
     }
 
     private fun sectionLabel(text: String): TextView {
@@ -1472,5 +1420,10 @@ class ChatActivity : AppCompatActivity() {
 
     private fun dp(value: Int): Int {
         return (value * resources.displayMetrics.density).toInt()
+    }
+
+    private fun statusBarHeight(): Int {
+        val id = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (id > 0) resources.getDimensionPixelSize(id) else dp(24)
     }
 }

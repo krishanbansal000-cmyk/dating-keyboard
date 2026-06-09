@@ -1,16 +1,14 @@
 package com.datingcopilot.keyboard.chat
 
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
-import android.view.animation.AccelerateDecelerateInterpolator
-import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -35,7 +33,10 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
     private lateinit var insightsSection: LinearLayout
     private lateinit var convoSection: LinearLayout
     private lateinit var suggSection: LinearLayout
-    private val loadingAnimators = mutableListOf<ValueAnimator>()
+    private val loadingHandler = Handler(Looper.getMainLooper())
+    private var loadingSpinRunnable: Runnable? = null
+    private var loadingRing: View? = null
+    private var loadingRingAccent: View? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,7 +58,7 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(resources.getColor(R.color.bg_dark, null))
-            setPadding(dp(18), dp(44), dp(18), dp(32))
+            setPadding(dp(18), statusBarHeight() + dp(12), dp(18), dp(32))
         }
 
         // Top bar
@@ -152,6 +153,28 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
                 )
             })
             
+            // Tap to expand indicator
+            previewCard.addView(TextView(this).apply {
+                text = "Tap to view full image"
+                textSize = 11f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(0xFFFF38F8.toInt())
+                setPadding(dp(14), dp(4), dp(14), dp(4))
+                setBackgroundColor(0x66000000.toInt())
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.TOP or Gravity.END
+                ).apply { topMargin = dp(12); rightMargin = dp(12) }
+            })
+            
+            // Make entire card clickable - show full-screen preview in-app.
+            previewCard.isClickable = true
+            previewCard.isFocusable = true
+            previewCard.setOnClickListener {
+                showFullScreenPreview(Uri.fromFile(java.io.File(imagePaths[0])))
+            }
+            
             root.addView(previewCard)
         } else if (imageUri != null) {
             val previewCard = FrameLayout(this).apply {
@@ -174,6 +197,9 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
                 setImageURI(imageUri)
             }
             previewCard.addView(imgView)
+            previewCard.isClickable = true
+            previewCard.isFocusable = true
+            previewCard.setOnClickListener { showFullScreenPreview(imageUri) }
             root.addView(previewCard)
         }
 
@@ -221,18 +247,9 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         }
         ringContainer.addView(ringAccent)
 
-        loadingAnimators += ObjectAnimator.ofFloat(ring, View.ROTATION, 0f, 360f).apply {
-            duration = 1200
-            repeatCount = ValueAnimator.INFINITE
-            interpolator = LinearInterpolator()
-            start()
-        }
-        loadingAnimators += ObjectAnimator.ofFloat(ringAccent, View.ROTATION, 360f, 0f).apply {
-            duration = 1500
-            repeatCount = ValueAnimator.INFINITE
-            interpolator = LinearInterpolator()
-            start()
-        }
+        loadingRing = ring
+        loadingRingAccent = ringAccent
+        startLoadingSpin()
 
         loadView.addView(TextView(this).apply {
             text = "RizzSe is thinking"
@@ -636,12 +653,73 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    private fun startLoadingSpin() {
+        val ring = loadingRing ?: return
+        val accent = loadingRingAccent ?: return
+        loadingSpinRunnable?.let { loadingHandler.removeCallbacks(it) }
+        var base = 0f
+        var accentBase = 0f
+        val runnable = object : Runnable {
+            override fun run() {
+                if (isFinishing || isDestroyed) return
+                base = (base + 6f) % 360f
+                accentBase = (accentBase - 5f) % 360f
+                ring.rotation = base
+                accent.rotation = accentBase
+                loadingHandler.postDelayed(this, 16L)
+            }
+        }
+        loadingSpinRunnable = runnable
+        loadingHandler.post(runnable)
+    }
 
+    private fun showFullScreenPreview(uri: Uri) {
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val layout = FrameLayout(this).apply {
+            setBackgroundColor(0xFF050009.toInt())
+            isClickable = true
+            setOnClickListener { dialog.dismiss() }
+        }
+
+        layout.addView(ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            adjustViewBounds = true
+            setImageURI(uri)
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ).apply { setMargins(dp(8), dp(48), dp(8), dp(72)) }
+            setOnClickListener { dialog.dismiss() }
+        })
+
+        layout.addView(TextView(this).apply {
+            text = "Tap anywhere to close"
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTextColor(0xFFEBD5FF.toInt())
+            setBackgroundColor(0x66000000.toInt())
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            ).apply { bottomMargin = dp(28) }
+            setOnClickListener { dialog.dismiss() }
+        })
+
+        dialog.setContentView(layout)
+        dialog.show()
+    }
 
     private fun stopLoadingAnimations() {
-        loadingAnimators.forEach { it.cancel() }
-        loadingAnimators.clear()
+        loadingSpinRunnable?.let { loadingHandler.removeCallbacks(it) }
+        loadingSpinRunnable = null
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private fun statusBarHeight(): Int {
+        val id = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (id > 0) resources.getDimensionPixelSize(id) else dp(24)
+    }
 }
