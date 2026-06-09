@@ -119,7 +119,7 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
                 textAlignment = TextView.TEXT_ALIGNMENT_CENTER
             })
             addView(TextView(this@KeyboardScreenshotActivity).apply {
-                text = "recording chat..."
+                text = "scroll the chat, then tap Stop in the notification"
                 textSize = 14f
                 setTextColor(0xAAFFFFFF.toInt())
                 textAlignment = TextView.TEXT_ALIGNMENT_CENTER
