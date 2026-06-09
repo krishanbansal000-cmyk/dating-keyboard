@@ -38,16 +38,14 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
             finish()
         } else {
             showRecordingOverlay()
-            Handler(Looper.getMainLooper()).postDelayed({
-                Log.d(TAG, "Starting ScreenshotCaptureService")
-                val captureIntent = Intent(this, ScreenshotCaptureService::class.java).apply {
-                    putExtra(ScreenshotCaptureService.EXTRA_RESULT_CODE, result.resultCode)
-                    putExtra(ScreenshotCaptureService.EXTRA_RESULT_DATA, data)
-                    putExtra(ScreenshotCaptureService.EXTRA_CHAT_CONTEXT, chatContext)
-                }
-                startForegroundService(captureIntent)
-                finish()
-            }, 1200)
+            val captureIntent = Intent(this, ScreenshotCaptureService::class.java).apply {
+                putExtra(ScreenshotCaptureService.EXTRA_RESULT_CODE, result.resultCode)
+                putExtra(ScreenshotCaptureService.EXTRA_RESULT_DATA, data)
+                putExtra(ScreenshotCaptureService.EXTRA_CHAT_CONTEXT, chatContext)
+            }
+            Log.d(TAG, "Starting ScreenshotCaptureService")
+            startForegroundService(captureIntent)
+            finish()
         }
     }
 

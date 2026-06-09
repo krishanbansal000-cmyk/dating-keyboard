@@ -5,13 +5,21 @@ import android.animation.ValueAnimator
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.util.Log
+import android.view.ScrollCaptureCallback
+import android.view.ScrollCaptureSession
+import android.view.Surface
 import android.view.inputmethod.InputMethodManager
 import android.view.Gravity
 import android.view.View
@@ -90,7 +98,6 @@ class ChatActivity : AppCompatActivity() {
             finish()
             return
         }
-
         currentPersona = prefs.getString("persona", "playful") ?: "playful"
         currentIntent = prefs.getString("intent", "flirt") ?: "flirt"
         currentPlatform = ChatContextService.getChatPlatform(this)
@@ -105,6 +112,11 @@ class ChatActivity : AppCompatActivity() {
         handleSendImage(intent)
         handleOpenImagePicker(intent)
         handleRizzseAction(intent)
+        try {
+            window?.registerScrollCaptureCallback(RizzseScrollCaptureCallback())
+        } catch (e: Throwable) {
+            Log.w("ChatActivity", "ScrollCaptureCallback register failed: ${e.message}")
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -1425,5 +1437,77 @@ class ChatActivity : AppCompatActivity() {
     private fun statusBarHeight(): Int {
         val id = resources.getIdentifier("status_bar_height", "dimen", "android")
         return if (id > 0) resources.getDimensionPixelSize(id) else dp(24)
+    }
+
+    private inner class RizzseScrollCaptureCallback : ScrollCaptureCallback {
+        override fun onScrollCaptureSearch(
+            signal: CancellationSignal,
+            onReady: java.util.function.Consumer<Rect>
+        ) {
+            val root = window?.decorView ?: return onReady.accept(Rect())
+            val visible = Rect(0, 0, root.width, root.height)
+            onReady.accept(visible)
+        }
+
+        override fun onScrollCaptureStart(
+            session: ScrollCaptureSession,
+            signal: CancellationSignal,
+            onReady: Runnable
+        ) {
+            val root = window?.decorView
+            if (root == null) {
+                onReady.run()
+                return
+            }
+            root.post {
+                onReady.run()
+            }
+        }
+
+        override fun onScrollCaptureImageRequest(
+            session: ScrollCaptureSession,
+            signal: CancellationSignal,
+            captureArea: Rect,
+            onComplete: java.util.function.Consumer<Rect>
+        ) {
+            val root = window?.decorView
+            val surface = session.surface
+            if (root == null) {
+                onComplete.accept(Rect())
+                return
+            }
+            try {
+                val pixelCount = captureArea.width() * captureArea.height()
+                if (pixelCount <= 0) {
+                    onComplete.accept(Rect())
+                    return
+                }
+                val buffer = java.nio.ByteBuffer.allocateDirect(pixelCount * 4)
+                buffer.order(java.nio.ByteOrder.nativeOrder())
+                val pixelSrc = IntArray(pixelCount)
+                val out = IntArray(pixelCount)
+                root.draw(android.graphics.Canvas(android.graphics.Bitmap.createBitmap(
+                    captureArea.width(), captureArea.height(), android.graphics.Bitmap.Config.ARGB_8888
+                )))
+                val bmp = android.graphics.Bitmap.createBitmap(
+                    captureArea.width(), captureArea.height(), android.graphics.Bitmap.Config.ARGB_8888
+                )
+                val canvas = Canvas(bmp)
+                canvas.translate(-captureArea.left.toFloat(), -captureArea.top.toFloat())
+                canvas.clipRect(captureArea)
+                root.draw(canvas)
+                bmp.copyPixelsToBuffer(buffer)
+                buffer.rewind()
+                bmp.recycle()
+                onComplete.accept(captureArea)
+            } catch (e: Throwable) {
+                Log.w("ChatActivity", "ScrollCapture image request failed: ${e.message}")
+                onComplete.accept(Rect())
+            }
+        }
+
+        override fun onScrollCaptureEnd(onReady: Runnable) {
+            onReady.run()
+        }
     }
 }

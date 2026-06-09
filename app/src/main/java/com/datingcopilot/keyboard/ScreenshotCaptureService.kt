@@ -50,6 +50,7 @@ class ScreenshotCaptureService : Service() {
     private var lastProcessedFrameTime: Long = 0
     private var frameCount: Long = 0
     private var captureFinished = false
+
     private val maxFrames = 8
     private val captureDurationMs = 15000L
     private val minCaptureDurationMs = 1000L
@@ -103,7 +104,7 @@ class ScreenshotCaptureService : Service() {
         } else {
             startForeground(NOTIFICATION_ID, buildNotification("Scroll the chat, then tap Stop"))
         }
-
+        Log.d(TAG, "Foreground service ready, starting capture")
         handler.postDelayed({
             startMultiFrameCapture(resultCode, data)
         }, 200)
