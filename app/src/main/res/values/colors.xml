@@ -16,6 +16,7 @@
     <color name="key_bg_pressed">#FF3D4260</color>
     <color name="key_text">#FFFFFFFF</color>
     <color name="key_special_bg">#FF374151</color>
+    <color name="key_special_bg_pressed">#FF4C5A73</color>
     <color name="suggestion_card_bg">#FF1E2235</color>
     <color name="white">#FFFFFFFF</color>
     <color name="red_400">#FFF87171</color>
@@ -53,6 +54,7 @@
     <color name="send_bg">#C8C8C8</color>
     <color name="send_text">#1E1E1E</color>
     <color name="ai_bg">#F7BE00</color>
+    <color name="ai_bg_pressed">#FFE05A00</color>
     <color name="ai_text">#1E1E1E</color>
     <color name="ai_hint">#66321D</color>
     <color name="ai_text_shine">#FFE082</color>

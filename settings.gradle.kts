@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "DatingCopilotKeyboard"
 include(":app")
+include(":heliboard")

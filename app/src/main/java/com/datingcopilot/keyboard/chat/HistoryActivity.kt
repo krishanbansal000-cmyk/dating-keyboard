@@ -10,13 +10,19 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.datingcopilot.keyboard.R
 import com.datingcopilot.keyboard.SettingsSheet
+import com.mikepenz.iconics.IconicsDrawable
+import com.mikepenz.iconics.typeface.library.googlematerial.GoogleMaterial
+import com.mikepenz.iconics.utils.colorInt
+import com.mikepenz.iconics.utils.sizeDp
 
 class HistoryActivity : AppCompatActivity() {
 
@@ -105,18 +111,7 @@ class HistoryActivity : AppCompatActivity() {
                 setTextColor(0xFFFF38F8.toInt())
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             })
-            addView(TextView(this@HistoryActivity).apply {
-                text = "●"
-                textSize = 28f
-                gravity = Gravity.CENTER
-                setTextColor(0xFFFF38F8.toInt())
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(0xFF2A1235.toInt())
-                    setStroke(dp(1), 0xFF8B5CF6.toInt())
-                }
-                layoutParams = LinearLayout.LayoutParams(dp(38), dp(38))
-            })
+            addView(materialIconBubble(GoogleMaterial.Icon.gmd_bolt, dp(38), 0xFF2A1235.toInt(), 0xFFFF38F8.toInt()))
         }
     }
 
@@ -181,15 +176,7 @@ class HistoryActivity : AppCompatActivity() {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
             }
-            meta.addView(TextView(this@HistoryActivity).apply {
-                text = "✦"
-                textSize = 18f
-                gravity = Gravity.CENTER
-                setTextColor(0xFFEBD5FF.toInt())
-                background = GradientDrawable().apply {
-                    cornerRadius = dp(8).toFloat()
-                    setColor(0xFF5B1173.toInt())
-                }
+            meta.addView(materialIconBubble(GoogleMaterial.Icon.gmd_auto_awesome, dp(36), 0xFF5B1173.toInt(), 0xFFEBD5FF.toInt()).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginEnd = dp(10) }
             })
             meta.addView(TextView(this@HistoryActivity).apply {
@@ -200,7 +187,7 @@ class HistoryActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             })
             meta.addView(TextView(this@HistoryActivity).apply {
-                text = "♥ ${94 - (index * 7).coerceAtMost(24)}%"
+                text = "${entry.suggestions.size} replies"
                 textSize = 13f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(0xFFFFB4DD.toInt())
@@ -218,29 +205,25 @@ class HistoryActivity : AppCompatActivity() {
                 orientation = LinearLayout.HORIZONTAL
                 setPadding(0, dp(18), 0, 0)
             }
-            body.addView(TextView(this@HistoryActivity).apply {
-                text = if (entry.type.contains("screenshot", ignoreCase = true)) "▣" else "AI"
-                textSize = 21f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(0xFFFF38F8.toInt())
-                gravity = Gravity.CENTER
+            val previewIcon = if (entry.type.contains("screenshot", ignoreCase = true)) GoogleMaterial.Icon.gmd_camera_alt else GoogleMaterial.Icon.gmd_auto_awesome
+            body.addView(materialIconBubble(previewIcon, dp(92), 0xFF5B1173.toInt(), 0xFFFF38F8.toInt()).apply {
                 background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(0xFF090312.toInt(), 0xFF5B1173.toInt(), 0xFFE41487.toInt())).apply {
                     cornerRadius = dp(8).toFloat()
                 }
                 layoutParams = LinearLayout.LayoutParams(dp(92), dp(112)).apply { marginEnd = dp(16) }
             })
             body.addView(TextView(this@HistoryActivity).apply {
-                text = "\"${bestSuggestion.take(116)}\""
-                textSize = 20f
+                text = entry.suggestions.joinToString("\n\n") { "\"${it.text}\"" }
+                textSize = 17f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(resources.getColor(R.color.text_primary, null))
-                maxLines = 5
+                maxLines = 8
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             })
             addView(body)
 
             addView(TextView(this@HistoryActivity).apply {
-                text = "Success: Number obtained"
+                text = entry.preview
                 textSize = 13f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(0xFFCBB4DA.toInt())
@@ -272,35 +255,69 @@ class HistoryActivity : AppCompatActivity() {
             background = GradientDrawable().apply { setColor(0xFF1B0E23.toInt()) }
             addView(navItem("Home", false) { finish() })
             addView(navItem("History", true) {})
-            addView(navItem("Setup", false) { startActivity(Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS)) })
+            if (!isRizzseKeyboardEnabled()) {
+                addView(navItem("Setup", false) { startActivity(Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS)) })
+            }
             addView(navItem("Settings", false) { SettingsSheet().show(supportFragmentManager, "settings") })
         }
     }
 
-    private fun navItem(label: String, selected: Boolean, action: () -> Unit): TextView {
-        return TextView(this).apply {
-            text = label
-            textSize = 12f
-            setTypeface(null, android.graphics.Typeface.BOLD)
+    private fun isRizzseKeyboardEnabled(): Boolean {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        return imm.enabledInputMethodList.any { info ->
+            info.packageName == packageName || info.id == "$packageName/.nboard.NboardImeService"
+        }
+    }
+
+    private fun navItem(label: String, selected: Boolean, action: () -> Unit): LinearLayout {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setTextColor(if (selected) Color.WHITE else 0xFFC4B5FD.toInt())
             background = if (selected) GradientDrawable().apply {
                 cornerRadius = dp(20).toFloat()
                 setColor(0xFF5B1173.toInt())
             } else null
-            layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginEnd = dp(4) }
+            layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(4) }
             isClickable = true
             setOnClickListener { action() }
         }
+        val icon = when (label) {
+            "Home" -> GoogleMaterial.Icon.gmd_home
+            "History" -> GoogleMaterial.Icon.gmd_history
+            "Setup" -> GoogleMaterial.Icon.gmd_keyboard
+            "Settings" -> GoogleMaterial.Icon.gmd_settings
+            else -> GoogleMaterial.Icon.gmd_circle
+        }
+        container.addView(ImageView(this).apply {
+            setImageDrawable(
+                IconicsDrawable(this@HistoryActivity, icon).apply {
+                    colorInt = if (selected) Color.WHITE else 0xFFC4B5FD.toInt()
+                    sizeDp = 22
+                }
+            )
+            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
+        })
+        container.addView(TextView(this@HistoryActivity).apply {
+            text = label
+            textSize = 10f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setTextColor(if (selected) Color.WHITE else 0xFFC4B5FD.toInt())
+            setPadding(0, dp(2), 0, 0)
+        })
+        return container
     }
 
-    private fun floatingLightning(): TextView {
-        return TextView(this).apply {
-            text = "ϟ"
-            textSize = 30f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
+    private fun floatingLightning(): ImageView {
+        return ImageView(this).apply {
+            setImageDrawable(
+                IconicsDrawable(this@HistoryActivity, GoogleMaterial.Icon.gmd_bolt).apply {
+                    colorInt = Color.WHITE
+                    sizeDp = 28
+                }
+            )
+            scaleType = ImageView.ScaleType.CENTER
+            setPadding(dp(16), dp(16), dp(16), dp(16))
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(0xFFE13EF8.toInt())
@@ -312,6 +329,38 @@ class HistoryActivity : AppCompatActivity() {
                 bottomMargin = dp(72)
             }
             setOnClickListener { finish() }
+        }
+    }
+
+    private fun iconBubble(iconRes: Int, size: Int, backgroundColor: Int, tint: Int): ImageView {
+        return ImageView(this).apply {
+            setImageDrawable(ContextCompat.getDrawable(this@HistoryActivity, iconRes))
+            setColorFilter(tint)
+            scaleType = ImageView.ScaleType.CENTER
+            setPadding(size / 4, size / 4, size / 4, size / 4)
+            background = GradientDrawable().apply {
+                cornerRadius = dp(8).toFloat()
+                setColor(backgroundColor)
+            }
+            layoutParams = LinearLayout.LayoutParams(size, size)
+        }
+    }
+
+    private fun materialIconBubble(icon: GoogleMaterial.Icon, size: Int, backgroundColor: Int, tint: Int): ImageView {
+        return ImageView(this).apply {
+            setImageDrawable(
+                IconicsDrawable(this@HistoryActivity, icon).apply {
+                    colorInt = tint
+                    sizeDp = (size / 3)
+                }
+            )
+            scaleType = ImageView.ScaleType.CENTER
+            setPadding(size / 4, size / 4, size / 4, size / 4)
+            background = GradientDrawable().apply {
+                cornerRadius = dp(8).toFloat()
+                setColor(backgroundColor)
+            }
+            layoutParams = LinearLayout.LayoutParams(size, size)
         }
     }
 

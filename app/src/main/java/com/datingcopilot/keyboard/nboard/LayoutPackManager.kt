@@ -95,7 +95,7 @@ object LayoutPackManager {
         )
     )
 
-    fun defaultPack(): LayoutPack = builtinPacks.first { it.id == BUILTIN_AZERTY_CLASSIC_ID }
+    fun defaultPack(): LayoutPack = builtinPacks.first { it.id == BUILTIN_QWERTY_CLASSIC_ID }
 
     fun defaultPackIdForLegacyMode(mode: KeyboardLayoutMode): String {
         return when (mode) {

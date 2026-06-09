@@ -168,7 +168,7 @@ class NboardImeService : InputMethodService() {
     internal var leftBottomModeOptions = listOf(BottomKeyMode.AI, BottomKeyMode.EMOJI)
     internal var rightBottomModeOptions = listOf(BottomKeyMode.CLIPBOARD, BottomKeyMode.EMOJI)
     internal var activeLayoutPack = LayoutPackManager.defaultPack()
-    internal var keyboardLanguageMode = KeyboardLanguageMode.FRENCH
+    internal var keyboardLanguageMode = KeyboardLanguageMode.ENGLISH
     private var keyboardFontMode = KeyboardFontMode.INTER
     private var appThemeMode = AppThemeMode.SYSTEM
     internal var wordPredictionEnabled = true
@@ -435,9 +435,13 @@ class NboardImeService : InputMethodService() {
     }
 
     internal fun dispatchRizzseAction(action: String) {
+        if (action == "record" || action == "screenshot") {
+            requestHideSelf(0)
+        }
         val prefs = getSharedPreferences("dating_copilot", MODE_MULTI_PROCESS)
         val chatContext = prefs.getString("rizzse_chat_context", "") ?: ""
         val intent = Intent("com.datingcopilot.keyboard.RIZZSE_ACTION").apply {
+            setPackage(packageName)
             putExtra("action", action)
             putExtra("chat_context", chatContext)
         }
@@ -700,7 +704,7 @@ class NboardImeService : InputMethodService() {
         aiModeButton.contentDescription = "Left mode key"
         rightPunctuationButton.contentDescription = "Period key"
         clipboardButton.contentDescription = "Right mode key"
-        rizzseButton.contentDescription = "RizzSe"
+        rizzseButton.contentDescription = "RizzSe screenshot"
         rizzseRecordButton.text = "RECORD"
         rizzseAiButton.contentDescription = "AI Assistant"
         actionButton.contentDescription = "Action"
@@ -711,8 +715,17 @@ class NboardImeService : InputMethodService() {
 
         setIcon(aiPromptToggleButton, R.drawable.ic_ai_custom, R.color.key_text)
         setIcon(rizzseButton, R.drawable.ic_camera_rizzse, R.color.key_text)
+        setIcon(rizzseAiButton, R.drawable.ic_sparkle_ai, R.color.ai_text)
+        setIcon(clipboardButton, R.drawable.ic_clipboard_lucide, R.color.key_text)
+        setIcon(actionButton, R.drawable.ic_send_lucide, R.color.key_text)
+        setIcon(aiModeButton, R.drawable.ic_ai_custom, R.color.key_text)
         setIcon(emojiSearchIconButton, R.drawable.ic_smile_lucide, R.color.ai_text)
         setIcon(recentClipboardChevronButton, R.drawable.ic_chevron_down_lucide, R.color.key_text)
+
+        val recordIcon = uiDrawable(R.drawable.ic_mic_lucide)?.mutate()
+        recordIcon?.setTint(uiColor(R.color.key_text))
+        rizzseRecordButton.setCompoundDrawablesRelativeWithIntrinsicBounds(recordIcon, null, null, null)
+        rizzseRecordButton.compoundDrawablePadding = dp(6)
         recentClipboardChevronButton.setPadding(0, 0, 0, 0)
         val clipboardIcon = uiDrawable(R.drawable.ic_clipboard_lucide)?.mutate()
         clipboardIcon?.setTint(uiColor(R.color.key_text))
@@ -723,6 +736,10 @@ class NboardImeService : InputMethodService() {
         recentClipboardChip.minWidth = 0
         recentClipboardChip.minimumWidth = 0
         updateBottomModeIcons()
+
+        rizzseButton.visibility = View.GONE
+        clipboardButton.visibility = View.GONE
+        aiModeButton.visibility = View.GONE
 
         flattenView(aiQuickActionsRow)
         flattenView(aiSummarizeButton)
@@ -937,7 +954,7 @@ class NboardImeService : InputMethodService() {
             true
         }
 
-        bindPressAction(rizzseRecordButton) { dispatchRizzseAction("screenshot") }
+        bindPressAction(rizzseRecordButton) { dispatchRizzseAction("record") }
         rizzseRecordButton.setOnLongClickListener {
             dispatchRizzseAction("record")
             true

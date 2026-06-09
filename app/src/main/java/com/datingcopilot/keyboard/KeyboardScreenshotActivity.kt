@@ -2,15 +2,23 @@ package com.datingcopilot.keyboard
 
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
+import android.os.Build
 import android.os.Bundle
-import android.widget.TextView
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import android.view.WindowInsets
+import android.view.WindowManager
 import android.widget.FrameLayout
-import android.graphics.drawable.GradientDrawable
-import android.view.Gravity
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 
 class KeyboardScreenshotActivity : AppCompatActivity() {
+    companion object {
+        private const val TAG = "KeyboardScreenshot"
+    }
+
     private val projectionManager by lazy {
         getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
     }
@@ -20,21 +28,31 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
     private val requestScreenCapture = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode != RESULT_OK || result.data == null) {
+        Log.d(TAG, "MediaProjection resultCode=${result.resultCode}, hasData=${result.data != null}")
+        val data: Intent? = result.data
+        if (result.resultCode != RESULT_OK || data == null) {
             finish()
         } else {
-            val intent = Intent(this, ScreenshotCaptureService::class.java).apply {
-                putExtra(ScreenshotCaptureService.EXTRA_RESULT_CODE, result.resultCode)
-                putExtra(ScreenshotCaptureService.EXTRA_RESULT_DATA, result.data)
-                putExtra(ScreenshotCaptureService.EXTRA_CHAT_CONTEXT, chatContext)
-            }
-            startForegroundService(intent)
-            showCountdownOverlay()
+            showRecordingOverlay()
+            Handler(Looper.getMainLooper()).postDelayed({
+                Log.d(TAG, "Starting ScreenshotCaptureService")
+                val captureIntent = Intent(this, ScreenshotCaptureService::class.java).apply {
+                    putExtra(ScreenshotCaptureService.EXTRA_RESULT_CODE, result.resultCode)
+                    putExtra(ScreenshotCaptureService.EXTRA_RESULT_DATA, data)
+                    putExtra(ScreenshotCaptureService.EXTRA_CHAT_CONTEXT, chatContext)
+                }
+                startForegroundService(captureIntent)
+                finish()
+            }, 1200)
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.decorView.windowInsetsController?.hide(WindowInsets.Type.ime())
+        }
         chatContext = intent?.getStringExtra("chat_context") ?: ""
 
         val prefs = getSharedPreferences("dating_copilot", MODE_PRIVATE)
@@ -43,41 +61,44 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
         }
 
         if (savedInstanceState == null) {
-            requestScreenCapture.launch(projectionManager.createScreenCaptureIntent())
+            Handler(Looper.getMainLooper()).postDelayed({
+                requestScreenCapture.launch(projectionManager.createScreenCaptureIntent())
+            }, 350)
         }
     }
 
-    private fun showCountdownOverlay() {
-        val overlay = FrameLayout(this).apply {
-            setBackgroundColor(0x99000000.toInt())
+    private fun showRecordingOverlay() {
+        val mosaic = AnimatedMosaicOverlay(this)
+
+        val textColumn = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER
             layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.CENTER
+            )
+            addView(TextView(this@KeyboardScreenshotActivity).apply {
+                text = "RizzSe"
+                textSize = 28f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(0xEEFFFFFF.toInt())
+                textAlignment = TextView.TEXT_ALIGNMENT_CENTER
+            })
+            addView(TextView(this@KeyboardScreenshotActivity).apply {
+                text = "recording chat..."
+                textSize = 14f
+                setTextColor(0xAAFFFFFF.toInt())
+                textAlignment = TextView.TEXT_ALIGNMENT_CENTER
+            })
+        }
+
+        setContentView(FrameLayout(this).apply {
+            addView(mosaic, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
-            )
-        }
-
-        val pill = TextView(this).apply {
-            text = "⬤ RizzSe · Starting capture..."
-            textSize = 16f
-            setTextColor(0xFFFFFFFF.toInt())
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setPadding(dp(24), dp(12), dp(24), dp(12))
-            gravity = Gravity.CENTER
-            val bg = GradientDrawable()
-            bg.cornerRadius = dp(28).toFloat()
-            bg.setColor(0xFF7C3AED.toInt())
-            background = bg
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER
-            )
-        }
-        overlay.addView(pill)
-        setContentView(overlay)
-
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ finish() }, 1500)
+            ))
+            addView(textColumn)
+        })
     }
-
-    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 }

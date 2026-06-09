@@ -107,7 +107,7 @@ internal fun NboardImeService.refreshAutoShiftFromContextAndRerender(forceRerend
     }
     if (isPredictionRowInitialized()) {
         renderPredictionRow()
-        setVisibleAnimated(predictionRow, shouldShowPredictionRow() && hasPredictionSuggestions)
+        setVisibleAnimated(predictionRow, false)
     }
 }
 

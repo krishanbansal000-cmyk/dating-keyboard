@@ -420,13 +420,7 @@ internal fun NboardImeService.setPredictionWords(words: List<String>) {
 }
 
 internal fun NboardImeService.shouldShowPredictionRow(): Boolean {
-    if (!wordPredictionEnabled) {
-        return false
-    }
-    if (isAiMode || isClipboardOpen || isEmojiMode || isNumbersMode || isGenerating) {
-        return false
-    }
-    return !shouldShowRecentClipboardRow()
+    return false
 }
 
 internal fun NboardImeService.buildWordPredictions(

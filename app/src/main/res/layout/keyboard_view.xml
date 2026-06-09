@@ -8,9 +8,9 @@
     android:clipToPadding="false"
     android:orientation="vertical"
     android:paddingStart="8dp"
-    android:paddingTop="12dp"
+    android:paddingTop="6dp"
     android:paddingEnd="8dp"
-    android:paddingBottom="6dp">
+    android:paddingBottom="0dp">
 
     <View
         android:id="@+id/voiceInputGlow"
@@ -386,11 +386,36 @@
     <LinearLayout
         android:id="@+id/rizzseActionStrip"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="4dp"
+        android:layout_height="34dp"
+        android:layout_marginTop="1dp"
+        android:layout_marginBottom="6dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/rizzseLightningIcon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:background="@drawable/bg_ai_button"
+            android:padding="6dp"
+            android:src="@drawable/ic_lightning_lucide" />
+
+        <TextView
+            android:id="@+id/rizzseBrandLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginStart="7dp"
+            android:fontFamily="@font/inter_variable"
+            android:gravity="center_vertical"
+            android:text="RizzSe"
+            android:textColor="#F5D0FE"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
 
         <Button
             android:id="@+id/rizzseRecordButton"
@@ -399,8 +424,8 @@
             android:background="@drawable/bg_chip"
             android:fontFamily="@font/inter_variable"
             android:gravity="center"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
             android:text="RECORD"
             android:textAllCaps="false"
             android:textColor="#F472B6"
@@ -409,8 +434,8 @@
 
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/rizzseAiButton"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:layout_marginStart="8dp"
             android:background="@drawable/bg_ai_button"
             android:padding="8dp"
@@ -433,7 +458,7 @@
                 android:id="@+id/row0"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
+                android:layout_marginBottom="5dp"
                 android:orientation="horizontal"
                 android:visibility="gone" />
 
@@ -441,14 +466,14 @@
                 android:id="@+id/row1"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
+                android:layout_marginBottom="5dp"
                 android:orientation="horizontal" />
 
             <LinearLayout
                 android:id="@+id/row2"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
+                android:layout_marginBottom="5dp"
                 android:orientation="horizontal" />
 
             <LinearLayout
@@ -472,14 +497,14 @@
         android:id="@+id/bottomRow"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp"
+        android:layout_marginBottom="4dp"
         android:gravity="bottom"
         android:orientation="horizontal">
 
         <Button
             android:id="@+id/modeSwitchButton"
             android:layout_width="0dp"
-            android:layout_height="54dp"
+            android:layout_height="48dp"
             android:layout_marginEnd="2dp"
             android:layout_weight="1.2"
             android:background="@drawable/bg_special_key"
@@ -492,17 +517,18 @@
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/aiModeButton"
             android:layout_width="0dp"
-            android:layout_height="54dp"
+            android:layout_height="48dp"
             android:layout_marginEnd="2dp"
             android:layout_weight="1"
             android:background="@drawable/bg_ai_button"
             android:padding="0dp"
-            android:scaleType="center" />
+            android:scaleType="center"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/leftPunctuationButton"
             android:layout_width="0dp"
-            android:layout_height="54dp"
+            android:layout_height="48dp"
             android:layout_marginEnd="2dp"
             android:layout_weight="0.85"
             android:background="@drawable/bg_key"
@@ -516,7 +542,7 @@
         <Button
             android:id="@+id/spaceButton"
             android:layout_width="0dp"
-            android:layout_height="54dp"
+            android:layout_height="48dp"
             android:layout_marginEnd="2dp"
             android:layout_weight="5.4"
             android:background="@drawable/bg_space_key"
@@ -529,7 +555,7 @@
         <Button
             android:id="@+id/rightPunctuationButton"
             android:layout_width="0dp"
-            android:layout_height="54dp"
+            android:layout_height="48dp"
             android:layout_marginEnd="2dp"
             android:layout_weight="1"
             android:background="@drawable/bg_key"
@@ -543,27 +569,29 @@
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/clipboardButton"
             android:layout_width="0dp"
-            android:layout_height="54dp"
+            android:layout_height="48dp"
             android:layout_marginEnd="2dp"
             android:layout_weight="1"
             android:background="@drawable/bg_special_key"
             android:padding="0dp"
-            android:scaleType="center" />
+            android:scaleType="center"
+            android:visibility="gone" />
 
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/rizzseButton"
             android:layout_width="0dp"
-            android:layout_height="54dp"
+            android:layout_height="48dp"
             android:layout_marginEnd="2dp"
             android:layout_weight="1"
             android:background="@drawable/bg_special_key"
             android:padding="0dp"
-            android:scaleType="center" />
+            android:scaleType="center"
+            android:visibility="gone" />
 
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/actionButton"
             android:layout_width="0dp"
-            android:layout_height="54dp"
+            android:layout_height="48dp"
             android:layout_weight="1.9"
             android:background="@drawable/bg_special_key"
             android:padding="0dp"
@@ -573,6 +601,6 @@
     <View
         android:id="@+id/bottomInsetSpacer"
         android:layout_width="match_parent"
-        android:layout_height="36dp" />
+        android:layout_height="12dp" />
 
 </LinearLayout>

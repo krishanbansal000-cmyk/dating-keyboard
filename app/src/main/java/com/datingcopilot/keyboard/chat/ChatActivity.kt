@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.view.inputmethod.InputMethodManager
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -31,6 +32,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.datingcopilot.keyboard.R
 import com.datingcopilot.keyboard.SettingsSheet
 import com.datingcopilot.keyboard.ChatContextService
+import com.mikepenz.iconics.IconicsDrawable
+import com.mikepenz.iconics.typeface.library.googlematerial.GoogleMaterial
+import com.mikepenz.iconics.utils.colorInt
+import com.mikepenz.iconics.utils.sizeDp
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -68,6 +73,7 @@ class ChatActivity : AppCompatActivity() {
     private var loadingPulseAnimator: ObjectAnimator? = null
 
     private val apiClient by lazy { com.datingcopilot.keyboard.ApiClient(this) }
+    private val personaManager by lazy { PersonaManager(this) }
     private val gson by lazy { Gson() }
 
     private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -88,6 +94,12 @@ class ChatActivity : AppCompatActivity() {
         currentPersona = prefs.getString("persona", "playful") ?: "playful"
         currentIntent = prefs.getString("intent", "flirt") ?: "flirt"
         currentPlatform = ChatContextService.getChatPlatform(this)
+
+        val recommended = personaManager.getRecommendedPersona()
+        if (recommended != null && recommended != currentPersona && prefs.getBoolean("auto_persona", false)) {
+            currentPersona = recommended
+            savePreference("persona", recommended)
+        }
 
         buildUI()
         handleSendImage(intent)
@@ -467,6 +479,7 @@ class ChatActivity : AppCompatActivity() {
         }
         suggestionAdapter = SuggestionCardAdapter { suggestion ->
             copyToClipboard(suggestion.text)
+            personaManager.recordCopy(suggestion.persona)
             Toast.makeText(this, "Reply copied. Paste it in your chat", Toast.LENGTH_SHORT).show()
         }
         suggestionsRecyclerView.adapter = suggestionAdapter
@@ -621,18 +634,20 @@ class ChatActivity : AppCompatActivity() {
             setTextColor(0xFFFF38F8.toInt())
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         })
-        topBar.addView(TextView(this).apply {
-            text = "i"
-            textSize = 13f
-            gravity = Gravity.CENTER
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.text_primary, null))
+        topBar.addView(ImageView(this).apply {
+            setImageDrawable(
+                IconicsDrawable(this@ChatActivity, GoogleMaterial.Icon.gmd_settings).apply {
+                    colorInt = 0xFFE9D5FF.toInt()
+                    sizeDp = 18
+                }
+            )
+            scaleType = ImageView.ScaleType.CENTER
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(0xFF231331.toInt())
                 setStroke(dp(1), 0xFFE9D5FF.toInt())
             }
-            layoutParams = LinearLayout.LayoutParams(dp(30), dp(30))
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
             setOnClickListener { SettingsSheet().show(supportFragmentManager, "settings") }
         })
         emptyStateView.addView(topBar)
@@ -728,11 +743,47 @@ class ChatActivity : AppCompatActivity() {
         suggestionsRecyclerView.adapter = suggestionAdapter
         mainLayout.addView(suggestionsRecyclerView)
 
-        messageInput = android.widget.EditText(this).apply {
-            visibility = View.GONE
+        inputRow = LinearLayout(this).apply {
             tag = "input_row"
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            background = GradientDrawable().apply {
+                setColor(0xFF160720.toInt())
+                setStroke(dp(1), 0xFF4C1D65.toInt())
+            }
         }
-        mainLayout.addView(messageInput, LinearLayout.LayoutParams(1, 1))
+        messageInput = android.widget.EditText(this).apply {
+            hint = "Type or tap for RizzSe keyboard"
+            textSize = 14f
+            setSingleLine(true)
+            setTextColor(resources.getColor(R.color.text_primary, null))
+            setHintTextColor(resources.getColor(R.color.text_muted, null))
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat()
+                setColor(resources.getColor(R.color.bg_input, null))
+                setStroke(dp(1), resources.getColor(R.color.glass_border, null))
+            }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(8)
+            }
+        }
+        inputRow.addView(messageInput)
+        inputRow.addView(TextView(this).apply {
+            text = "Go"
+            textSize = 13f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.white, null))
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat()
+                setColor(resources.getColor(R.color.accent_violet, null))
+            }
+            setOnClickListener { analyzeText(messageInput.text.toString().trim()) }
+        })
+        mainLayout.addView(inputRow)
 
         mainLayout.addView(bottomNav())
         root.addView(mainLayout)
@@ -772,9 +823,26 @@ class ChatActivity : AppCompatActivity() {
         root.addView(loadingView)
 
         setContentView(root)
+
+        messageInput.postDelayed({
+            messageInput.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.showSoftInput(messageInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }, 400)
     }
 
     private fun personaCard(): View {
+        val stats = personaManager.getAllPersonaStats()
+        val currentStats = stats.find { it.persona == currentPersona }
+        val effectiveness = currentStats?.let {
+            if (it.selectionCount > 0) (it.effectivenessScore * 100).toInt() else null
+        } ?: 0
+        val totalCopies = stats.sumOf { it.copyCount }
+        val personaDisplay = currentPersona.replaceFirstChar { it.uppercase() }
+
+        val topPersonas = personaManager.getTopPersonas(3)
+        val recommendedPersona = personaManager.getRecommendedPersona()
+
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(16), dp(18), dp(16))
@@ -794,25 +862,33 @@ class ChatActivity : AppCompatActivity() {
                 setTextColor(0xFFC084FC.toInt())
             })
             addView(TextView(this@ChatActivity).apply {
-                text = "The Comedian"
+                text = personaDisplay
                 textSize = 23f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(0xFFE9D5FF.toInt())
             })
+            if (recommendedPersona != null && recommendedPersona != currentPersona) {
+                addView(TextView(this@ChatActivity).apply {
+                    text = "⭐ Try ${recommendedPersona.replaceFirstChar { it.uppercase() }} — your most effective persona"
+                    textSize = 11f
+                    setTextColor(0xFFFFD700.toInt())
+                    setPadding(0, dp(4), 0, 0)
+                })
+            }
             val row = LinearLayout(this@ChatActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(0, dp(18), 0, 0)
             }
             row.addView(TextView(this@ChatActivity).apply {
-                text = "Daily Rizz Power"
+                text = "Effectiveness"
                 textSize = 12f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(0xFFE9D5FF.toInt())
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             })
             row.addView(TextView(this@ChatActivity).apply {
-                text = "69%"
+                text = "${effectiveness}%"
                 textSize = 16f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(0xFFE9D5FF.toInt())
@@ -825,6 +901,14 @@ class ChatActivity : AppCompatActivity() {
                     topMargin = dp(6)
                 }
             })
+            if (totalCopies > 0) {
+                addView(TextView(this@ChatActivity).apply {
+                    text = "$totalCopies replies copied · ${topPersonas.joinToString(", ") { it.persona.replaceFirstChar { c -> c.uppercase() } }}"
+                    textSize = 10f
+                    setTextColor(0xFFC084FC.toInt())
+                    setPadding(0, dp(10), 0, 0)
+                })
+            }
         }
     }
 
@@ -853,6 +937,9 @@ class ChatActivity : AppCompatActivity() {
             }
             isClickable = true
             setOnClickListener {
+                if (this@ChatActivity.currentPersona != persona) {
+                    this@ChatActivity.personaManager.recordSelection(persona)
+                }
                 currentPersona = persona
                 currentIntent = intent
                 savePreference("persona", persona)
@@ -864,36 +951,56 @@ class ChatActivity : AppCompatActivity() {
 
     private fun analyzeCard(): View {
         return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(16), dp(24), dp(16), dp(24))
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(20), dp(20), dp(20))
             background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFFBE00FF.toInt(), 0xFFE41487.toInt())).apply {
                 cornerRadius = dp(12).toFloat()
             }
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(132)
+                dp(100)
             ).apply { topMargin = dp(18) }
             isClickable = true
             setOnClickListener { showImagePicker() }
-            addView(TextView(this@ChatActivity).apply {
-                text = "+"
-                textSize = 30f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(Color.WHITE)
+            
+            val iconContainer = FrameLayout(this@ChatActivity).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(60), dp(60)).apply { marginEnd = dp(16) }
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(0x40FFFFFF.toInt())
+                }
+            }
+            iconContainer.addView(ImageView(this@ChatActivity).apply {
+                setImageDrawable(
+                    IconicsDrawable(this@ChatActivity, GoogleMaterial.Icon.gmd_camera_alt).apply {
+                        colorInt = Color.WHITE
+                        sizeDp = 30
+                    }
+                )
+                scaleType = ImageView.ScaleType.CENTER
+                layoutParams = FrameLayout.LayoutParams(dp(60), dp(60))
             })
-            addView(TextView(this@ChatActivity).apply {
+            addView(iconContainer)
+            
+            val textColumn = LinearLayout(this@ChatActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            textColumn.addView(TextView(this@ChatActivity).apply {
                 text = "Analyze Chat"
-                textSize = 22f
+                textSize = 20f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(Color.WHITE)
             })
-            addView(TextView(this@ChatActivity).apply {
+            textColumn.addView(TextView(this@ChatActivity).apply {
                 text = "Upload screenshot for instant rizz"
                 textSize = 12f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(0xFFFFD6F2.toInt())
+                setPadding(0, dp(2), 0, 0)
             })
+            addView(textColumn)
         }
     }
 
@@ -946,8 +1053,17 @@ class ChatActivity : AppCompatActivity() {
             background = GradientDrawable().apply { setColor(0xFF1B0E23.toInt()) }
             addView(navItem("Home", true) {})
             addView(navItem("History", false) { startActivity(Intent(this@ChatActivity, HistoryActivity::class.java)) })
-            addView(navItem("Setup", false) { startActivity(Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS)) })
+            if (!isRizzseKeyboardEnabled()) {
+                addView(navItem("Setup", false) { startActivity(Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS)) })
+            }
             addView(navItem("Settings", false) { SettingsSheet().show(supportFragmentManager, "settings") })
+        }
+    }
+
+    private fun isRizzseKeyboardEnabled(): Boolean {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        return imm.enabledInputMethodList.any { info ->
+            info.packageName == packageName || info.id == "$packageName/.nboard.NboardImeService"
         }
     }
 
@@ -1005,7 +1121,15 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun toneChip(label: String, persona: String, intent: String, selected: Boolean = false): TextView {
-        val chip = choiceChip(label, selected) { view ->
+        val stats = personaManager.getAllPersonaStats()
+        val personaStats = stats.find { it.persona == persona }
+        val isRecommended = personaManager.getRecommendedPersona() == persona
+        val displayLabel = if (isRecommended && personaStats?.copyCount ?: 0 > 0) "⭐ $label" else label
+
+        val chip = choiceChip(displayLabel, selected) { view ->
+            if (currentPersona != persona) {
+                personaManager.recordSelection(persona)
+            }
             currentPersona = persona
             currentIntent = intent
             savePreference("persona", persona)
