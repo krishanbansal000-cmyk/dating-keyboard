@@ -160,7 +160,18 @@ public class LatinIME extends InputMethodService implements
     private final BroadcastReceiver mRizzseHideImeReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(final Context context, final Intent intent) {
-            requestHideSelf(0);
+            String action = intent.getAction();
+            if ("com.datingcopilot.keyboard.HIDE_IME".equals(action)) {
+                requestHideSelf(0);
+            } else if ("com.datingcopilot.keyboard.SHOW_IME".equals(action)) {
+                requestShowSelf(0);
+                mHandler.postDelayed(() -> showPendingRizzseSuggestions(), 500);
+            } else if ("com.datingcopilot.keyboard.CAPTURE_STOPPED".equals(action)) {
+                // Capture finished - now show "Analyzing..." and start polling
+                getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+                    .edit().putBoolean("show_analyzing", true).apply();
+                mHandler.postDelayed(() -> showPendingRizzseSuggestions(), 500);
+            }
         }
     };
 
@@ -581,6 +592,8 @@ public class LatinIME extends InputMethodService implements
 
         final IntentFilter rizzseHideImeFilter = new IntentFilter();
         rizzseHideImeFilter.addAction("com.datingcopilot.keyboard.HIDE_IME");
+        rizzseHideImeFilter.addAction("com.datingcopilot.keyboard.SHOW_IME");
+        rizzseHideImeFilter.addAction("com.datingcopilot.keyboard.CAPTURE_STOPPED");
         ContextCompat.registerReceiver(this, mRizzseHideImeReceiver, rizzseHideImeFilter, ContextCompat.RECEIVER_NOT_EXPORTED);
 
         final IntentFilter restartAfterUnlockFilter = new IntentFilter();
@@ -1000,6 +1013,12 @@ public class LatinIME extends InputMethodService implements
         } else {
             mHandler.postDelayed(this::showPendingRizzseSuggestions, 500);
         }
+        
+        // Check if capture is active (IME may have restarted, missed the broadcast)
+        android.content.SharedPreferences capturePrefs = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE);
+        if (capturePrefs.getBoolean("capture_active", false)) {
+            mHandler.post(() -> showPendingRizzseSuggestions());
+        }
     }
 
         mainKeyboardView.setMainDictionaryAvailability(mDictionaryFacilitator.hasAtLeastOneInitializedMainDictionary());
@@ -1028,6 +1047,8 @@ public class LatinIME extends InputMethodService implements
             setNavigationBarColor();
             workaroundForHuaweiStatusBarIssue();
         }
+        // Ensure suggestion polling runs when keyboard becomes visible
+        mHandler.postDelayed(() -> showPendingRizzseSuggestions(), 500);
     }
 
     @Override
@@ -1239,12 +1260,19 @@ public class LatinIME extends InputMethodService implements
                 touchRight = touchLeft + mSettings.getCurrent().mFloatingWidth;
                 touchBottom = touchTop + mSettings.getCurrent().mFloatingHeight + stripHeight + (int)FloatingKeyboardUtils.getFloatingHandleHeight(getResources());
             }
+            if (rizzsePanel != null && rizzsePanel.getParent() != null && rizzsePanel.getHeight() > 0) {
+                touchTop = Math.max(0, touchTop - rizzsePanel.getHeight());
+            }
             outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION;
             outInsets.touchableRegion.set(touchLeft, touchTop, touchRight, touchBottom);
         }
 
         // Has to be subtracted after calculating touchableRegion
         visibleTopY -= getEmojiSearchActivityHeight();
+
+        if (rizzsePanel != null && rizzsePanel.getParent() != null && rizzsePanel.getHeight() > 0) {
+            visibleTopY = Math.max(0, visibleTopY - rizzsePanel.getHeight());
+        }
 
         outInsets.contentTopInsets = visibleTopY;
         outInsets.visibleTopInsets = visibleTopY;
@@ -1497,80 +1525,281 @@ public class LatinIME extends InputMethodService implements
         return null != mSuggestionStripView;
     }
 
+    private android.widget.LinearLayout rizzsePanel;
+    private final java.util.List<String> currentRizzseSuggestions = new java.util.ArrayList<>();
+    private boolean rizzseIsShowingSuggestions = false;
+    private Runnable rizzseTimerRunnable;
+
     private void showPendingRizzseSuggestions() {
         try {
-            if (!hasSuggestionStripView()) {
+            if (mInputView == null) {
+                mHandler.postDelayed(() -> showPendingRizzseSuggestions(), 1000);
                 return;
             }
-            mHandler.cancelUpdateSuggestionStrip();
+
+            if (rizzseTimerRunnable != null) {
+                mHandler.removeCallbacks(rizzseTimerRunnable);
+                rizzseTimerRunnable = null;
+            }
 
             android.content.SharedPreferences rizzsePrefs = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE);
+            boolean isCapturing = rizzsePrefs.getBoolean("capture_active", false);
+            boolean showAnalyzing = rizzsePrefs.getBoolean("show_analyzing", false);
+
             String pendingSuggestions = rizzsePrefs.getString("pending_keyboard_suggestions", null);
-            if (pendingSuggestions == null) {
+            if (pendingSuggestions != null && !pendingSuggestions.isEmpty()) {
+                currentRizzseSuggestions.clear();
+                try {
+                    org.json.JSONArray arr = new org.json.JSONArray(pendingSuggestions);
+                    for (int i = 0; i < arr.length() && i < 5; i++) {
+                        org.json.JSONObject obj = arr.getJSONObject(i);
+                        String text = obj.optString("text", "");
+                        if (!text.isEmpty()) currentRizzseSuggestions.add(text);
+                    }
+                } catch (Exception e) {
+                    String[] parts = pendingSuggestions.split("\n");
+                    for (String p : parts) {
+                        String t = p.trim();
+                        if (!t.isEmpty()) currentRizzseSuggestions.add(t);
+                    }
+                }
+                rizzsePrefs.edit()
+                    .remove("pending_keyboard_suggestions")
+                    .putBoolean("show_analyzing", false)
+                    .apply();
+                showAnalyzing = false;
+            }
+
+            boolean hasSuggestions = !currentRizzseSuggestions.isEmpty();
+
+            if (rizzseIsShowingSuggestions && hasSuggestions && !isCapturing && !showAnalyzing) {
                 return;
             }
-            rizzsePrefs.edit().remove("pending_keyboard_suggestions").apply();
 
-            org.json.JSONArray arr = new org.json.JSONArray(pendingSuggestions);
-            if (arr.length() == 0) {
-                return;
+            if (rizzsePanel != null) {
+                android.view.ViewGroup parent = (android.view.ViewGroup) rizzsePanel.getParent();
+                if (parent != null) parent.removeView(rizzsePanel);
+                rizzsePanel = null;
             }
+            rizzseIsShowingSuggestions = false;
 
-            android.widget.LinearLayout rizzseStrip = new android.widget.LinearLayout(this);
-            rizzseStrip.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-            rizzseStrip.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            int pad = (int) (8 * getResources().getDisplayMetrics().density);
-            rizzseStrip.setPadding(pad, pad / 2, pad, pad / 2);
+            if (!isCapturing && !showAnalyzing && !hasSuggestions) return;
 
-            for (int i = 0; i < arr.length() && i < 3; i++) {
-                org.json.JSONObject obj = arr.getJSONObject(i);
-                final String suggestionText = obj.optString("text", "");
-                if (suggestionText.isEmpty()) continue;
-                String label = obj.optString("persona", "smooth");
-                String displayText = (label.substring(0, 1).toUpperCase() + "›") + " " + suggestionText;
+            int dp = (int) getResources().getDisplayMetrics().density;
 
-                android.widget.TextView chip = new android.widget.TextView(this);
-                chip.setText(displayText.length() > 30 ? displayText.substring(0, 30) + "…" : displayText);
-                chip.setTextSize(13);
-                chip.setTypeface(null, android.graphics.Typeface.BOLD);
-                chip.setTextColor(0xFFFFFFFF);
-                chip.setSingleLine(true);
-                chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                chip.setPadding(pad, pad / 2, pad, pad / 2);
+            rizzsePanel = new android.widget.LinearLayout(this);
+            rizzsePanel.setOrientation(android.widget.LinearLayout.VERTICAL);
+            rizzsePanel.setBackgroundColor(0xFFF5F5F5);
 
-                android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-                bg.setCornerRadius(16 * getResources().getDisplayMetrics().density);
-                bg.setColor(0xFF7C3AED);
-                chip.setBackground(bg);
-                chip.setClickable(true);
-                chip.setFocusable(true);
-                chip.setOnClickListener(v -> {
-                    try {
-                        final android.view.inputmethod.InputConnection ic = getCurrentInputConnection();
-                        if (ic != null) {
-                            ic.commitText(suggestionText, 1);
-                        }
-                    } catch (Exception ignored) {}
-                    mHandler.post(() -> {
-                        if (hasSuggestionStripView()) {
-                            mSuggestionStripView.setExternalSuggestionView(null, false);
-                            setNeutralSuggestionStrip();
-                        }
-                    });
-                });
+            android.widget.LinearLayout headerRow = new android.widget.LinearLayout(this);
+            headerRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            headerRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            headerRow.setPadding(dp * 12, dp * 8, dp * 12, dp * 4);
 
-                android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+            android.widget.TextView appIcon = new android.widget.TextView(this);
+            appIcon.setText("⚡");
+            appIcon.setTextSize(16);
+            headerRow.addView(appIcon);
+
+            if (isCapturing) {
+                long startTime = rizzsePrefs.getLong("capture_start_time", System.currentTimeMillis());
+                android.widget.TextView timerText = new android.widget.TextView(this);
+                timerText.setId(android.view.View.generateViewId());
+                long elapsed = (System.currentTimeMillis() - startTime) / 1000;
+                timerText.setText(String.format("Recording %ds", elapsed));
+                timerText.setTextSize(14);
+                timerText.setTextColor(0xFFCC0000);
+                timerText.setTypeface(null, android.graphics.Typeface.BOLD);
+                android.widget.LinearLayout.LayoutParams timerLp = new android.widget.LinearLayout.LayoutParams(
                         0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-                lp.setMargins(pad / 2, 0, pad / 2, 0);
-                chip.setLayoutParams(lp);
-                rizzseStrip.addView(chip);
+                timerLp.setMargins(dp * 8, 0, 0, 0);
+                timerText.setLayoutParams(timerLp);
+                headerRow.addView(timerText);
+
+                final int timerViewId = timerText.getId();
+                rizzseTimerRunnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            android.widget.TextView tv = rizzsePanel != null ? rizzsePanel.findViewById(timerViewId) : null;
+                            if (tv != null) {
+                                long s = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+                                    .getLong("capture_start_time", System.currentTimeMillis());
+                                long sec = (System.currentTimeMillis() - s) / 1000;
+                                tv.setText(String.format("Recording %ds", sec));
+                            }
+                            if (getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+                                    .getBoolean("capture_active", false)) {
+                                mHandler.postDelayed(this, 1000);
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                };
+                mHandler.postDelayed(rizzseTimerRunnable, 1000);
+
+                android.widget.TextView stopBtn = new android.widget.TextView(this);
+                stopBtn.setText("  Stop  ");
+                stopBtn.setTextSize(14);
+                stopBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+                stopBtn.setTextColor(0xFFFFFFFF);
+                stopBtn.setPadding(dp * 14, dp * 6, dp * 14, dp * 6);
+                stopBtn.setMinHeight(dp * 36);
+                stopBtn.setGravity(android.view.Gravity.CENTER);
+                android.graphics.drawable.GradientDrawable stopBg = new android.graphics.drawable.GradientDrawable();
+                stopBg.setCornerRadius(dp * 10);
+                stopBg.setColor(0xFFE53935);
+                stopBtn.setBackground(stopBg);
+                stopBtn.setClickable(true);
+                stopBtn.setFocusable(true);
+                stopBtn.setOnClickListener(v -> {
+                    getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+                        .edit().putBoolean("capture_active", false).apply();
+                    sendBroadcast(new android.content.Intent(
+                        "com.datingcopilot.keyboard.CAPTURE_STOPPED").setPackage(getPackageName()));
+                });
+                headerRow.addView(stopBtn);
+
+                android.widget.TextView frameInfo = new android.widget.TextView(this);
+                frameInfo.setText("Frames will be captured automatically");
+                frameInfo.setTextSize(11);
+                frameInfo.setTextColor(0xFF999999);
+                android.widget.LinearLayout.LayoutParams infoLp = new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+                infoLp.setMargins(dp * 12, 0, dp * 12, dp * 6);
+                rizzsePanel.addView(frameInfo, infoLp);
+
+                mHandler.postDelayed(() -> showPendingRizzseSuggestions(), 2000);
+
+            } else if (showAnalyzing && !hasSuggestions) {
+                android.widget.TextView status = new android.widget.TextView(this);
+                status.setText("Analyzing...");
+                status.setTextSize(14);
+                status.setTextColor(0xFF666666);
+                status.setTypeface(null, android.graphics.Typeface.BOLD);
+                android.widget.LinearLayout.LayoutParams statusLp = new android.widget.LinearLayout.LayoutParams(
+                        0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                statusLp.setMargins(dp * 8, 0, 0, 0);
+                headerRow.addView(status, statusLp);
+
+                android.widget.ProgressBar spinner = new android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleSmall);
+                android.widget.LinearLayout.LayoutParams spinnerLp = new android.widget.LinearLayout.LayoutParams(
+                        dp * 24, dp * 24);
+                headerRow.addView(spinner, spinnerLp);
+
+                mHandler.postDelayed(() -> showPendingRizzseSuggestions(), 1000);
+
+            } else if (hasSuggestions) {
+                android.widget.TextView label = new android.widget.TextView(this);
+                label.setText("Suggestions");
+                label.setTextSize(13);
+                label.setTextColor(0xFF333333);
+                label.setTypeface(null, android.graphics.Typeface.BOLD);
+                android.widget.LinearLayout.LayoutParams labelLp = new android.widget.LinearLayout.LayoutParams(
+                        0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                labelLp.setMargins(dp * 8, 0, 0, 0);
+                headerRow.addView(label, labelLp);
+
+                android.widget.TextView closeBtn = new android.widget.TextView(this);
+                closeBtn.setText("✕");
+                closeBtn.setTextSize(16);
+                closeBtn.setTextColor(0xFF999999);
+                closeBtn.setPadding(dp * 8, 0, 0, dp * 4);
+                closeBtn.setClickable(true);
+                closeBtn.setOnClickListener(v -> {
+                    currentRizzseSuggestions.clear();
+                    removeRizzsePanel();
+                });
+                headerRow.addView(closeBtn);
+
+                android.widget.HorizontalScrollView chipScroll = new android.widget.HorizontalScrollView(this);
+                chipScroll.setHorizontalScrollBarEnabled(false);
+                chipScroll.setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
+                android.widget.LinearLayout.LayoutParams scrollLp = new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+                scrollLp.setMargins(0, dp * 2, 0, dp * 6);
+
+                android.widget.LinearLayout chipRow = new android.widget.LinearLayout(this);
+                chipRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+                chipRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                chipRow.setPadding(dp * 8, 0, dp * 8, 0);
+
+                for (int i = 0; i < currentRizzseSuggestions.size() && i < 5; i++) {
+                    final String suggestionText = currentRizzseSuggestions.get(i);
+                    if (suggestionText.isEmpty()) continue;
+
+                    android.widget.TextView chip = new android.widget.TextView(this);
+                    chip.setText(suggestionText);
+                    chip.setTextSize(14);
+                    chip.setTextColor(0xFF1A1A1A);
+                    chip.setSingleLine(true);
+                    chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    chip.setMaxEms(20);
+                    chip.setPadding(dp * 14, dp * 10, dp * 14, dp * 10);
+                    chip.setMinHeight(dp * 44);
+
+                    android.graphics.drawable.GradientDrawable chipBg = new android.graphics.drawable.GradientDrawable();
+                    chipBg.setCornerRadius(dp * 12);
+                    chipBg.setColor(0xFFFFFFFF);
+                    chipBg.setStroke(dp, 0xFFE0E0E0);
+                    chip.setBackground(chipBg);
+                    chip.setClickable(true);
+                    chip.setFocusable(true);
+                    chip.setOnClickListener(v -> {
+                        try {
+                            final android.view.inputmethod.InputConnection ic = getCurrentInputConnection();
+                            if (ic != null) ic.commitText(suggestionText, 1);
+                        } catch (Exception ignored) {}
+                        currentRizzseSuggestions.clear();
+                        mHandler.post(() -> removeRizzsePanel());
+                    });
+
+                    android.widget.LinearLayout.LayoutParams chipLp = new android.widget.LinearLayout.LayoutParams(
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+                    chipLp.setMargins(dp * 4, 0, dp * 4, 0);
+                    chipRow.addView(chip, chipLp);
+                }
+
+                chipScroll.addView(chipRow);
+                rizzsePanel.addView(chipScroll, scrollLp);
+                rizzseIsShowingSuggestions = true;
             }
 
-            if (rizzseStrip.getChildCount() > 0) {
-                mHandler.cancelUpdateSuggestionStrip();
-                mSuggestionStripView.setExternalSuggestionView(rizzseStrip, true);
+            rizzsePanel.addView(headerRow, 0);
+
+            android.view.ViewGroup mainFrame = findViewByType(mInputView, android.widget.LinearLayout.class);
+            if (mainFrame != null) {
+                mainFrame.addView(rizzsePanel, 0);
             }
-        } catch (Exception ignored) { }
+
+            mInputView.post(() -> updateFullscreenMode());
+        } catch (Exception ignored) {}
+    }
+
+    private android.view.ViewGroup findViewByType(android.view.View view, Class<?> type) {
+        if (type.isInstance(view)) return (android.view.ViewGroup) view;
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                android.view.ViewGroup result = findViewByType(group.getChildAt(i), type);
+                if (result != null) return result;
+            }
+        }
+        return null;
+    }
+
+    private void removeRizzsePanel() {
+        try {
+            rizzseIsShowingSuggestions = false;
+            if (rizzsePanel != null) {
+                android.view.ViewGroup parent = (android.view.ViewGroup) rizzsePanel.getParent();
+                if (parent != null) parent.removeView(rizzsePanel);
+                rizzsePanel = null;
+            }
+            mInputView.post(() -> updateFullscreenMode());
+        } catch (Exception ignored) {}
     }
 
     private void setSuggestedWords(final SuggestedWords suggestedWords) {

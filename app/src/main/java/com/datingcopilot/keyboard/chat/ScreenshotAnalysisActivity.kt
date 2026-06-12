@@ -33,10 +33,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
     private lateinit var insightsSection: LinearLayout
     private lateinit var convoSection: LinearLayout
     private lateinit var suggSection: LinearLayout
-    private val loadingHandler = Handler(Looper.getMainLooper())
-    private var loadingSpinRunnable: Runnable? = null
-    private var loadingRing: View? = null
-    private var loadingRingAccent: View? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -220,36 +216,18 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         }
         loadingState = loadView
 
-        // Animated ring
+        // Animated ring - use arc drawable for visible rotation
         val ringContainer = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(dp(64), dp(64)).apply { bottomMargin = dp(16) }
         }
         loadView.addView(ringContainer)
 
-        val ring = View(this).apply {
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(0x00000000)
-                setStroke(dp(4), resources.getColor(R.color.accent_violet, null))
-            }
+        val ring = android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleLarge).apply {
+            isIndeterminate = true
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(resources.getColor(R.color.accent_violet, null))
             layoutParams = FrameLayout.LayoutParams(dp(64), dp(64))
         }
         ringContainer.addView(ring)
-        
-        val ringAccent = View(this).apply {
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(0x00000000)
-                setStroke(dp(4), resources.getColor(R.color.accent_pink, null))
-            }
-            layoutParams = FrameLayout.LayoutParams(dp(64), dp(64))
-            alpha = 0.5f
-        }
-        ringContainer.addView(ringAccent)
-
-        loadingRing = ring
-        loadingRingAccent = ringAccent
-        startLoadingSpin()
 
         loadView.addView(TextView(this).apply {
             text = "RizzSe is thinking"
@@ -355,7 +333,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
 
     private fun showResults(response: AnalyzeResponse) {
         val density = resources.displayMetrics.density
-        stopLoadingAnimations()
         loadingState.visibility = View.GONE
         convoSection.removeAllViews()
         insightsSection.removeAllViews()
@@ -520,7 +497,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
     }
 
     private fun showSuggestions(suggestions: List<SuggestionOption>) {
-        stopLoadingAnimations()
         loadingState.visibility = View.GONE
         val density = resources.displayMetrics.density
         val label = TextView(this).apply {
@@ -621,7 +597,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
     }
 
     private fun showError(msg: String) {
-        stopLoadingAnimations()
         loadingState.visibility = View.GONE
         suggSection.removeAllViews()
         suggSection.visibility = View.VISIBLE
@@ -649,28 +624,7 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        stopLoadingAnimations()
         super.onDestroy()
-    }
-
-    private fun startLoadingSpin() {
-        val ring = loadingRing ?: return
-        val accent = loadingRingAccent ?: return
-        loadingSpinRunnable?.let { loadingHandler.removeCallbacks(it) }
-        var base = 0f
-        var accentBase = 0f
-        val runnable = object : Runnable {
-            override fun run() {
-                if (isFinishing || isDestroyed) return
-                base = (base + 6f) % 360f
-                accentBase = (accentBase - 5f) % 360f
-                ring.rotation = base
-                accent.rotation = accentBase
-                loadingHandler.postDelayed(this, 16L)
-            }
-        }
-        loadingSpinRunnable = runnable
-        loadingHandler.post(runnable)
     }
 
     private fun showFullScreenPreview(uri: Uri) {
@@ -709,11 +663,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
 
         dialog.setContentView(layout)
         dialog.show()
-    }
-
-    private fun stopLoadingAnimations() {
-        loadingSpinRunnable?.let { loadingHandler.removeCallbacks(it) }
-        loadingSpinRunnable = null
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

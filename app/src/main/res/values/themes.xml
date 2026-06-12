@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.DatingCopilotKeyboard" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="colorPrimary">#8B5CF6</item>
-        <item name="colorPrimaryDark">#1A1025</item>
-        <item name="colorAccent">#A855F7</item>
+        <item name="colorPrimary">#3B82F6</item>
+        <item name="colorPrimaryDark">#000000</item>
+        <item name="colorAccent">#3B82F6</item>
         <item name="android:windowBackground">@color/bg_dark</item>
         <item name="android:statusBarColor">@color/bg_dark</item>
         <item name="android:navigationBarColor">@color/bg_dark</item>
@@ -13,31 +13,44 @@
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>
-        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowIsFloating">true</item>
         <item name="android:backgroundDimEnabled">false</item>
         <item name="android:windowDisablePreview">true</item>
         <item name="android:windowAnimationStyle">@null</item>
-        <item name="android:colorAccent">#A855F7</item>
+        <item name="android:colorAccent">#3B82F6</item>
     </style>
 
+    <!-- Light keyboard theme (default day mode) -->
     <style name="Theme.Nboard" parent="Theme.AppCompat.NoActionBar">
-        <item name="colorKeyboardBg">#1A1025</item>
-        <item name="colorKeyBg">#2D2548</item>
-        <item name="colorKeySpecialBg">#3D3060</item>
-        <item name="colorKeyText">#F1F5F9</item>
-        <item name="colorSpaceText">#9483B8</item>
-        <item name="colorSendBg">#F472B6</item>
-        <item name="colorSendText">#FFFFFF</item>
-        <item name="colorPopupShadow">#000000</item>
+        <item name="colorKeyboardBg">#FFFFFFFF</item>
+        <item name="colorKeyBg">#FFF0F0F0</item>
+        <item name="colorKeySpecialBg">#FFE8E8E8</item>
+        <item name="colorKeyText">#FF000000</item>
+        <item name="colorSpaceText">#FF666666</item>
+        <item name="colorSendBg">#FF2563EB</item>
+        <item name="colorSendText">#FFFFFFFF</item>
+        <item name="colorPopupShadow">#FF000000</item>
     </style>
 
-    <style name="Theme.Nboard.Amoled" parent="Theme.AppCompat.Light.NoActionBar">
+    <!-- Dark keyboard theme (night mode) -->
+    <style name="Theme.Nboard.Dark" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorKeyboardBg">#FF000000</item>
+        <item name="colorKeyBg">#FF1C1C1C</item>
+        <item name="colorKeySpecialBg">#FF2A2A2A</item>
+        <item name="colorKeyText">#FFFFFFFF</item>
+        <item name="colorSpaceText">#FF888888</item>
+        <item name="colorSendBg">#FF3B82F6</item>
+        <item name="colorSendText">#FFFFFFFF</item>
+        <item name="colorPopupShadow">#FF000000</item>
+    </style>
+
+    <style name="Theme.Nboard.Amoled" parent="Theme.AppCompat.NoActionBar">
         <item name="colorKeyboardBg">#000000</item>
         <item name="colorKeyBg">#0A0A0A</item>
         <item name="colorKeySpecialBg">#151515</item>
         <item name="colorKeyText">#FFFFFF</item>
         <item name="colorSpaceText">#9A9A9A</item>
-        <item name="colorSendBg">#151515</item>
+        <item name="colorSendBg">#FF2563EB</item>
         <item name="colorSendText">#FFFFFF</item>
         <item name="colorPopupShadow">#000000</item>
     </style>

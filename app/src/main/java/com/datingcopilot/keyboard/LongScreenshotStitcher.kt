@@ -38,6 +38,59 @@ class LongScreenshotStitcher {
         val pixelShift: Int        // how many pixels of overlap detected
     )
 
+    fun stitchFast(frames: List<Bitmap>): Bitmap? {
+        if (frames.isEmpty()) return null
+        if (frames.size == 1) return frames[0].copy(Bitmap.Config.ARGB_8888, false)
+
+        val width = frames[0].width
+        val height = frames[0].height
+
+        val contentTop = findContentTop(frames[0], width, height)
+        val contentBottom = findContentBottom(frames[0], width, height)
+        val contentHeight = contentBottom - contentTop
+        if (contentHeight <= 0) return frames.last().copy(Bitmap.Config.ARGB_8888, false)
+
+        val profiles = frames.map { buildProfile(it, width, contentTop, contentBottom) }
+
+        val segments = mutableListOf(StitchSegment(0, Rect(0, 0, width, height), 0))
+        val recentShifts = mutableListOf<Int>()
+
+        for (i in 1 until frames.size) {
+            val shift = findOptimalShift(profiles[i - 1], profiles[i], contentHeight)
+            val bestShift: Int
+
+            if (shift > 0) {
+                bestShift = shift
+                recentShifts.add(shift)
+                if (recentShifts.size > 3) recentShifts.removeAt(0)
+            } else {
+                bestShift = if (recentShifts.isNotEmpty()) {
+                    recentShifts.sorted()[recentShifts.size / 2]
+                } else {
+                    (contentHeight * 0.5f).toInt()
+                }
+            }
+
+            val srcTop = (contentBottom - bestShift).coerceIn(contentTop, contentBottom - 1)
+            val srcBottom = contentBottom.coerceAtLeast(srcTop + 1)
+            segments.add(StitchSegment(i, Rect(0, srcTop, width, srcBottom), bestShift))
+        }
+
+        val totalHeight = segments.sumOf { it.srcRect.height() }
+        if (totalHeight <= 0) return frames.last().copy(Bitmap.Config.ARGB_8888, false)
+
+        val result = Bitmap.createBitmap(width, totalHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(result)
+        var y = 0
+
+        for (s in segments) {
+            canvas.drawBitmap(frames[s.frameIndex], s.srcRect, Rect(0, y, width, y + s.srcRect.height()), null)
+            y += s.srcRect.height()
+        }
+
+        return result
+    }
+
     fun stitch(frames: List<Bitmap>): Bitmap? {
         if (frames.isEmpty()) return null
         if (frames.size == 1) return frames[0].copy(Bitmap.Config.ARGB_8888, false)

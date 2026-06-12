@@ -60,15 +60,15 @@ object Defaults {
     const val PREF_SHOW_EMOJI_DESCRIPTIONS = true
     @JvmField
     var PREF_POPUP_ON = true
-    const val PREF_AUTO_CORRECTION = true
+    const val PREF_AUTO_CORRECTION = false
     const val PREF_MORE_AUTO_CORRECTION = false
     const val PREF_AUTO_CORRECT_CONFIDENCE = 0.24f
-    const val PREF_AUTOCORRECT_SHORTCUTS = true
-    const val PREF_BACKSPACE_REVERTS_AUTOCORRECT = true
+    const val PREF_AUTOCORRECT_SHORTCUTS = false
+    const val PREF_BACKSPACE_REVERTS_AUTOCORRECT = false
     const val PREF_CENTER_SUGGESTION_TEXT_TO_ENTER = false
-    const val PREF_SHOW_SUGGESTIONS = true
+    const val PREF_SHOW_SUGGESTIONS = false
     const val PREF_ALWAYS_SHOW_SUGGESTIONS = false
-    const val PREF_ALWAYS_SHOW_SUGGESTIONS_EXCEPT_WEB_TEXT = true
+    const val PREF_ALWAYS_SHOW_SUGGESTIONS_EXCEPT_WEB_TEXT = false
     const val PREF_KEY_USE_PERSONALIZED_DICTS = true
     const val PREF_KEY_USE_DOUBLE_SPACE_PERIOD = true
     const val PREF_BLOCK_POTENTIALLY_OFFENSIVE = true

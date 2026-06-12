@@ -22,6 +22,14 @@ class RizzseActionReceiver : BroadcastReceiver() {
             .putString("rizzse_chat_context", chatContext)
             .apply()
 
+        if (action == "open_app") {
+            val appIntent = Intent(context, com.datingcopilot.keyboard.chat.ChatActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            context.startActivity(appIntent)
+            return
+        }
+
         val launchIntent = Intent(context, com.datingcopilot.keyboard.KeyboardScreenshotActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra("chat_context", chatContext)

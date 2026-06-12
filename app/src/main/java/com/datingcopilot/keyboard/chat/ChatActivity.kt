@@ -45,6 +45,7 @@ import com.mikepenz.iconics.typeface.library.googlematerial.GoogleMaterial
 import com.mikepenz.iconics.utils.colorInt
 import com.mikepenz.iconics.utils.sizeDp
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -79,6 +80,7 @@ class ChatActivity : AppCompatActivity() {
     private var selectedToneChip: TextView? = null
     private var lastInputText = ""
     private var loadingPulseAnimator: ObjectAnimator? = null
+    private var lastPendingKeyboardSuggestionsJson: String? = null
 
     private val apiClient by lazy { com.datingcopilot.keyboard.ApiClient(this) }
     private val personaManager by lazy { PersonaManager(this) }
@@ -112,6 +114,7 @@ class ChatActivity : AppCompatActivity() {
         handleSendImage(intent)
         handleOpenImagePicker(intent)
         handleRizzseAction(intent)
+        showPendingKeyboardSuggestions()
         try {
             window?.registerScrollCaptureCallback(RizzseScrollCaptureCallback())
         } catch (e: Throwable) {
@@ -125,6 +128,21 @@ class ChatActivity : AppCompatActivity() {
         handleSendImage(intent)
         handleOpenImagePicker(intent)
         handleRizzseAction(intent)
+        showPendingKeyboardSuggestions()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        showPendingKeyboardSuggestions()
+        // Show keyboard if capture is active (IME may have been killed by projection dialog)
+        val prefs = getSharedPreferences("dating_copilot", android.content.Context.MODE_PRIVATE)
+        if (prefs.getBoolean("capture_active", false) && ::messageInput.isInitialized) {
+            messageInput.postDelayed({
+                messageInput.requestFocus()
+                val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                imm?.showSoftInput(messageInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+            }, 200)
+        }
     }
 
     private fun handleRizzseAction(intent: Intent?) {
@@ -516,11 +534,6 @@ class ChatActivity : AppCompatActivity() {
             )
         }
 
-        toneBar.addView(toneChip("Rizz", "playful", "flirt", selected = currentPersona == "playful" && currentIntent == "flirt"))
-        toneBar.addView(toneChip("Funny", "witty", "recover_dry", selected = currentPersona == "witty"))
-        toneBar.addView(toneChip("Chill", "chill", "keep_going", selected = currentPersona == "chill"))
-        toneBar.addView(toneChip("Ask out", "direct", "ask_date", selected = currentPersona == "direct"))
-
         toneScroll.addView(toneBar)
         mainLayout.addView(toneScroll)
 
@@ -665,39 +678,6 @@ class ChatActivity : AppCompatActivity() {
         emptyStateView.addView(topBar)
 
         emptyStateView.addView(personaCard())
-
-        val vibeHeader = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(4), dp(18), 0, dp(10))
-        }
-        vibeHeader.addView(ImageView(this).apply {
-            setImageDrawable(
-                IconicsDrawable(this@ChatActivity, GoogleMaterial.Icon.gmd_auto_awesome).apply {
-                    colorInt = 0xFFFF38F8.toInt()
-                    sizeDp = 18
-                }
-            )
-            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply { marginEnd = dp(6) }
-        })
-        vibeHeader.addView(TextView(this).apply {
-            text = "Your Vibe"
-            textSize = 16f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.text_primary, null))
-        })
-        emptyStateView.addView(vibeHeader)
-
-        val vibeGrid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        vibeGrid.addView(vibeRow(
-            vibeTile("Funny", "playful", "flirt", currentPersona == "playful"),
-            vibeTile("Chill", "chill", "keep_going", currentPersona == "chill")
-        ))
-        vibeGrid.addView(vibeRow(
-            vibeTile("Direct", "direct", "ask_date", currentPersona == "direct"),
-            vibeTile("Flirty", "witty", "recover_dry", currentPersona == "witty")
-        ))
-        emptyStateView.addView(vibeGrid)
 
         emptyStateView.addView(analyzeCard())
 
@@ -905,6 +885,22 @@ class ChatActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             addView(left)
             addView(right)
+        }
+    }
+
+    private fun showPendingKeyboardSuggestions() {
+        val prefs = getSharedPreferences("dating_copilot", Context.MODE_MULTI_PROCESS)
+        val json = prefs.getString(PREF_PENDING_KEYBOARD_SUGGESTIONS, null) ?: return
+        if (json == lastPendingKeyboardSuggestionsJson) return
+        lastPendingKeyboardSuggestionsJson = json
+        try {
+            val type = object : TypeToken<List<SuggestionOption>>() {}.type
+            val suggestions: List<SuggestionOption> = gson.fromJson(json, type) ?: emptyList()
+            if (suggestions.isNotEmpty()) {
+                showSuggestions(suggestions)
+            }
+        } catch (e: Exception) {
+            Log.w("ChatActivity", "Failed to load pending suggestions: ${e.message}")
         }
     }
 

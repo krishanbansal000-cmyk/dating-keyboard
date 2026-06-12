@@ -12,6 +12,147 @@
     android:paddingEnd="8dp"
     android:paddingBottom="0dp">
 
+    <!-- AI Suggestions Panel - at the very top -->
+    <LinearLayout
+        android:id="@+id/rizzseSuggestionsPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/rizzseSuggestionLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="6dp"
+            android:fontFamily="@font/inter_variable"
+            android:text="AI Suggestions"
+            android:textColor="@color/text_muted"
+            android:textSize="11sp"
+            android:letterSpacing="0.06" />
+
+        <LinearLayout
+            android:id="@+id/rizzseSuggestion1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_suggestion_card"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="12dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginEnd="10dp"
+                android:src="@drawable/ic_sparkle_small" />
+
+            <TextView
+                android:id="@+id/rizzseSuggestion1Text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="@font/inter_variable"
+                android:maxLines="2"
+                android:textColor="@color/suggestion_card_text"
+                android:textSize="14sp" />
+
+            <ImageView
+                android:id="@+id/rizzseSuggestion1Close"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginStart="8dp"
+                android:padding="6dp"
+                android:src="@drawable/ic_close_circle" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/rizzseSuggestion2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_suggestion_card"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="12dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginEnd="10dp"
+                android:src="@drawable/ic_sparkle_small" />
+
+            <TextView
+                android:id="@+id/rizzseSuggestion2Text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="@font/inter_variable"
+                android:maxLines="2"
+                android:textColor="@color/suggestion_card_text"
+                android:textSize="14sp" />
+
+            <ImageView
+                android:id="@+id/rizzseSuggestion2Close"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginStart="8dp"
+                android:padding="6dp"
+                android:src="@drawable/ic_close_circle" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/rizzseSuggestion3"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_suggestion_card"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="12dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginEnd="10dp"
+                android:src="@drawable/ic_sparkle_small" />
+
+            <TextView
+                android:id="@+id/rizzseSuggestion3Text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="@font/inter_variable"
+                android:maxLines="2"
+                android:textColor="@color/suggestion_card_text"
+                android:textSize="14sp" />
+
+            <ImageView
+                android:id="@+id/rizzseSuggestion3Close"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginStart="8dp"
+                android:padding="6dp"
+                android:src="@drawable/ic_close_circle" />
+        </LinearLayout>
+    </LinearLayout>
+
     <View
         android:id="@+id/voiceInputGlow"
         android:layout_width="match_parent"
@@ -408,7 +549,7 @@
             android:fontFamily="@font/inter_variable"
             android:gravity="center_vertical"
             android:text="RizzSe"
-            android:textColor="#F5D0FE"
+            android:textColor="@color/text_secondary"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -428,19 +569,25 @@
             android:paddingEnd="14dp"
             android:text="RECORD"
             android:textAllCaps="false"
-            android:textColor="#F472B6"
+            android:textColor="@color/accent_violet"
             android:textSize="11sp"
             android:letterSpacing="0.08" />
 
-        <androidx.appcompat.widget.AppCompatImageButton
+        <Button
             android:id="@+id/rizzseAiButton"
-            android:layout_width="32dp"
+            android:layout_width="wrap_content"
             android:layout_height="32dp"
             android:layout_marginStart="8dp"
-            android:background="@drawable/bg_ai_button"
-            android:padding="8dp"
-            android:scaleType="center"
-            android:src="@drawable/ic_sparkle_ai" />
+            android:background="@drawable/bg_chip"
+            android:fontFamily="@font/inter_variable"
+            android:gravity="center"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="APP"
+            android:textAllCaps="false"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:letterSpacing="0.08" />
     </LinearLayout>
 
     <FrameLayout
@@ -512,7 +659,8 @@
             android:text="123"
             android:textAllCaps="false"
             android:textColor="?attr/colorKeyText"
-            android:textSize="13sp" />
+            android:textSize="13sp"
+            android:visibility="gone" />
 
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/aiModeButton"
@@ -530,7 +678,7 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_marginEnd="2dp"
-            android:layout_weight="0.85"
+            android:layout_weight="1"
             android:background="@drawable/bg_key"
             android:fontFamily="@font/inter_variable"
             android:gravity="center"
@@ -544,7 +692,7 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_marginEnd="2dp"
-            android:layout_weight="5.4"
+            android:layout_weight="5"
             android:background="@drawable/bg_space_key"
             android:fontFamily="@font/inter_variable"
             android:text="space"
@@ -592,7 +740,7 @@
             android:id="@+id/actionButton"
             android:layout_width="0dp"
             android:layout_height="48dp"
-            android:layout_weight="1.9"
+            android:layout_weight="2"
             android:background="@drawable/bg_special_key"
             android:padding="0dp"
             android:scaleType="center" />

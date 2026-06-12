@@ -432,8 +432,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
                 cornerRadius = dp(16).toFloat()
-                setColor(0xFF1E0D28.toInt())
-                setStroke(dp(1), 0xFF4A2560.toInt())
+                setColor(0xFF2563EB.toInt())
+                setStroke(dp(1), 0xFF3B82F6.toInt())
             }
             layoutParams = LinearLayout.LayoutParams(dp(40), LinearLayout.LayoutParams.MATCH_PARENT).apply {
                 marginEnd = dp(2)
@@ -448,7 +448,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         val icon = ImageView(context).apply {
             setImageDrawable(
                 IconicsDrawable(context, GoogleMaterial.Icon.gmd_auto_awesome).apply {
-                    colorInt = 0xFFC084FC.toInt()
+                    colorInt = 0xFFFFFFFF.toInt()
                     sizeDp = 18
                 }
             )
@@ -462,19 +462,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     private fun dispatchRizzseAction(action: String) {
         AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS)
-        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-        imm?.hideSoftInputFromWindow(windowToken, 0)
-        context.sendBroadcast(Intent("com.datingcopilot.keyboard.HIDE_IME").apply {
+        context.sendBroadcast(Intent("com.datingcopilot.keyboard.RIZZSE_ACTION").apply {
             setPackage("com.datingcopilot.keyboard")
+            putExtra("action", action)
+            putExtra("chat_context", "")
         })
-        // Delay to ensure keyboard is fully dismissed before launching capture
-        postDelayed({
-            context.sendBroadcast(Intent("com.datingcopilot.keyboard.RIZZSE_ACTION").apply {
-                setPackage("com.datingcopilot.keyboard")
-                putExtra("action", action)
-                putExtra("chat_context", "")
-            })
-        }, 400)
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
