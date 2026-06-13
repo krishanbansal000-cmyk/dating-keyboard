@@ -22,7 +22,12 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import android.view.Gravity
+import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import java.io.File
 import java.io.FileOutputStream
@@ -49,10 +54,13 @@ class ScreenshotCaptureService : Service() {
     private var lastProcessedFrameTime: Long = 0
     private var frameCount: Long = 0
     private var captureFinished = false
+    private var overlayView: View? = null
+    private var overlayTimerText: TextView? = null
+    private var overlayTimerRunnable: Runnable? = null
 
-    private val maxFrames = 5
+    private val maxFrames = 8
     private val captureDurationMs = 15000L
-    private val minCaptureDurationMs = 1000L
+    private val minCaptureDurationMs = 5000L
     private val stableStopMs = 1400L
     private val frameIntervalMs = 300L
     private val pixelCompareCount = 100
@@ -200,6 +208,7 @@ class ScreenshotCaptureService : Service() {
         }, handler)
 
         handler.post(processingLoopRunnable)
+        showRecordingOverlay()
 
         handler.postDelayed({
             if (captureFinished) return@postDelayed
@@ -309,6 +318,7 @@ class ScreenshotCaptureService : Service() {
     private fun finishCapture(width: Int, height: Int) {
         if (captureFinished) return
         captureFinished = true
+        removeRecordingOverlay()
         cleanupCapture()
 
         val frames = ArrayList(capturedFrames)
@@ -400,6 +410,99 @@ class ScreenshotCaptureService : Service() {
         }
     }
 
+    private fun showRecordingOverlay() {
+        try {
+            val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+            val dp = resources.displayMetrics.density
+
+            val container = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding((dp * 10).toInt(), (dp * 6).toInt(), (dp * 10).toInt(), (dp * 6).toInt())
+                val bg = android.graphics.drawable.GradientDrawable()
+                bg.cornerRadius = dp * 24
+                bg.setColor(0xE6222222.toInt())
+                background = bg
+            }
+
+            val dot = View(this).apply {
+                val dotBg = android.graphics.drawable.GradientDrawable()
+                dotBg.setCornerRadius(dp * 4)
+                dotBg.setColor(0xFFE53935.toInt())
+                background = dotBg
+                layoutParams = LinearLayout.LayoutParams((dp * 8).toInt(), (dp * 8).toInt())
+            }
+            container.addView(dot)
+
+            overlayTimerText = TextView(this).apply {
+                text = "  0s / 15s"
+                textSize = 13f
+                setTextColor(0xFFFFFFFF.toInt())
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setPadding((dp * 6).toInt(), 0, (dp * 10).toInt(), 0)
+            }
+            container.addView(overlayTimerText)
+
+            val stopBtn = TextView(this).apply {
+                text = "Stop"
+                textSize = 12f
+                setTextColor(0xFFFFFFFF.toInt())
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setPadding((dp * 12).toInt(), (dp * 4).toInt(), (dp * 12).toInt(), (dp * 4).toInt())
+                setMinHeight((dp * 28).toInt())
+                gravity = Gravity.CENTER
+                val btnBg = android.graphics.drawable.GradientDrawable()
+                btnBg.setCornerRadius(dp * 10)
+                btnBg.setColor(0xFFE53935.toInt())
+                background = btnBg
+                setOnClickListener {
+                    getSharedPreferences("dating_copilot", MODE_PRIVATE)
+                        .edit().putBoolean("capture_active", false).apply()
+                    sendBroadcast(Intent("com.datingcopilot.keyboard.CAPTURE_STOPPED").setPackage(packageName))
+                }
+            }
+            container.addView(stopBtn)
+
+            overlayView = container
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                y = (dp * 60).toInt()
+            }
+            wm.addView(container, params)
+
+            overlayTimerRunnable = object : Runnable {
+                override fun run() {
+                    if (captureFinished) { removeRecordingOverlay(); return }
+                    val elapsed = (System.currentTimeMillis() - captureStartTime) / 1000
+                    val remaining = ((captureDurationMs / 1000) - elapsed).coerceAtLeast(0)
+                    overlayTimerText?.text = "  ${elapsed}s / ${captureDurationMs / 1000}s"
+                    if (remaining > 0) handler.postDelayed(this, 500)
+                }
+            }
+            handler.post(overlayTimerRunnable!!)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not show recording overlay: ${e.message}")
+        }
+    }
+
+    private fun removeRecordingOverlay() {
+        overlayTimerRunnable?.let { handler.removeCallbacks(it) }
+        overlayTimerRunnable = null
+        overlayTimerText = null
+        try {
+            overlayView?.let {
+                (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it)
+            }
+        } catch (_: Exception) {}
+        overlayView = null
+    }
+
     private fun cleanupCapture() {
         try { virtualDisplay?.release() } catch (_: Exception) {}; virtualDisplay = null
         try { imageReader?.close() } catch (_: Exception) {}; imageReader = null
@@ -408,6 +511,7 @@ class ScreenshotCaptureService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
+        removeRecordingOverlay()
         cleanupCapture()
         capturedFrames.forEach { if (!it.isRecycled) it.recycle() }
         capturedFrames.clear()

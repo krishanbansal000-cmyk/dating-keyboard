@@ -659,6 +659,103 @@ class ApiClient(context: Context) {
         }
     }
 
+    fun fetchScreenshotInsights(
+        uri: Uri,
+        persona: String,
+        context: Context,
+        intent: String = "keep_going",
+        platform: String = "whatsapp"
+    ): ConversationInsights? {
+        return try {
+            val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            val extension = when {
+                mimeType.contains("png") -> ".png"
+                mimeType.contains("webp") -> ".webp"
+                else -> ".jpg"
+            }
+            val tempFile = File(context.cacheDir, "insights_${System.currentTimeMillis()}$extension")
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(tempFile).use { output -> input.copyTo(output) }
+            } ?: return null
+
+            val mediaType = mimeType.toMediaTypeOrNull()
+            val requestBody = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("image", tempFile.name, tempFile.asRequestBody(mediaType))
+                .addFormDataPart("persona", persona)
+                .addFormDataPart("intent", intent)
+                .addFormDataPart("platform", platform)
+                .addFormDataPart("hinglish", if (prefs.getBoolean("hinglish_mode", false)) "true" else "false")
+                .build()
+
+            val request = Request.Builder()
+                .url("${getBaseUrl()}/api/v1/screenshot-insights")
+                .post(requestBody)
+                .build()
+
+            val response = client.newCall(request).execute()
+            tempFile.delete()
+
+            if (!response.isSuccessful) return null
+            val responseBody = response.body?.string() ?: return null
+            val result = gson.fromJson(responseBody, Map::class.java)
+            parseInsights(result)
+        } catch (e: Exception) {
+            android.util.Log.e("ApiClient", "Screenshot insights exception: ${e.message}", e)
+            null
+        }
+    }
+
+    fun fetchScreenshotInsightsMulti(
+        uris: List<Uri>,
+        chatContext: String,
+        context: Context,
+        persona: String = "playful",
+        intent: String = "keep_going",
+        platform: String = "whatsapp"
+    ): ConversationInsights? {
+        return try {
+            val requestBodyBuilder = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("persona", persona)
+                .addFormDataPart("intent", intent)
+                .addFormDataPart("platform", platform)
+                .addFormDataPart("chat_context", chatContext)
+                .addFormDataPart("hinglish", if (prefs.getBoolean("hinglish_mode", false)) "true" else "false")
+
+            for (uri in uris) {
+                val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+                val extension = when {
+                    mimeType.contains("png") -> ".png"
+                    mimeType.contains("webp") -> ".webp"
+                    else -> ".jpg"
+                }
+                val tempFile = File(context.cacheDir, "insights_multi_${System.currentTimeMillis()}$extension")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(tempFile).use { output -> input.copyTo(output) }
+                } ?: continue
+                val mediaType = mimeType.toMediaTypeOrNull()
+                requestBodyBuilder.addFormDataPart("images", tempFile.name, tempFile.asRequestBody(mediaType))
+            }
+
+            val request = Request.Builder()
+                .url("${getBaseUrl()}/api/v1/screenshot-insights")
+                .post(requestBodyBuilder.build())
+                .build()
+
+            val response = client.newCall(request).execute()
+            context.cacheDir.listFiles()?.filter { it.name.startsWith("insights_multi_") }?.forEach { it.delete() }
+
+            if (!response.isSuccessful) return null
+            val responseBody = response.body?.string() ?: return null
+            val result = gson.fromJson(responseBody, Map::class.java)
+            parseInsights(result)
+        } catch (e: Exception) {
+            android.util.Log.e("ApiClient", "Multi screenshot insights exception: ${e.message}", e)
+            null
+        }
+    }
+
     fun getConversationInsights(
         chatContext: String,
         persona: String = "playful",
