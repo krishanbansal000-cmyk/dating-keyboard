@@ -179,7 +179,14 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(0xFFFF38F8.toInt())
                 setPadding(dp(8), 0, dp(8), 0)
-                gravity = Gravity.CENTER_VERTICAL
+                gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                isClickable = true
+                setOnClickListener {
+                    context.sendBroadcast(Intent("com.datingcopilot.keyboard.RIZZSE_ACTION").apply {
+                        setPackage("com.datingcopilot.keyboard")
+                        putExtra("action", "open_app")
+                    })
+                }
             })
             pinnedKeys.addView(createRizzseVibeButton())
             pinnedKeys.addView(createRizzseRecordButton())
