@@ -1552,6 +1552,12 @@ public class LatinIME extends InputMethodService implements
             boolean isCapturing = rizzsePrefs.getBoolean("capture_active", false);
             boolean showAnalyzing = rizzsePrefs.getBoolean("show_analyzing", false);
 
+            // Fresh capture: clear old suggestions so they don't flash
+            if (isCapturing) {
+                currentRizzseSuggestions.clear();
+                rizzseIsShowingSuggestions = false;
+            }
+
             String pendingSuggestions = rizzsePrefs.getString("pending_keyboard_suggestions", null);
             if (pendingSuggestions != null && !pendingSuggestions.isEmpty()) {
                 currentRizzseSuggestions.clear();

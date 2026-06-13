@@ -91,6 +91,8 @@ class ScreenshotCaptureService : Service() {
         prefs.edit()
             .putBoolean("capture_active", true)
             .putLong("capture_start_time", System.currentTimeMillis())
+            .remove("pending_keyboard_suggestions")
+            .remove("suggestions_show_time")
             .apply()
 
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, -1) ?: -1
