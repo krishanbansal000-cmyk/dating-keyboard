@@ -739,7 +739,7 @@ def analyze_screenshot():
                 is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
                 context_prompt = build_context_prompt(persona, intent, platform, hinglish)
                 
-                vision_prompt = f"""This is one chat screenshot, often a long stitched capture. Read the full visible chat from top to bottom. Reply only to the newest incoming message from them, usually near the bottom. Output exactly these 3 lines and nothing else. Keep each under 100 chars. {context_prompt}
+                vision_prompt = f"""Read the chat screenshot. Reply ONLY to the latest message from them. Return EXACTLY these 3 lines and NOTHING else. Each under 100 chars. {context_prompt}
 
 >>> Safe:
 >>> Smooth:
@@ -763,8 +763,8 @@ def analyze_screenshot():
                 response, first_error = call_ai_with_error(
                     messages,
                     model=OPENAI_MODEL,
-                    max_tokens=120,
-                    temperature=0.55,
+                    max_tokens=80,
+                    temperature=0.45,
                     timeout_seconds=30
                 )
                 if first_error:
@@ -787,7 +787,7 @@ def analyze_screenshot():
                         raw_model_text[:500]
                     )
 
-                    retry_prompt = f"""Read this chat screenshot carefully. If it contains a chat, write exactly 3 respectful replies to the latest incoming message. You MUST include Safe, Smooth, and Bold. Return exactly this format and nothing else. {context_prompt}
+                    retry_prompt = f"""Read this chat screenshot. Write ONLY 3 replies to the latest message. Return ONLY these 3 lines, nothing else. {context_prompt}
 
 >>> Safe: <reply>
 >>> Smooth: <reply>
@@ -801,8 +801,8 @@ def analyze_screenshot():
                     retry_response, retry_error = call_ai_with_error(
                         retry_messages,
                         model=OPENAI_MODEL,
-                        max_tokens=220,
-                        temperature=0.45,
+                        max_tokens=100,
+                        temperature=0.4,
                         timeout_seconds=30
                     )
                     if retry_error:
@@ -847,11 +847,8 @@ def analyze_screenshot():
         )
         
         return jsonify({
-            "conversation": conversation,
             "suggestions": suggestions,
-            "detected_app": "Dating App",
-            "persona": persona,
-            "source": source
+            "persona": persona
         })
         
     except Exception as e:
@@ -907,7 +904,7 @@ def analyze_screenshots():
                     context_hint = f"\n\nAdditional text context from chat:\n{ctx_text[:600]}"
 
             if len(encoded_images) == 1:
-                vision_prompt = f"""This is one chat screenshot, often a long stitched capture. Read the full visible chat from top to bottom. Reply only to the newest incoming message from them, usually near the bottom. Output exactly these 3 lines and nothing else. Keep each under 100 chars. {context_prompt}{context_hint}
+                vision_prompt = f"""Read the chat screenshot. Reply ONLY to the latest message. Return EXACTLY these 3 lines and NOTHING else. Each under 100 chars. {context_prompt}{context_hint}
 
 >>> Safe:
 >>> Smooth:
@@ -934,7 +931,7 @@ def analyze_screenshots():
                     else:
                         image_contents.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{enc}", "detail": "low"}})
 
-                vision_prompt = f"""You are given {len(encoded_images)} screenshots of a chat conversation, captured as the user scrolled. These show different parts of the same conversation. Read all of them to understand the full context, then reply to the LATEST incoming message. Keep each reply under 100 chars. {context_prompt}{context_hint}
+                vision_prompt = f"""{len(encoded_images)} chat screenshots. Read all. Reply ONLY to the latest message. Return EXACTLY 3 lines, NOTHING else. Each under 100 chars. {context_prompt}{context_hint}
 
 >>> Safe:
 >>> Smooth:
@@ -944,8 +941,8 @@ def analyze_screenshots():
             response, first_error = call_ai_with_error(
                 messages,
                 model=OPENAI_MODEL,
-                max_tokens=160,
-                temperature=0.55,
+                max_tokens=100,
+                temperature=0.45,
                 timeout_seconds=45
             )
             if first_error:
@@ -962,7 +959,7 @@ def analyze_screenshots():
 
             if not suggestions and encoded_images and AI_PROVIDER != "gemini":
                 app.logger.warning("analyze-screenshots retry: model=%s images=%d reason=%s", OPENAI_MODEL, len(encoded_images), failure_reason)
-                retry_prompt = f"""Read this chat screenshot carefully. If it contains a chat, write exactly 3 respectful replies to the latest incoming message. You MUST include Safe, Smooth, and Bold. Return exactly this format and nothing else. {context_prompt}{context_hint}
+                retry_prompt = f"""Read this chat screenshot. Write ONLY 3 replies to the latest message. Return ONLY these 3 lines, nothing else. {context_prompt}{context_hint}
 
 >>> Safe: <reply>
 >>> Smooth: <reply>
@@ -977,8 +974,8 @@ def analyze_screenshots():
                 retry_response, retry_error = call_ai_with_error(
                     retry_messages,
                     model=OPENAI_MODEL,
-                    max_tokens=220,
-                    temperature=0.45,
+                    max_tokens=120,
+                    temperature=0.4,
                     timeout_seconds=30
                 )
                 if retry_error:
@@ -1009,8 +1006,7 @@ def analyze_screenshots():
         )
         return jsonify({
             "suggestions": suggestions,
-            "persona": persona,
-            "source": source
+            "persona": persona
         })
 
     except Exception as e:
