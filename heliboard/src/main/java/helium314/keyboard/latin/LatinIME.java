@@ -1728,7 +1728,7 @@ public class LatinIME extends InputMethodService implements
                 android.widget.LinearLayout chipRow = new android.widget.LinearLayout(this);
                 chipRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
                 chipRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-                chipRow.setPadding(dp * 8, dp * 6, dp * 8, dp * 6);
+                chipRow.setPadding(dp * 6, dp * 4, dp * 6, dp * 4);
 
                 // Get last screenshot path for opening previous analysis
                 final String lastScreenshotPath = rizzsePrefs.getString("pending_screenshot_paths", "");
@@ -1738,9 +1738,9 @@ public class LatinIME extends InputMethodService implements
 
                 android.widget.TextView appBtn = new android.widget.TextView(this);
                 appBtn.setText("\u26A1");
-                appBtn.setTextSize(20);
+                appBtn.setTextSize(16);
                 appBtn.setTextColor(0xFFFF38F8);
-                appBtn.setPadding(dp * 8, dp * 4, dp * 8, dp * 4);
+                appBtn.setPadding(dp * 6, dp * 2, dp * 6, dp * 2);
                 appBtn.setClickable(true);
                 appBtn.setOnClickListener(v -> {
                     try {
@@ -1763,17 +1763,17 @@ public class LatinIME extends InputMethodService implements
 
                     android.widget.TextView chip = new android.widget.TextView(this);
                     chip.setText(suggestionText);
-                    chip.setTextSize(14);
+                    chip.setTextSize(12);
                     chip.setTextColor(0xFFE9D5FF);
                     chip.setMaxLines(2);
                     chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                    chip.setPadding(dp * 14, dp * 10, dp * 14, dp * 10);
-                    chip.setMinHeight(dp * 48);
-                    chip.setMinWidth(dp * 200);
+                    chip.setPadding(dp * 12, dp * 8, dp * 12, dp * 8);
+                    chip.setMinHeight(dp * 52);
+                    chip.setMinWidth(dp * 170);
                     chip.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
                     android.graphics.drawable.GradientDrawable chipBg = new android.graphics.drawable.GradientDrawable();
-                    chipBg.setCornerRadius(dp * 12);
+                    chipBg.setCornerRadius(dp * 10);
                     chipBg.setColor(0xFF2A1535);
                     chipBg.setStroke(dp, chipColors[i % chipColors.length]);
                     chip.setBackground(chipBg);
@@ -1791,16 +1791,16 @@ public class LatinIME extends InputMethodService implements
                     android.widget.LinearLayout.LayoutParams chipLp = new android.widget.LinearLayout.LayoutParams(
                             android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                             android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-                    chipLp.setMargins(dp * 4, 0, dp * 4, 0);
+                    chipLp.setMargins(dp * 3, 0, dp * 3, 0);
                     chipRow.addView(chip, chipLp);
                 }
 
                 // X close button
                 android.widget.TextView closeBtn = new android.widget.TextView(this);
                 closeBtn.setText("\u2715");
-                closeBtn.setTextSize(16);
+                closeBtn.setTextSize(14);
                 closeBtn.setTextColor(0xFF999999);
-                closeBtn.setPadding(dp * 8, dp * 4, dp * 8, dp * 4);
+                closeBtn.setPadding(dp * 6, dp * 2, dp * 6, dp * 2);
                 closeBtn.setClickable(true);
                 closeBtn.setOnClickListener(v -> {
                     currentRizzseSuggestions.clear();
