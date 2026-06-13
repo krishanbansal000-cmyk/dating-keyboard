@@ -1696,14 +1696,18 @@ public class LatinIME extends InputMethodService implements
                 mHandler.postDelayed(() -> showPendingRizzseSuggestions(), 1000);
 
             } else if (hasSuggestions) {
-                android.widget.HorizontalScrollView chipScroll = new android.widget.HorizontalScrollView(this);
-                chipScroll.setHorizontalScrollBarEnabled(false);
-                chipScroll.setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
+                android.widget.LinearLayout chipContainer = new android.widget.LinearLayout(this);
+                chipContainer.setOrientation(android.widget.LinearLayout.VERTICAL);
+                chipContainer.setPadding(dp * 8, dp * 6, dp * 8, dp * 6);
 
-                android.widget.LinearLayout chipRow = new android.widget.LinearLayout(this);
-                chipRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
-                chipRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-                chipRow.setPadding(dp * 8, dp * 6, dp * 8, dp * 6);
+                android.widget.LinearLayout row1 = new android.widget.LinearLayout(this);
+                row1.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+                row1.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+                android.widget.LinearLayout row2 = new android.widget.LinearLayout(this);
+                row2.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+                row2.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                row2.setPadding(0, dp * 6, 0, 0);
 
                 android.widget.TextView appBtn = new android.widget.TextView(this);
                 appBtn.setText("\u26A1");
@@ -1719,9 +1723,10 @@ public class LatinIME extends InputMethodService implements
                         sendBroadcast(appIntent);
                     } catch (Exception ignored) {}
                 });
-                chipRow.addView(appBtn);
+                row1.addView(appBtn);
 
                 int[] chipColors = {0xFF9333EA, 0xFFDB2777, 0xFF7C3AED, 0xFFEC4899, 0xFFA855F7};
+                int mid = Math.min(3, currentRizzseSuggestions.size());
                 for (int i = 0; i < currentRizzseSuggestions.size() && i < 5; i++) {
                     final String suggestionText = currentRizzseSuggestions.get(i);
                     if (suggestionText.isEmpty()) continue;
@@ -1732,8 +1737,9 @@ public class LatinIME extends InputMethodService implements
                     chip.setTextColor(0xFFE9D5FF);
                     chip.setMaxLines(2);
                     chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                    chip.setPadding(dp * 14, dp * 10, dp * 14, dp * 10);
+                    chip.setPadding(dp * 12, dp * 8, dp * 12, dp * 8);
                     chip.setMinHeight(dp * 48);
+                    chip.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
                     android.graphics.drawable.GradientDrawable chipBg = new android.graphics.drawable.GradientDrawable();
                     chipBg.setCornerRadius(dp * 12);
@@ -1752,14 +1758,22 @@ public class LatinIME extends InputMethodService implements
                     });
 
                     android.widget.LinearLayout.LayoutParams chipLp = new android.widget.LinearLayout.LayoutParams(
-                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+                            0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
                     chipLp.setMargins(dp * 4, 0, dp * 4, 0);
-                    chipRow.addView(chip, chipLp);
+                    chip.setLayoutParams(chipLp);
+
+                    if (i < mid) {
+                        row1.addView(chip);
+                    } else {
+                        row2.addView(chip);
+                    }
                 }
 
-                chipScroll.addView(chipRow);
-                rizzsePanel.addView(chipScroll);
+                chipContainer.addView(row1);
+                if (currentRizzseSuggestions.size() > mid) {
+                    chipContainer.addView(row2);
+                }
+                rizzsePanel.addView(chipContainer);
                 rizzseIsShowingSuggestions = true;
             }
 

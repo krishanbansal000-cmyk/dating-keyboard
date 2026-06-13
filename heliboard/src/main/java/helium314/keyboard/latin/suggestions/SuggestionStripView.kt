@@ -173,6 +173,14 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             }
         }
         if (!isGone && !Settings.getValues().mSuggestionStripHiddenPerUserSettings) {
+            pinnedKeys.addView(TextView(context).apply {
+                text = "RizzSe"
+                textSize = 14f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(0xFFFF38F8.toInt())
+                setPadding(dp(8), 0, dp(8), 0)
+                gravity = Gravity.CENTER_VERTICAL
+            })
             pinnedKeys.addView(createRizzseVibeButton())
             pinnedKeys.addView(createRizzseRecordButton())
             pinnedKeys.addView(createRizzseMagicButton())
@@ -271,12 +279,12 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
-                cornerRadius = dp(16).toFloat()
+                cornerRadius = dp(20).toFloat()
                 setColor(0xFF1E0D28.toInt())
-                setStroke(dp(1), 0xFF4A2560.toInt())
+                setStroke(dp(1), 0xFF5D2872.toInt())
             }
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
-                marginEnd = dp(4)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT).apply {
+                marginEnd = dp(6)
                 topMargin = dp(2)
                 bottomMargin = dp(2)
             }
@@ -287,24 +295,24 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         
         val label = TextView(context).apply {
             text = vibeLabel
-            textSize = 11f
+            textSize = 13f
             setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(0xFFC084FC.toInt())
+            setTextColor(0xFFE9D5FF.toInt())
             gravity = Gravity.CENTER
-            setPadding(dp(10), 0, dp(4), 0)
+            setPadding(dp(12), 0, dp(2), 0)
         }
         container.addView(label)
         
         val icon = ImageView(context).apply {
             setImageDrawable(
                 IconicsDrawable(context, GoogleMaterial.Icon.gmd_arrow_drop_down).apply {
-                    colorInt = 0xFF6B3A80.toInt()
-                    sizeDp = 16
+                    colorInt = 0xFF8B5CF6.toInt()
+                    sizeDp = 18
                 }
             )
             scaleType = ImageView.ScaleType.CENTER_INSIDE
-            layoutParams = LinearLayout.LayoutParams(dp(16), dp(16)).apply {
-                marginEnd = dp(6)
+            layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).apply {
+                marginEnd = dp(8)
             }
         }
         container.addView(icon)
@@ -383,13 +391,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = GradientDrawable().apply {
-                cornerRadius = dp(16).toFloat()
-                setColor(0xFF2A1133.toInt())
-                setStroke(dp(1), 0xFF7C3AED.toInt())
+            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFF7C3AED.toInt(), 0xFFDB2777.toInt())).apply {
+                cornerRadius = dp(20).toFloat()
             }
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2f).apply {
-                marginEnd = dp(4)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT).apply {
+                marginEnd = dp(6)
                 topMargin = dp(2)
                 bottomMargin = dp(2)
             }
@@ -400,25 +406,25 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         
         val label = TextView(context).apply {
             text = "Long Shot"
-            textSize = 11f
-            letterSpacing = 0.03f
+            textSize = 13f
+            letterSpacing = 0.02f
             setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(0xFFFFE6F4.toInt())
+            setTextColor(0xFFFFFFFF.toInt())
             gravity = Gravity.CENTER
-            setPadding(dp(12), 0, dp(4), 0)
+            setPadding(dp(14), 0, dp(4), 0)
         }
         container.addView(label)
         
         val icon = ImageView(context).apply {
             setImageDrawable(
                 IconicsDrawable(context, GoogleMaterial.Icon.gmd_camera_alt).apply {
-                    colorInt = 0xFFC084FC.toInt()
-                    sizeDp = 16
+                    colorInt = 0xFFFFFFFF.toInt()
+                    sizeDp = 18
                 }
             )
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).apply {
-                marginEnd = dp(8)
+                marginEnd = dp(10)
             }
         }
         container.addView(icon)
@@ -431,12 +437,12 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
-                cornerRadius = dp(16).toFloat()
+                cornerRadius = dp(20).toFloat()
                 setColor(0xFF2563EB.toInt())
-                setStroke(dp(1), 0xFF3B82F6.toInt())
+                setStroke(dp(1), 0xFF60A5FA.toInt())
             }
-            layoutParams = LinearLayout.LayoutParams(dp(40), LinearLayout.LayoutParams.MATCH_PARENT).apply {
-                marginEnd = dp(2)
+            layoutParams = LinearLayout.LayoutParams(dp(44), LinearLayout.LayoutParams.MATCH_PARENT).apply {
+                marginEnd = dp(4)
                 topMargin = dp(2)
                 bottomMargin = dp(2)
             }
@@ -449,11 +455,11 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
             setImageDrawable(
                 IconicsDrawable(context, GoogleMaterial.Icon.gmd_auto_awesome).apply {
                     colorInt = 0xFFFFFFFF.toInt()
-                    sizeDp = 18
+                    sizeDp = 20
                 }
             )
             scaleType = ImageView.ScaleType.CENTER_INSIDE
-            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
+            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
         }
         container.addView(icon)
         
