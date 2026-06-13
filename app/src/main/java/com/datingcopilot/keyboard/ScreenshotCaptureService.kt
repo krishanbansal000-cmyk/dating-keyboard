@@ -50,7 +50,7 @@ class ScreenshotCaptureService : Service() {
     private var frameCount: Long = 0
     private var captureFinished = false
 
-    private val maxFrames = 8
+    private val maxFrames = 5
     private val captureDurationMs = 15000L
     private val minCaptureDurationMs = 1000L
     private val stableStopMs = 1400L
@@ -334,18 +334,28 @@ class ScreenshotCaptureService : Service() {
 
         // Don't open analysis activity - show results in keyboard suggestion strip
         
+        Log.d(TAG, "TIMING finishCapture at ${System.currentTimeMillis()}, frames=${frames.size}")
+        
         // Stitch and analyze in background
         thread(name = "RizzSeStitch") {
+            val t0 = System.currentTimeMillis()
             try {
                 val stitcher = LongScreenshotStitcher()
                 val stitched = stitcher.stitchFast(frames)
+                val t1 = System.currentTimeMillis()
+                Log.d(TAG, "TIMING Stitch: ${t1 - t0}ms for ${frames.size} frames")
+                
                 frames.forEach { if (!it.isRecycled) it.recycle() }
-                if (stitched == null) { stopSelf(); return@thread }
+                if (stitched == null) {
+                    Log.w(TAG, "TIMING Stitch returned null, total: ${System.currentTimeMillis() - t0}ms")
+                    stopSelf(); return@thread
+                }
                 
                 val file = File(cacheDir, "kb_long_ss_${System.currentTimeMillis()}.jpg")
                 FileOutputStream(file).use { stitched.compress(Bitmap.CompressFormat.JPEG, 80, it) }
+                val t2 = System.currentTimeMillis()
                 stitched.recycle()
-                Log.d(TAG, "Stitched: ${file.absolutePath}")
+                Log.d(TAG, "TIMING Compress+write: ${t2 - t1}ms, file=${file.length()} bytes")
                 
                 prefs.edit()
                     .putString("pending_screenshot_paths", file.absolutePath)
@@ -359,6 +369,7 @@ class ScreenshotCaptureService : Service() {
                     prefs.getString("rizzse_chat_context", "") ?: ""
                 }
 
+                val t3 = System.currentTimeMillis()
                 val response = ApiClient(this@ScreenshotCaptureService).uploadScreenshot(
                     android.net.Uri.fromFile(file),
                     persona,
@@ -366,6 +377,9 @@ class ScreenshotCaptureService : Service() {
                     intentType,
                     platform
                 )
+                val t4 = System.currentTimeMillis()
+                Log.d(TAG, "TIMING API call: ${t4 - t3}ms (includes AI processing on server)")
+                
                 val suggestions = response?.suggestions.orEmpty()
                 if (suggestions.isNotEmpty()) {
                     val suggestionsJson = com.google.gson.Gson().toJson(suggestions)
@@ -373,12 +387,14 @@ class ScreenshotCaptureService : Service() {
                         .putString("pending_keyboard_suggestions", suggestionsJson)
                         .putString("pending_keyboard_context", resolvedContext)
                         .apply()
-                    Log.d(TAG, "Suggestions saved to keyboard: ${suggestions.size}")
+                    Log.d(TAG, "TIMING Total pipeline: ${t4 - t0}ms | Stitch:${t1 - t0}ms | File:${t2 - t1}ms | API+AI:${t4 - t3}ms | Suggestions:${suggestions.size}")
                     // Notify keyboard to show suggestions
                     sendBroadcast(Intent("com.datingcopilot.keyboard.SHOW_IME").apply { setPackage(packageName) })
+                } else {
+                    Log.w(TAG, "TIMING API returned no suggestions, total: ${t4 - t0}ms")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Analysis failed: ${e.message}", e)
+                Log.e(TAG, "TIMING Failed at ${System.currentTimeMillis() - t0}ms: ${e.message}", e)
             }
             stopSelf()
         }
