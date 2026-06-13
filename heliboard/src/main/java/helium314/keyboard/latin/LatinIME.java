@@ -1622,12 +1622,11 @@ public class LatinIME extends InputMethodService implements
             headerRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
             headerRow.setPadding(dp * 14, dp * 10, dp * 14, dp * 6);
 
-            android.widget.TextView appIcon = new android.widget.TextView(this);
-            appIcon.setText("\u26A1");
-            appIcon.setTextSize(18);
-            headerRow.addView(appIcon);
-
             if (isCapturing) {
+                android.widget.TextView appIcon = new android.widget.TextView(this);
+                appIcon.setText("\u26A1");
+                appIcon.setTextSize(18);
+                headerRow.addView(appIcon);
                 long startTime = rizzsePrefs.getLong("capture_start_time", System.currentTimeMillis());
                 long maxDurationSec = 5;
                 android.widget.TextView timerText = new android.widget.TextView(this);
