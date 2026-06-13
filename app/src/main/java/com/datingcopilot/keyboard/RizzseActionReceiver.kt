@@ -23,10 +23,28 @@ class RizzseActionReceiver : BroadcastReceiver() {
             .apply()
 
         if (action == "open_app") {
-            val appIntent = Intent(context, com.datingcopilot.keyboard.chat.ChatActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            val lastScreenshotPath = intent.getStringExtra("last_screenshot_path") ?: ""
+            val lastChatContext = intent.getStringExtra("last_chat_context") ?: ""
+            val lastPersona = intent.getStringExtra("last_persona") ?: "playful"
+            val lastIntent = intent.getStringExtra("last_intent") ?: "keep_going"
+            
+            if (lastScreenshotPath.isNotEmpty() && java.io.File(lastScreenshotPath).exists()) {
+                // Open previous analysis
+                val analysisIntent = Intent(context, com.datingcopilot.keyboard.chat.ScreenshotAnalysisActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    putExtra("image_paths", arrayOf(lastScreenshotPath))
+                    putExtra("chat_context", lastChatContext)
+                    putExtra("persona", lastPersona)
+                    putExtra("intent", lastIntent)
+                    putExtra("platform", "whatsapp")
+                }
+                context.startActivity(analysisIntent)
+            } else {
+                val appIntent = Intent(context, com.datingcopilot.keyboard.chat.ChatActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }
+                context.startActivity(appIntent)
             }
-            context.startActivity(appIntent)
             return
         }
 
