@@ -52,8 +52,10 @@ class LongScreenshotStitcher {
 
         val segments = mutableListOf(StitchSegment(0, Rect(0, 0, width, height), 0))
         val recentShifts = mutableListOf<Int>()
+        val perFrameTimes = mutableListOf<String>()
 
         for (i in 1 until frames.size) {
+            val ft0 = System.nanoTime()
             val prevCols = profiles[i - 1]
             val nextCols = profiles[i]
             val maxShift = (contentHeight * MAX_OVERLAP_RATIO).toInt().coerceAtMost(contentHeight - 1)
@@ -106,6 +108,7 @@ class LongScreenshotStitcher {
 
             val srcTop = (contentHeight - finalShift).coerceIn(0, contentHeight - 1)
             segments.add(StitchSegment(i, Rect(0, srcTop, width, height), finalShift))
+            perFrameTimes.add("f$i:${(System.nanoTime()-ft0)/1e6}ms shift=$finalShift score=${"%.0f".format(bestScore)}")
         }
 
         val totalHeight = segments.sumOf { it.srcRect.height() }
@@ -119,7 +122,9 @@ class LongScreenshotStitcher {
             y += s.srcRect.height()
         }
         val t2 = System.nanoTime()
-        Log.d(TAG, "stitchFast: ${frames.size} f -> ${totalHeight}px | profile:${(t1-t0)/1e6}ms match:${(t2-t1)/1e6}ms total:${(t2-t0)/1e6}ms")
+        val tCanvas = System.nanoTime()
+        Log.d(TAG, "stitchFast: ${frames.size} f -> ${totalHeight}px | profile:${(t1-t0)/1e6}ms match:${(tCanvas-t1)/1e6}ms canvas:${(t2-tCanvas)/1e6}ms total:${(t2-t0)/1e6}ms shifts=${segments.drop(1).map { it.pixelShift }}")
+        for (ft in perFrameTimes) Log.d(TAG, "  $ft")
         return result
     }
 

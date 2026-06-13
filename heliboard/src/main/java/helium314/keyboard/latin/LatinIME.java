@@ -1589,30 +1589,33 @@ public class LatinIME extends InputMethodService implements
 
             rizzsePanel = new android.widget.LinearLayout(this);
             rizzsePanel.setOrientation(android.widget.LinearLayout.VERTICAL);
-            rizzsePanel.setBackgroundColor(0xFFF5F5F5);
+            rizzsePanel.setBackgroundColor(0xFF1A0A24);
+            rizzsePanel.setElevation(dp * 4);
 
             android.widget.LinearLayout headerRow = new android.widget.LinearLayout(this);
             headerRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
             headerRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            headerRow.setPadding(dp * 12, dp * 8, dp * 12, dp * 4);
+            headerRow.setPadding(dp * 14, dp * 10, dp * 14, dp * 6);
 
             android.widget.TextView appIcon = new android.widget.TextView(this);
-            appIcon.setText("⚡");
-            appIcon.setTextSize(16);
+            appIcon.setText("\u26A1");
+            appIcon.setTextSize(18);
             headerRow.addView(appIcon);
 
             if (isCapturing) {
                 long startTime = rizzsePrefs.getLong("capture_start_time", System.currentTimeMillis());
+                long maxDurationSec = 15;
                 android.widget.TextView timerText = new android.widget.TextView(this);
                 timerText.setId(android.view.View.generateViewId());
                 long elapsed = (System.currentTimeMillis() - startTime) / 1000;
-                timerText.setText(String.format("Recording %ds", elapsed));
+                long remaining = maxDurationSec - elapsed;
+                timerText.setText(String.format("  %ds left", Math.max(0, remaining)));
                 timerText.setTextSize(14);
-                timerText.setTextColor(0xFFCC0000);
+                timerText.setTextColor(0xFFFF38F8);
                 timerText.setTypeface(null, android.graphics.Typeface.BOLD);
                 android.widget.LinearLayout.LayoutParams timerLp = new android.widget.LinearLayout.LayoutParams(
                         0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-                timerLp.setMargins(dp * 8, 0, 0, 0);
+                timerLp.setMargins(dp * 4, 0, 0, 0);
                 timerText.setLayoutParams(timerLp);
                 headerRow.addView(timerText);
 
@@ -1626,7 +1629,8 @@ public class LatinIME extends InputMethodService implements
                                 long s = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
                                     .getLong("capture_start_time", System.currentTimeMillis());
                                 long sec = (System.currentTimeMillis() - s) / 1000;
-                                tv.setText(String.format("Recording %ds", sec));
+                                long rem = maxDurationSec - sec;
+                                tv.setText(String.format("  %ds left", Math.max(0, rem)));
                             }
                             if (getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
                                     .getBoolean("capture_active", false)) {
@@ -1639,14 +1643,14 @@ public class LatinIME extends InputMethodService implements
 
                 android.widget.TextView stopBtn = new android.widget.TextView(this);
                 stopBtn.setText("  Stop  ");
-                stopBtn.setTextSize(14);
+                stopBtn.setTextSize(13);
                 stopBtn.setTypeface(null, android.graphics.Typeface.BOLD);
                 stopBtn.setTextColor(0xFFFFFFFF);
-                stopBtn.setPadding(dp * 14, dp * 6, dp * 14, dp * 6);
-                stopBtn.setMinHeight(dp * 36);
+                stopBtn.setPadding(dp * 16, dp * 6, dp * 16, dp * 6);
+                stopBtn.setMinHeight(dp * 34);
                 stopBtn.setGravity(android.view.Gravity.CENTER);
                 android.graphics.drawable.GradientDrawable stopBg = new android.graphics.drawable.GradientDrawable();
-                stopBg.setCornerRadius(dp * 10);
+                stopBg.setCornerRadius(dp * 12);
                 stopBg.setColor(0xFFE53935);
                 stopBtn.setBackground(stopBg);
                 stopBtn.setClickable(true);
@@ -1660,31 +1664,33 @@ public class LatinIME extends InputMethodService implements
                 headerRow.addView(stopBtn);
 
                 android.widget.TextView frameInfo = new android.widget.TextView(this);
-                frameInfo.setText("Frames will be captured automatically");
+                frameInfo.setText("Scroll the chat to capture messages");
                 frameInfo.setTextSize(11);
-                frameInfo.setTextColor(0xFF999999);
+                frameInfo.setTextColor(0xFFB388D9);
                 android.widget.LinearLayout.LayoutParams infoLp = new android.widget.LinearLayout.LayoutParams(
                         android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-                infoLp.setMargins(dp * 12, 0, dp * 12, dp * 6);
+                infoLp.setMargins(dp * 14, 0, dp * 14, dp * 8);
                 rizzsePanel.addView(frameInfo, infoLp);
 
                 mHandler.postDelayed(() -> showPendingRizzseSuggestions(), 2000);
 
             } else if (showAnalyzing && !hasSuggestions) {
                 android.widget.TextView status = new android.widget.TextView(this);
-                status.setText("Analyzing...");
+                status.setText("  Analyzing...");
                 status.setTextSize(14);
-                status.setTextColor(0xFF666666);
+                status.setTextColor(0xFFE9D5FF);
                 status.setTypeface(null, android.graphics.Typeface.BOLD);
                 android.widget.LinearLayout.LayoutParams statusLp = new android.widget.LinearLayout.LayoutParams(
                         0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-                statusLp.setMargins(dp * 8, 0, 0, 0);
+                statusLp.setMargins(dp * 4, 0, 0, 0);
                 headerRow.addView(status, statusLp);
 
                 android.widget.ProgressBar spinner = new android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleSmall);
                 android.widget.LinearLayout.LayoutParams spinnerLp = new android.widget.LinearLayout.LayoutParams(
-                        dp * 24, dp * 24);
+                        dp * 22, dp * 22);
+                spinnerLp.setMarginEnd(dp * 8);
+                spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(0xFFFF38F8));
                 headerRow.addView(spinner, spinnerLp);
 
                 mHandler.postDelayed(() -> showPendingRizzseSuggestions(), 1000);
@@ -1697,13 +1703,13 @@ public class LatinIME extends InputMethodService implements
                 android.widget.LinearLayout chipRow = new android.widget.LinearLayout(this);
                 chipRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
                 chipRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-                chipRow.setPadding(dp * 6, dp * 4, dp * 6, dp * 4);
+                chipRow.setPadding(dp * 8, dp * 6, dp * 8, dp * 6);
 
                 android.widget.TextView appBtn = new android.widget.TextView(this);
-                appBtn.setText("⚡");
-                appBtn.setTextSize(18);
-                appBtn.setTextColor(0xFF6C63FF);
-                appBtn.setPadding(dp * 6, dp * 4, dp * 6, dp * 4);
+                appBtn.setText("\u26A1");
+                appBtn.setTextSize(20);
+                appBtn.setTextColor(0xFFFF38F8);
+                appBtn.setPadding(dp * 8, dp * 4, dp * 8, dp * 4);
                 appBtn.setClickable(true);
                 appBtn.setOnClickListener(v -> {
                     try {
@@ -1715,23 +1721,24 @@ public class LatinIME extends InputMethodService implements
                 });
                 chipRow.addView(appBtn);
 
+                int[] chipColors = {0xFF9333EA, 0xFFDB2777, 0xFF7C3AED, 0xFFEC4899, 0xFFA855F7};
                 for (int i = 0; i < currentRizzseSuggestions.size() && i < 5; i++) {
                     final String suggestionText = currentRizzseSuggestions.get(i);
                     if (suggestionText.isEmpty()) continue;
 
                     android.widget.TextView chip = new android.widget.TextView(this);
                     chip.setText(suggestionText);
-                    chip.setTextSize(15);
-                    chip.setTextColor(0xFF1A1A1A);
+                    chip.setTextSize(14);
+                    chip.setTextColor(0xFFE9D5FF);
                     chip.setMaxLines(2);
                     chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                    chip.setPadding(dp * 12, dp * 8, dp * 12, dp * 8);
+                    chip.setPadding(dp * 14, dp * 10, dp * 14, dp * 10);
                     chip.setMinHeight(dp * 48);
 
                     android.graphics.drawable.GradientDrawable chipBg = new android.graphics.drawable.GradientDrawable();
-                    chipBg.setCornerRadius(dp * 10);
-                    chipBg.setColor(0xFFFFFFFF);
-                    chipBg.setStroke(dp, 0xFFD0D0D0);
+                    chipBg.setCornerRadius(dp * 12);
+                    chipBg.setColor(0xFF2A1535);
+                    chipBg.setStroke(dp, chipColors[i % chipColors.length]);
                     chip.setBackground(chipBg);
                     chip.setClickable(true);
                     chip.setFocusable(true);
@@ -1747,7 +1754,7 @@ public class LatinIME extends InputMethodService implements
                     android.widget.LinearLayout.LayoutParams chipLp = new android.widget.LinearLayout.LayoutParams(
                             android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                             android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-                    chipLp.setMargins(dp * 3, 0, dp * 3, 0);
+                    chipLp.setMargins(dp * 4, 0, dp * 4, 0);
                     chipRow.addView(chip, chipLp);
                 }
 
