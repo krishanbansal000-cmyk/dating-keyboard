@@ -1690,40 +1690,30 @@ public class LatinIME extends InputMethodService implements
                 mHandler.postDelayed(() -> showPendingRizzseSuggestions(), 1000);
 
             } else if (hasSuggestions) {
-                android.widget.TextView label = new android.widget.TextView(this);
-                label.setText("Suggestions");
-                label.setTextSize(13);
-                label.setTextColor(0xFF333333);
-                label.setTypeface(null, android.graphics.Typeface.BOLD);
-                android.widget.LinearLayout.LayoutParams labelLp = new android.widget.LinearLayout.LayoutParams(
-                        0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-                labelLp.setMargins(dp * 8, 0, 0, 0);
-                headerRow.addView(label, labelLp);
-
-                android.widget.TextView closeBtn = new android.widget.TextView(this);
-                closeBtn.setText("✕");
-                closeBtn.setTextSize(16);
-                closeBtn.setTextColor(0xFF999999);
-                closeBtn.setPadding(dp * 8, 0, 0, dp * 4);
-                closeBtn.setClickable(true);
-                closeBtn.setOnClickListener(v -> {
-                    currentRizzseSuggestions.clear();
-                    removeRizzsePanel();
-                });
-                headerRow.addView(closeBtn);
-
                 android.widget.HorizontalScrollView chipScroll = new android.widget.HorizontalScrollView(this);
                 chipScroll.setHorizontalScrollBarEnabled(false);
                 chipScroll.setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
-                android.widget.LinearLayout.LayoutParams scrollLp = new android.widget.LinearLayout.LayoutParams(
-                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-                scrollLp.setMargins(0, dp * 2, 0, dp * 6);
 
                 android.widget.LinearLayout chipRow = new android.widget.LinearLayout(this);
                 chipRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
                 chipRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-                chipRow.setPadding(dp * 8, 0, dp * 8, 0);
+                chipRow.setPadding(dp * 6, dp * 4, dp * 6, dp * 4);
+
+                android.widget.TextView appBtn = new android.widget.TextView(this);
+                appBtn.setText("⚡");
+                appBtn.setTextSize(18);
+                appBtn.setTextColor(0xFF6C63FF);
+                appBtn.setPadding(dp * 6, dp * 4, dp * 6, dp * 4);
+                appBtn.setClickable(true);
+                appBtn.setOnClickListener(v -> {
+                    try {
+                        android.content.Intent appIntent = new android.content.Intent("com.datingcopilot.keyboard.RIZZSE_ACTION");
+                        appIntent.putExtra("action", "open_app");
+                        appIntent.setPackage(getPackageName());
+                        sendBroadcast(appIntent);
+                    } catch (Exception ignored) {}
+                });
+                chipRow.addView(appBtn);
 
                 for (int i = 0; i < currentRizzseSuggestions.size() && i < 5; i++) {
                     final String suggestionText = currentRizzseSuggestions.get(i);
@@ -1731,18 +1721,17 @@ public class LatinIME extends InputMethodService implements
 
                     android.widget.TextView chip = new android.widget.TextView(this);
                     chip.setText(suggestionText);
-                    chip.setTextSize(14);
+                    chip.setTextSize(15);
                     chip.setTextColor(0xFF1A1A1A);
-                    chip.setSingleLine(true);
+                    chip.setMaxLines(2);
                     chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                    chip.setMaxEms(20);
-                    chip.setPadding(dp * 14, dp * 10, dp * 14, dp * 10);
-                    chip.setMinHeight(dp * 44);
+                    chip.setPadding(dp * 12, dp * 8, dp * 12, dp * 8);
+                    chip.setMinHeight(dp * 48);
 
                     android.graphics.drawable.GradientDrawable chipBg = new android.graphics.drawable.GradientDrawable();
-                    chipBg.setCornerRadius(dp * 12);
+                    chipBg.setCornerRadius(dp * 10);
                     chipBg.setColor(0xFFFFFFFF);
-                    chipBg.setStroke(dp, 0xFFE0E0E0);
+                    chipBg.setStroke(dp, 0xFFD0D0D0);
                     chip.setBackground(chipBg);
                     chip.setClickable(true);
                     chip.setFocusable(true);
@@ -1758,16 +1747,18 @@ public class LatinIME extends InputMethodService implements
                     android.widget.LinearLayout.LayoutParams chipLp = new android.widget.LinearLayout.LayoutParams(
                             android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                             android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
-                    chipLp.setMargins(dp * 4, 0, dp * 4, 0);
+                    chipLp.setMargins(dp * 3, 0, dp * 3, 0);
                     chipRow.addView(chip, chipLp);
                 }
 
                 chipScroll.addView(chipRow);
-                rizzsePanel.addView(chipScroll, scrollLp);
+                rizzsePanel.addView(chipScroll);
                 rizzseIsShowingSuggestions = true;
             }
 
-            rizzsePanel.addView(headerRow, 0);
+            if (!hasSuggestions) {
+                rizzsePanel.addView(headerRow, 0);
+            }
 
             android.view.ViewGroup mainFrame = findViewByType(mInputView, android.widget.LinearLayout.class);
             if (mainFrame != null) {
