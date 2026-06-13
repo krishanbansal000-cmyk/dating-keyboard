@@ -29,7 +29,7 @@ class RizzseActionReceiver : BroadcastReceiver() {
             val lastIntent = intent.getStringExtra("last_intent") ?: "keep_going"
             
             if (lastScreenshotPath.isNotEmpty() && java.io.File(lastScreenshotPath).exists()) {
-                // Open previous analysis
+                // Open previous analysis with screenshot
                 val analysisIntent = Intent(context, com.datingcopilot.keyboard.chat.ScreenshotAnalysisActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     putExtra("image_paths", arrayOf(lastScreenshotPath))
@@ -40,6 +40,7 @@ class RizzseActionReceiver : BroadcastReceiver() {
                 }
                 context.startActivity(analysisIntent)
             } else {
+                // Open app main page with keyboard suggestions
                 val appIntent = Intent(context, com.datingcopilot.keyboard.chat.ChatActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 }

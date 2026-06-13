@@ -59,7 +59,7 @@ class ScreenshotCaptureService : Service() {
     private var overlayTimerRunnable: Runnable? = null
 
     private val maxFrames = 8
-    private val captureDurationMs = 15000L
+    private val captureDurationMs = 5000L
     private val minCaptureDurationMs = 5000L
     private val stableStopMs = 1400L
     private val frameIntervalMs = 300L
@@ -435,7 +435,7 @@ class ScreenshotCaptureService : Service() {
             container.addView(dot)
 
             overlayTimerText = TextView(this).apply {
-                text = "  0s / 15s"
+                text = "  0s / 5s"
                 textSize = 13f
                 setTextColor(0xFFFFFFFF.toInt())
                 setTypeface(null, android.graphics.Typeface.BOLD)

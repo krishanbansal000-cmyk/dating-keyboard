@@ -1529,6 +1529,8 @@ public class LatinIME extends InputMethodService implements
     private final java.util.List<String> currentRizzseSuggestions = new java.util.ArrayList<>();
     private boolean rizzseIsShowingSuggestions = false;
     private Runnable rizzseTimerRunnable;
+    private Runnable rizzseDismissRunnable;
+    private static final long RIZZSE_SUGGESTION_SHELF_LIFE_MS = 3 * 60 * 1000; // 3 minutes
 
     private void showPendingRizzseSuggestions() {
         try {
@@ -1540,6 +1542,10 @@ public class LatinIME extends InputMethodService implements
             if (rizzseTimerRunnable != null) {
                 mHandler.removeCallbacks(rizzseTimerRunnable);
                 rizzseTimerRunnable = null;
+            }
+            if (rizzseDismissRunnable != null) {
+                mHandler.removeCallbacks(rizzseDismissRunnable);
+                rizzseDismissRunnable = null;
             }
 
             android.content.SharedPreferences rizzsePrefs = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE);
@@ -1571,6 +1577,14 @@ public class LatinIME extends InputMethodService implements
             }
 
             boolean hasSuggestions = !currentRizzseSuggestions.isEmpty();
+
+            // Check if suggestions have expired (3 minute shelf life)
+            long suggestionsShowTime = rizzsePrefs.getLong("suggestions_show_time", 0);
+            if (hasSuggestions && suggestionsShowTime > 0 && System.currentTimeMillis() - suggestionsShowTime > RIZZSE_SUGGESTION_SHELF_LIFE_MS) {
+                currentRizzseSuggestions.clear();
+                rizzsePrefs.edit().remove("suggestions_show_time").apply();
+                hasSuggestions = false;
+            }
 
             if (rizzseIsShowingSuggestions && hasSuggestions && !isCapturing && !showAnalyzing) {
                 return;
@@ -1604,7 +1618,7 @@ public class LatinIME extends InputMethodService implements
 
             if (isCapturing) {
                 long startTime = rizzsePrefs.getLong("capture_start_time", System.currentTimeMillis());
-                long maxDurationSec = 15;
+                long maxDurationSec = 5;
                 android.widget.TextView timerText = new android.widget.TextView(this);
                 timerText.setId(android.view.View.generateViewId());
                 long elapsed = (System.currentTimeMillis() - startTime) / 1000;
@@ -1770,9 +1784,37 @@ public class LatinIME extends InputMethodService implements
                     chipRow.addView(chip, chipLp);
                 }
 
+                // X close button
+                android.widget.TextView closeBtn = new android.widget.TextView(this);
+                closeBtn.setText("\u2715");
+                closeBtn.setTextSize(16);
+                closeBtn.setTextColor(0xFF999999);
+                closeBtn.setPadding(dp * 8, dp * 4, dp * 8, dp * 4);
+                closeBtn.setClickable(true);
+                closeBtn.setOnClickListener(v -> {
+                    currentRizzseSuggestions.clear();
+                    mHandler.post(() -> removeRizzsePanel());
+                });
+                chipRow.addView(closeBtn);
+
                 chipScroll.addView(chipRow);
                 rizzsePanel.addView(chipScroll);
                 rizzseIsShowingSuggestions = true;
+
+                // Store show time and schedule auto-dismiss after 3 minutes
+                rizzsePrefs.edit().putLong("suggestions_show_time", System.currentTimeMillis()).apply();
+                rizzseDismissRunnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            currentRizzseSuggestions.clear();
+                            removeRizzsePanel();
+                            getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+                                .edit().remove("suggestions_show_time").apply();
+                        } catch (Exception ignored) {}
+                    }
+                };
+                mHandler.postDelayed(rizzseDismissRunnable, RIZZSE_SUGGESTION_SHELF_LIFE_MS);
             }
 
             if (!hasSuggestions) {
@@ -1803,6 +1845,10 @@ public class LatinIME extends InputMethodService implements
     private void removeRizzsePanel() {
         try {
             rizzseIsShowingSuggestions = false;
+            if (rizzseDismissRunnable != null) {
+                mHandler.removeCallbacks(rizzseDismissRunnable);
+                rizzseDismissRunnable = null;
+            }
             if (rizzsePanel != null) {
                 android.view.ViewGroup parent = (android.view.ViewGroup) rizzsePanel.getParent();
                 if (parent != null) parent.removeView(rizzsePanel);
