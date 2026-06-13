@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Rect
 import android.util.Log
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sqrt
 
 class LongScreenshotStitcher {
