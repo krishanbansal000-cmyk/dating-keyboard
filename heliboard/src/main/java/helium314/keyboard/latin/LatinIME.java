@@ -1556,6 +1556,11 @@ public class LatinIME extends InputMethodService implements
             if (isCapturing) {
                 currentRizzseSuggestions.clear();
                 rizzseIsShowingSuggestions = false;
+                // Also wipe any stale prefs from old background thread
+                rizzsePrefs.edit()
+                    .remove("pending_keyboard_suggestions")
+                    .remove("suggestions_show_time")
+                    .apply();
             }
 
             String pendingSuggestions = rizzsePrefs.getString("pending_keyboard_suggestions", null);
@@ -1823,9 +1828,8 @@ public class LatinIME extends InputMethodService implements
                 mHandler.postDelayed(rizzseDismissRunnable, RIZZSE_SUGGESTION_SHELF_LIFE_MS);
             }
 
-            if (!hasSuggestions) {
-                rizzsePanel.addView(headerRow, 0);
-            }
+            // Always add headerRow - it contains timer/stop for recording, or status for analyzing
+            rizzsePanel.addView(headerRow, 0);
 
             android.view.ViewGroup mainFrame = findViewByType(mInputView, android.widget.LinearLayout.class);
             if (mainFrame != null) {

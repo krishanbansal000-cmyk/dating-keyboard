@@ -54,6 +54,7 @@ class ScreenshotCaptureService : Service() {
     private var lastProcessedFrameTime: Long = 0
     private var frameCount: Long = 0
     private var captureFinished = false
+    private var currentSessionId = 0
     private var overlayView: View? = null
     private var overlayTimerText: TextView? = null
     private var overlayTimerRunnable: Runnable? = null
@@ -87,6 +88,8 @@ class ScreenshotCaptureService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "onStartCommand")
+        currentSessionId++
+        val sessionId = currentSessionId
         val prefs = getSharedPreferences("dating_copilot", MODE_PRIVATE)
         prefs.edit()
             .putBoolean("capture_active", true)
@@ -349,6 +352,7 @@ class ScreenshotCaptureService : Service() {
         Log.d(TAG, "TIMING finishCapture at ${System.currentTimeMillis()}, frames=${frames.size}")
         
         // Stitch and analyze in background
+        val thisSessionId = currentSessionId
         thread(name = "RizzSeStitch") {
             val t0 = System.currentTimeMillis()
             try {
@@ -368,6 +372,13 @@ class ScreenshotCaptureService : Service() {
                 val t2 = System.currentTimeMillis()
                 stitched.recycle()
                 Log.d(TAG, "TIMING Compress+write: ${t2 - t1}ms, file=${file.length()} bytes")
+                
+                // If a new recording started while we were stitching, discard this result
+                if (thisSessionId != currentSessionId) {
+                    Log.d(TAG, "TIMING Discarding stale session $thisSessionId (current=$currentSessionId)")
+                    file.delete()
+                    stopSelf(); return@thread
+                }
                 
                 prefs.edit()
                     .putString("pending_screenshot_paths", file.absolutePath)
@@ -391,6 +402,12 @@ class ScreenshotCaptureService : Service() {
                 )
                 val t4 = System.currentTimeMillis()
                 Log.d(TAG, "TIMING API call: ${t4 - t3}ms (includes AI processing on server)")
+                
+                // Double-check session before storing results
+                if (thisSessionId != currentSessionId) {
+                    Log.d(TAG, "TIMING Discarding stale API response session $thisSessionId")
+                    stopSelf(); return@thread
+                }
                 
                 val suggestions = response?.suggestions.orEmpty()
                 if (suggestions.isNotEmpty()) {
