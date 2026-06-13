@@ -29,6 +29,39 @@ class LongScreenshotStitcher {
 
     private val matchColumnFractions = floatArrayOf(0.1f, 0.3f, 0.5f, 0.7f, 0.9f)
 
+    /**
+     * Run a synthetic benchmark to measure stitching speed.
+     * Returns a string with timing results.
+     */
+    fun benchmark(context: android.content.Context): String {
+        val w = 1080
+        val h = 1920
+        val overlap = 600
+        val frames = List(8) { idx ->
+            Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).apply {
+                val canvas = Canvas(this)
+                canvas.drawColor(android.graphics.Color.BLACK)
+                val paint = android.graphics.Paint().apply { color = android.graphics.Color.DKGRAY }
+                // Draw horizontal lines to simulate text
+                for (y in 0 until h step 40) {
+                    paint.color = if ((y / 40 + idx * 100) % 2 == 0) android.graphics.Color.DKGRAY else android.graphics.Color.GRAY
+                    canvas.drawRect(0f, y.toFloat(), w.toFloat(), (y + 20).toFloat(), paint)
+                }
+                // Draw a "chat" offset per frame
+                val chatY = h - overlap + (idx * overlap / 8)
+                paint.color = android.graphics.Color.WHITE
+                canvas.drawRect(100f, chatY.toFloat(), 800f, (chatY + 30).toFloat(), paint)
+            }
+        }
+        val t0 = System.currentTimeMillis()
+        val result = stitchFast(frames)
+        val t1 = System.currentTimeMillis()
+        val r = result?.let { "result=${it.width}x${it.height}" } ?: "null"
+        frames.forEach { it.recycle() }
+        result?.recycle()
+        return "Benchmark: 8 frames ${w}x${h} -> $r | stitch=${t1 - t0}ms"
+    }
+
     fun stitchFast(frames: List<Bitmap>): Bitmap? {
         val t0 = System.nanoTime()
         if (frames.isEmpty()) return null

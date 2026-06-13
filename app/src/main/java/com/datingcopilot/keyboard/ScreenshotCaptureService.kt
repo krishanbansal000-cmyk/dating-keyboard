@@ -60,9 +60,9 @@ class ScreenshotCaptureService : Service() {
 
     private val maxFrames = 8
     private val captureDurationMs = 5000L
-    private val minCaptureDurationMs = 5000L
-    private val stableStopMs = 1400L
-    private val frameIntervalMs = 300L
+    private val minCaptureDurationMs = 1500L
+    private val stableStopMs = 600L
+    private val frameIntervalMs = 200L
     private val pixelCompareCount = 100
     private val differThreshold = 0.08f
 
@@ -362,7 +362,7 @@ class ScreenshotCaptureService : Service() {
                 }
                 
                 val file = File(cacheDir, "kb_long_ss_${System.currentTimeMillis()}.jpg")
-                FileOutputStream(file).use { stitched.compress(Bitmap.CompressFormat.JPEG, 80, it) }
+                FileOutputStream(file).use { stitched.compress(Bitmap.CompressFormat.JPEG, 65, it) }
                 val t2 = System.currentTimeMillis()
                 stitched.recycle()
                 Log.d(TAG, "TIMING Compress+write: ${t2 - t1}ms, file=${file.length()} bytes")
