@@ -252,9 +252,8 @@ class ScreenshotCaptureService : Service() {
                 Log.d(TAG, "Captured frame ${capturedFrames.size}")
             }
 
-            val hasSettled = capturedFrames.isNotEmpty() && capturedFrames.size >= 2 &&
-                elapsed >= minCaptureDurationMs && System.currentTimeMillis() - lastUniqueFrameTime >= stableStopMs
-            if (capturedFrames.size >= maxFrames || elapsed >= captureDurationMs || hasSettled) {
+            // Only stop after full 5 seconds, max frames, or user taps stop
+            if (capturedFrames.size >= maxFrames || elapsed >= captureDurationMs) {
                 imageReader?.setOnImageAvailableListener(null, null)
                 finishCapture(width, height)
             }

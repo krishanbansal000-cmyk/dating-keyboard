@@ -1766,9 +1766,8 @@ public class LatinIME extends InputMethodService implements
                     chip.setTextColor(0xFFE9D5FF);
                     chip.setMaxLines(2);
                     chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                    chip.setPadding(dp * 12, dp * 8, dp * 12, dp * 8);
-                    chip.setMinHeight(dp * 52);
-                    chip.setMinWidth(dp * 170);
+                    chip.setPadding(dp * 14, dp * 10, dp * 14, dp * 10);
+                    chip.setMinHeight(dp * 56);
                     chip.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
                     android.graphics.drawable.GradientDrawable chipBg = new android.graphics.drawable.GradientDrawable();
@@ -1787,9 +1786,9 @@ public class LatinIME extends InputMethodService implements
                         mHandler.post(() -> removeRizzsePanel());
                     });
 
+                    // Fixed width so text wraps to 2 lines
                     android.widget.LinearLayout.LayoutParams chipLp = new android.widget.LinearLayout.LayoutParams(
-                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+                            dp * 200, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
                     chipLp.setMargins(dp * 3, 0, dp * 3, 0);
                     chipRow.addView(chip, chipLp);
                 }
