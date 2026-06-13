@@ -344,9 +344,9 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
     }
 
     private fun runMultiImageAnalysis(imagePaths: List<String>, chatContext: String, persona: String, intentType: String, platform: String) {
+        val uris = imagePaths.map { Uri.fromFile(java.io.File(it)) }
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val uris = imagePaths.map { Uri.fromFile(java.io.File(it)) }
                 val response = apiClient.uploadScreenshots(uris, chatContext, this@ScreenshotAnalysisActivity, persona, intentType, platform)
                 withContext(Dispatchers.Main) {
                     if (response != null && response.suggestions?.isNotEmpty() == true) {
@@ -363,6 +363,9 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
                         showError("Analysis failed")
                     }
                 }
+                if (response != null && response.suggestions?.isNotEmpty() == true) {
+                    fetchInsightsMulti(uris, chatContext, persona, intentType, platform)
+                }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { showError("Error: ${e.message?.take(80)}") }
             } finally {
@@ -378,8 +381,29 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
                 withContext(Dispatchers.Main) {
                     if (response != null) showResults(response) else showError("Analysis failed")
                 }
+                if (response != null) {
+                    fetchInsights(uri, persona, intentType, platform)
+                }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { showError("Error: ${e.message?.take(50)}") }
+            }
+        }
+    }
+
+    private fun fetchInsights(uri: Uri, persona: String, intentType: String, platform: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val insights = apiClient.fetchScreenshotInsights(uri, persona, this@ScreenshotAnalysisActivity, intentType, platform)
+            withContext(Dispatchers.Main) {
+                if (insights != null) showInsights(insights)
+            }
+        }
+    }
+
+    private fun fetchInsightsMulti(uris: List<Uri>, chatContext: String, persona: String, intentType: String, platform: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val insights = apiClient.fetchScreenshotInsightsMulti(uris, chatContext, this@ScreenshotAnalysisActivity, persona, intentType, platform)
+            withContext(Dispatchers.Main) {
+                if (insights != null) showInsights(insights)
             }
         }
     }
@@ -412,8 +436,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             response.conversation?.lastOrNull()?.text ?: "Screenshot analysis",
             response.suggestions.orEmpty()
         )
-
-        response.insights?.let { showInsights(it) }
 
         response.conversation?.forEachIndexed { i, msg ->
             val isYou = msg.sender == "you"
@@ -592,12 +614,29 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
     }
 
     private fun createCard(sug: SuggestionOption, density: Float): LinearLayout {
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        val accentColor = when (sug.persona.lowercase()) {
+            "safe" -> R.color.accent_pink
+            "smooth" -> R.color.accent_violet
+            "bold" -> R.color.accent_magenta
+            else -> R.color.accent_violet
+        }
+        val cardOuter = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { bottomMargin = (12 * density).toInt() }
+        }
+        val leftStrip = View(this).apply {
+            background = GradientDrawable().apply {
+                cornerRadius = 4 * density
+                setColor(resources.getColor(accentColor, null))
+            }
+            layoutParams = LinearLayout.LayoutParams((4 * density).toInt(), LinearLayout.LayoutParams.MATCH_PARENT)
+        }
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             setPadding((16 * density).toInt(), (14 * density).toInt(), (16 * density).toInt(), (14 * density).toInt())
             val bg = GradientDrawable()
             bg.cornerRadius = 16 * density
@@ -619,7 +658,7 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             text = sug.persona.replaceFirstChar { it.uppercase() }
             textSize = 10f
             setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.accent_violet, null))
+            setTextColor(resources.getColor(accentColor, null))
             setPadding((8 * density).toInt(), (2 * density).toInt(), (8 * density).toInt(), (2 * density).toInt())
             val bg = GradientDrawable()
             bg.cornerRadius = 6 * density
@@ -654,7 +693,7 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
 
         card.addView(TextView(this).apply {
             text = sug.text
-            textSize = 14f
+            textSize = 15f
             setTextColor(resources.getColor(R.color.text_primary, null))
             setLineSpacing(3f, 1.0f)
             layoutParams = LinearLayout.LayoutParams(
@@ -663,7 +702,9 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             )
         })
 
-        return card
+        cardOuter.addView(leftStrip)
+        cardOuter.addView(card)
+        return cardOuter
     }
 
     private fun showError(msg: String) {

@@ -846,21 +846,9 @@ def analyze_screenshot():
             time.monotonic() - started_at
         )
 
-        if base64_image:
-            insights, insights_error = generate_conversation_insights(
-                encoded_images=[base64_image],
-                persona=persona,
-                intent=intent,
-                platform=platform,
-                hinglish=hinglish
-            )
-            if insights_error:
-                app.logger.warning("screenshot insights failed: %s", insights_error)
-        
         return jsonify({
             "conversation": conversation,
             "suggestions": suggestions,
-            "insights": insights,
             "detected_app": "Dating App",
             "persona": persona,
             "source": source
@@ -1019,6 +1007,43 @@ def analyze_screenshots():
             "analyze-screenshots ok: model=%s source=%s suggestions=%d images=%d duration=%.2fs",
             OPENAI_MODEL, source, len(suggestions), len(image_files), time.monotonic() - started_at
         )
+        return jsonify({
+            "suggestions": suggestions,
+            "persona": persona,
+            "source": source
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/v1/screenshot-insights", methods=["POST"])
+def screenshot_insights():
+    """Separate insights endpoint to run in parallel with analyze-screenshot."""
+    started_at = time.monotonic()
+    try:
+        persona = request.form.get("persona", "playful")
+        intent = request.form.get("intent", "keep_going")
+        platform = request.form.get("platform", "whatsapp")
+        hinglish = truthy(request.form.get("hinglish", "false"))
+        chat_context = request.form.get("chat_context", "")
+
+        encoded_images = []
+        image_files = request.files.getlist("images")
+        if not image_files or all(f.filename == "" for f in image_files):
+            if "image" in request.files:
+                image_files = [request.files["image"]]
+
+        for img_file in image_files:
+            if img_file.filename == "":
+                continue
+            img_file.seek(0)
+            encoded_images.append(encode_chat_screenshot(img_file))
+
+        if not encoded_images:
+            return jsonify({"insights": {}})
+
         insights, insights_error = generate_conversation_insights(
             chat_context=chat_context,
             encoded_images=encoded_images,
@@ -1028,13 +1053,11 @@ def analyze_screenshots():
             hinglish=hinglish
         )
         if insights_error:
-            app.logger.warning("analyze-screenshots insights failed: %s", insights_error)
-        return jsonify({
-            "suggestions": suggestions,
-            "insights": insights,
-            "persona": persona,
-            "source": source
-        })
+            app.logger.warning("screenshot-insights failed: %s duration=%.2fs", insights_error, time.monotonic() - started_at)
+            return jsonify({"insights": {}})
+
+        app.logger.info("screenshot-insights ok: duration=%.2fs", time.monotonic() - started_at)
+        return jsonify({"insights": insights})
 
     except Exception as e:
         traceback.print_exc()
