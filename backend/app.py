@@ -25,6 +25,9 @@ CORS(app, supports_credentials=True)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 API_ENDPOINT = os.getenv("OPENAI_BASE_URL", "https://opencode.ai/zen/go/v1")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "mimo-v2.5")
+AI_PROVIDER = os.getenv("AI_PROVIDER", "opencode").lower()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY", ""))
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 USE_MOCK = os.getenv("USE_MOCK", "false").lower() in {"1", "true", "yes", "on"}
 AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "12"))
 AI_MAX_WORKERS = int(os.getenv("AI_MAX_WORKERS", "16"))
@@ -54,14 +57,16 @@ if OPENAI_API_KEY:
             client_kwargs["base_url"] = API_ENDPOINT
         openai_client = OpenAI(**client_kwargs)
 
+if AI_PROVIDER == "gemini":
+    OPENAI_MODEL = GEMINI_MODEL
+
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB max
 
 SYSTEM_PROMPT = (
-    "Output exactly 3 dating replies under 100 chars: >>> Safe:, >>> Smooth:, >>> Bold:. "
-    "No extras. Be respectful, context-aware, and never insult, neg, pressure, or dismiss them. "
-    "Emojis are allowed sparingly only when they fit the user's tone/context."
+    "Return exactly 3 lines: >>> Safe:, >>> Smooth:, >>> Bold:. Under 100 chars each. No extra text. "
+    "Be respectful, context-aware, and never insult, neg, pressure, or dismiss them."
 )
 
 PERSONA_PROMPTS = {
@@ -93,10 +98,8 @@ PLATFORM_PROMPTS = {
 }
 
 STYLE_RULES = (
-    "Indian Gen-Z style. Reply to latest message. Safe=low-risk, Smooth=witty/flirty, "
-    "Bold=high-risk rizz. Emojis may be used if natural, but never force them. "
-    "Always stay respectful and match their energy. Avoid insults, negging, pressure, vulgarity, "
-    "uncle jokes, fake deep lines, chemistry jokes, generic templates."
+    "Indian Gen-Z style. Reply to the latest message. Safe=low-risk, Smooth=witty/flirty, Bold=high-risk rizz. "
+    "Stay respectful, match their energy, and avoid insults, negging, pressure, vulgarity, and generic templates."
 )
 
 OPENER_PROMPTS = {
@@ -190,6 +193,22 @@ def encode_image(image_file, max_side=1200, quality=72):
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
 
+def encode_chat_screenshot(image_file, max_width=1100, quality=74):
+    """Encode chat screenshots without shrinking tall captures into unreadable thumbnails."""
+    image = Image.open(image_file)
+    if image.mode in ('RGBA', 'LA', 'P'):
+        image = image.convert('RGB')
+    if image.width > max_width:
+        scale = max_width / image.width
+        image = image.resize(
+            (max(1, int(image.width * scale)), max(1, int(image.height * scale))),
+            Image.Resampling.LANCZOS
+        )
+    buffered = io.BytesIO()
+    image.save(buffered, format="JPEG", quality=quality, optimize=True)
+    return base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+
 def image_debug_info(image_file):
     pos = image_file.tell()
     image_file.seek(0)
@@ -224,11 +243,72 @@ BAD_ENDINGS = {
 
 
 def get_response_text(response):
+    if isinstance(response, dict):
+        return (response.get("text") or "").strip()
     if hasattr(response, 'choices'):
         return (response.choices[0].message.content or "").strip()
     if getattr(response, "content", None):
         return (getattr(response.content[0], "text", "") or "").strip()
     return ""
+
+
+def gemini_parts_from_content(content):
+    if isinstance(content, str):
+        return [{"text": content}]
+
+    parts = []
+    for item in content:
+        item_type = item.get("type") if isinstance(item, dict) else None
+        if item_type == "text":
+            parts.append({"text": item.get("text", "")})
+        elif item_type == "image_url":
+            url = item.get("image_url", {}).get("url", "")
+            if "," in url:
+                parts.append({
+                    "inline_data": {
+                        "mime_type": "image/jpeg",
+                        "data": url.split(",", 1)[1]
+                    }
+                })
+        elif item_type == "image":
+            source = item.get("source", {})
+            data = source.get("data", "")
+            if data:
+                parts.append({
+                    "inline_data": {
+                        "mime_type": source.get("media_type", "image/jpeg"),
+                        "data": data
+                    }
+                })
+    return parts
+
+
+def call_gemini(messages, system_prompt=SYSTEM_PROMPT, max_tokens=120, temperature=0.25):
+    if not GEMINI_API_KEY:
+        raise RuntimeError("No Gemini API key configured. Check GEMINI_API_KEY in .env")
+
+    contents = []
+    for message in messages:
+        role = "model" if message.get("role") == "assistant" else "user"
+        contents.append({"role": role, "parts": gemini_parts_from_content(message.get("content", ""))})
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+    payload = {
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": contents,
+        "generationConfig": {
+            "temperature": temperature,
+            "maxOutputTokens": max_tokens,
+            "candidateCount": 1
+        }
+    }
+    response = http_requests.post(url, params={"key": GEMINI_API_KEY}, json=payload, timeout=45)
+    if not response.ok:
+        raise RuntimeError(f"Gemini failed: HTTP {response.status_code} - {response.text[:500]}")
+    data = response.json()
+    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+    text = "".join(part.get("text", "") for part in parts).strip()
+    return {"text": text}
 
 
 def parse_suggestions(text, persona, key="persona", min_confidence=78, max_confidence=98):
@@ -374,6 +454,14 @@ def truthy(value):
     return str(value).lower() in {"1", "true", "yes", "on"}
 
 
+def client_ready():
+    if USE_MOCK:
+        return False
+    if AI_PROVIDER == "gemini":
+        return GEMINI_API_KEY != ""
+    return openai_client is not None or anthropic_client is not None
+
+
 def extract_json_object(text):
     if not text:
         return None
@@ -419,9 +507,11 @@ def sanitize_insights(parsed):
     }
 
 
-def call_ai_for_task(messages, system_prompt, model=None, max_tokens=420, temperature=0.4, timeout_seconds=30):
+def call_ai_for_task(messages, system_prompt, model=None, max_tokens=280, temperature=0.35, timeout_seconds=30):
     model_name = model or OPENAI_MODEL
     def invoke():
+        if AI_PROVIDER == "gemini":
+            return call_gemini(messages, system_prompt=system_prompt, max_tokens=max_tokens, temperature=temperature)
         if model_name in ANTHROPIC_MODELS and anthropic_client is not None:
             return anthropic_client.messages.create(
                 model=model_name,
@@ -450,7 +540,7 @@ def call_ai_for_task(messages, system_prompt, model=None, max_tokens=420, temper
 
 def generate_conversation_insights(chat_context="", encoded_images=None, persona="playful", intent="keep_going", platform="whatsapp", hinglish=False):
     encoded_images = encoded_images or []
-    if USE_MOCK or (openai_client is None and anthropic_client is None):
+    if not client_ready():
         return {}, "No AI client"
 
     context_prompt = build_context_prompt(persona, intent, platform, hinglish)
@@ -493,9 +583,12 @@ Chat text context:
     return sanitize_insights(parsed), None
 
 
-def call_ai(messages, model=None, max_tokens=90, temperature=0.65):
+def call_ai(messages, model=None, max_tokens=90, temperature=0.5):
     """Call AI model. Raises on failure — no mock fallback."""
     model_name = model or OPENAI_MODEL
+
+    if AI_PROVIDER == "gemini":
+        return call_gemini(messages, system_prompt=SYSTEM_PROMPT, max_tokens=max_tokens, temperature=temperature)
     
     # Inject system prompt to enforce format
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
@@ -549,6 +642,13 @@ def call_ai_stream(messages, **kwargs):
     temperature = kwargs.get("temperature", 0.65)
     
     full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
+
+    if AI_PROVIDER == "gemini":
+        response = call_gemini(messages, system_prompt=SYSTEM_PROMPT, max_tokens=max_tokens, temperature=temperature)
+        text = get_response_text(response)
+        if text:
+            yield text
+        return
     
     if model_name in ANTHROPIC_MODELS and anthropic_client is not None:
         with anthropic_client.messages.stream(
@@ -577,8 +677,9 @@ def health():
         "service": "RizzSe AI Backend",
         "mode": "mock" if USE_MOCK else "ai",
         "model": OPENAI_MODEL,
+        "provider": AI_PROVIDER,
         "mock_enabled": USE_MOCK,
-        "client_ready": openai_client is not None or anthropic_client is not None
+        "client_ready": client_ready()
     })
 
 
@@ -628,17 +729,17 @@ def analyze_screenshot():
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             image_file.save(filepath)
             
-            have_client = not USE_MOCK and (openai_client is not None or anthropic_client is not None)
+            have_client = client_ready()
             if have_client:
                 image_file.seek(0)
                 image_info = image_debug_info(image_file)
                 image_file.seek(0)
-                base64_image = encode_image(image_file)
+                base64_image = encode_chat_screenshot(image_file)
                 
                 is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
                 context_prompt = build_context_prompt(persona, intent, platform, hinglish)
                 
-                vision_prompt = f"""Read this chat screenshot. Reply to the latest incoming message. Keep each reply under 100 chars. Return only these 3 lines, no explanation. {context_prompt}
+                vision_prompt = f"""This is one chat screenshot, often a long stitched capture. Read the full visible chat from top to bottom. Reply only to the newest incoming message from them, usually near the bottom. Output exactly these 3 lines and nothing else. Keep each under 100 chars. {context_prompt}
 
 >>> Safe:
 >>> Smooth:
@@ -662,7 +763,7 @@ def analyze_screenshot():
                 response, first_error = call_ai_with_error(
                     messages,
                     model=OPENAI_MODEL,
-                    max_tokens=220,
+                    max_tokens=120,
                     temperature=0.55,
                     timeout_seconds=30
                 )
@@ -678,7 +779,7 @@ def analyze_screenshot():
                         failure_reason = f"First vision response had {len(suggestions)} parseable suggestions"
                         suggestions = None
 
-                if not suggestions:
+                if not suggestions and AI_PROVIDER != "gemini":
                     app.logger.warning(
                         "screenshot parse failed: image=%s response_len=%d response=%r",
                         image_info,
@@ -700,7 +801,7 @@ def analyze_screenshot():
                     retry_response, retry_error = call_ai_with_error(
                         retry_messages,
                         model=OPENAI_MODEL,
-                        max_tokens=420,
+                        max_tokens=220,
                         temperature=0.45,
                         timeout_seconds=30
                     )
@@ -785,7 +886,7 @@ def analyze_screenshots():
         if not image_files or all(f.filename == "" for f in image_files):
             return jsonify({"error": "No images provided"}), 400
 
-        have_client = not USE_MOCK and (openai_client is not None or anthropic_client is not None)
+        have_client = client_ready()
         suggestions = None
         insights = {}
         source = "none"
@@ -801,7 +902,7 @@ def analyze_screenshots():
                 image_info = image_debug_info(img_file)
                 img_file.seek(0)
                 app.logger.info("analyze-screenshots: processing image %s (%s)", img_file.filename, image_info)
-                encoded_images.append(encode_image(img_file))
+                encoded_images.append(encode_chat_screenshot(img_file))
 
             if not encoded_images:
                 return jsonify({"error": "No valid images"}), 400
@@ -818,7 +919,7 @@ def analyze_screenshots():
                     context_hint = f"\n\nAdditional text context from chat:\n{ctx_text[:600]}"
 
             if len(encoded_images) == 1:
-                vision_prompt = f"""Read this chat screenshot carefully. Reply to the latest incoming message. Keep each reply under 100 chars. {context_prompt}{context_hint}
+                vision_prompt = f"""This is one chat screenshot, often a long stitched capture. Read the full visible chat from top to bottom. Reply only to the newest incoming message from them, usually near the bottom. Output exactly these 3 lines and nothing else. Keep each under 100 chars. {context_prompt}{context_hint}
 
 >>> Safe:
 >>> Smooth:
@@ -855,7 +956,7 @@ def analyze_screenshots():
             response, first_error = call_ai_with_error(
                 messages,
                 model=OPENAI_MODEL,
-                max_tokens=280,
+                max_tokens=160,
                 temperature=0.55,
                 timeout_seconds=45
             )
@@ -871,7 +972,7 @@ def analyze_screenshots():
                     failure_reason = f"Got {len(suggestions) if suggestions else 0} suggestions, need 3"
                     suggestions = None
 
-            if not suggestions and encoded_images:
+            if not suggestions and encoded_images and AI_PROVIDER != "gemini":
                 app.logger.warning("analyze-screenshots retry: model=%s images=%d reason=%s", OPENAI_MODEL, len(encoded_images), failure_reason)
                 retry_prompt = f"""Read this chat screenshot carefully. If it contains a chat, write exactly 3 respectful replies to the latest incoming message. You MUST include Safe, Smooth, and Bold. Return exactly this format and nothing else. {context_prompt}{context_hint}
 
@@ -888,7 +989,7 @@ def analyze_screenshots():
                 retry_response, retry_error = call_ai_with_error(
                     retry_messages,
                     model=OPENAI_MODEL,
-                    max_tokens=420,
+                    max_tokens=220,
                     temperature=0.45,
                     timeout_seconds=30
                 )
@@ -1010,7 +1111,7 @@ def chat_draft():
                 )
             })
 
-        have_client = not USE_MOCK and (openai_client is not None or anthropic_client is not None)
+        have_client = client_ready()
         if have_client:
             context_prompt = build_context_prompt(persona, intent, platform, hinglish)
             convo_text = "\n".join([
@@ -1035,7 +1136,7 @@ def chat_draft():
             
             response = call_ai_fast(
                 [{"role": "user", "content": f"{input_hint}\n\n{context_prompt} Write 3 short replies as Safe, Smooth, Bold (under 100 chars each).\n\n>>> Safe:\n>>> Smooth:\n>>> Bold:"}],
-                max_tokens=80, temperature=0.55
+                max_tokens=100, temperature=0.45
             )
             
             if response:
@@ -1083,7 +1184,7 @@ def chat_draft_stream():
             options = fallback_suggestions(persona, intent, key="tone", hinglish=hinglish, latest_text=latest_text)
             return jsonify({"options": options})
 
-        have_client = not USE_MOCK and (openai_client is not None or anthropic_client is not None)
+        have_client = client_ready()
         
         def generate():
             if have_client:
@@ -1112,7 +1213,7 @@ def chat_draft_stream():
                 try:
                     for chunk in call_ai_stream(
                         [{"role": "user", "content": f"{input_hint}\n\n{context_prompt} Write 3 short replies as Safe, Smooth, Bold (under 100 chars each).\n\n>>> Safe:\n>>> Smooth:\n>>> Bold:"}],
-                        max_tokens=90, temperature=0.65
+                        max_tokens=100, temperature=0.5
                     ):
                         full_text += chunk
                         # Send partial text as SSE
