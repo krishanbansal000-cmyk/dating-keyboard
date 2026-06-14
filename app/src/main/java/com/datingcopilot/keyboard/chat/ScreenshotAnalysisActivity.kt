@@ -1,16 +1,14 @@
 package com.datingcopilot.keyboard.chat
 
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
-import android.view.animation.AccelerateDecelerateInterpolator
-import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -35,7 +33,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
     private lateinit var insightsSection: LinearLayout
     private lateinit var convoSection: LinearLayout
     private lateinit var suggSection: LinearLayout
-    private val loadingAnimators = mutableListOf<ValueAnimator>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,49 +54,33 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(resources.getColor(R.color.bg_dark, null))
-            setPadding(dp(18), dp(44), dp(18), dp(32))
+            setPadding(dp(18), statusBarHeight() + dp(12), dp(18), dp(32))
         }
 
+        // Top bar
         val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(18) }
+            ).apply { bottomMargin = dp(12) }
         }
 
-        val backBtn = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(10), dp(8), dp(14), dp(8))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(18).toFloat()
-                setColor(resources.getColor(R.color.bg_surface, null))
-                setStroke(dp(1), resources.getColor(R.color.glass_border_light, null))
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { finish() }
-        }
-        backBtn.addView(TextView(this).apply {
+        val backBtn = TextView(this).apply {
             text = "‹"
-            textSize = 24f
+            textSize = 28f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(resources.getColor(R.color.white, null))
             gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(dp(18), LinearLayout.LayoutParams.WRAP_CONTENT)
-        })
-        backBtn.addView(TextView(this).apply {
-            text = "Back"
-            textSize = 13f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.text_secondary, null))
-        })
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(14).toFloat()
+                setColor(resources.getColor(R.color.bg_surface, null))
+            }
+            isClickable = true
+            setOnClickListener { finish() }
+        }
         topBar.addView(backBtn)
 
         topBar.addView(View(this).apply {
@@ -108,111 +89,125 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
 
         val title = TextView(this).apply {
             text = "RizzSe"
-            textSize = 18f
+            textSize = 20f
             setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.text_primary, null))
+            setTextColor(0xFFFF38F8.toInt())
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { gravity = Gravity.CENTER }
         }
         topBar.addView(title)
         root.addView(topBar)
 
-        // Screenshot strip (horizontal scroll if multiple)
+        // Screenshot preview
         if (imagePaths.isNotEmpty()) {
-            val stripLabel = TextView(this).apply {
+            val previewCard = FrameLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(360)
+                ).apply { bottomMargin = dp(16) }
+                val bg = GradientDrawable()
+                bg.cornerRadius = dp(20).toFloat()
+                bg.setColor(resources.getColor(R.color.bg_surface, null))
+                bg.setStroke(dp(1), resources.getColor(R.color.glass_border, null))
+                background = bg
+                clipChildren = true
+            }
+            
+            val imgView = ImageView(this).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                setImageURI(Uri.fromFile(java.io.File(imagePaths[0])))
+            }
+            previewCard.addView(imgView)
+            
+            // Gradient overlay at bottom
+            previewCard.addView(View(this).apply {
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(0x00000000, 0x80000000.toInt())
+                )
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    dp(80),
+                    Gravity.BOTTOM
+                )
+            })
+            
+            // Label overlay
+            previewCard.addView(TextView(this).apply {
                 text = if (imagePaths.size == 1) "Long screenshot captured" else "${imagePaths.size} screenshots captured"
-                textSize = 12f
-                setTextColor(resources.getColor(R.color.text_muted, null))
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = dp(8) }
+                textSize = 13f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(0xFFFFFFFF.toInt())
+                setPadding(dp(16), dp(0), dp(16), dp(16))
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.BOTTOM or Gravity.START
+                )
+            })
+            
+            // Tap to expand indicator
+            previewCard.addView(TextView(this).apply {
+                text = "Tap to view full image"
+                textSize = 11f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(0xFFFF38F8.toInt())
+                setPadding(dp(14), dp(4), dp(14), dp(4))
+                setBackgroundColor(0x66000000.toInt())
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.TOP or Gravity.END
+                ).apply { topMargin = dp(12); rightMargin = dp(12) }
+            })
+            
+            // Make entire card clickable - show full-screen preview in-app.
+            previewCard.isClickable = true
+            previewCard.isFocusable = true
+            previewCard.setOnClickListener {
+                showFullScreenPreview(Uri.fromFile(java.io.File(imagePaths[0])))
             }
-            root.addView(stripLabel)
-
-            val strip = android.widget.HorizontalScrollView(this).apply {
-                isHorizontalScrollBarEnabled = false
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = dp(12) }
-            }
-            val stripInner = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-            }
-            for (path in imagePaths) {
-                val frame = FrameLayout(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        dp(140),
-                        dp(260)
-                    ).apply { marginEnd = dp(8) }
-                    val bg = GradientDrawable()
-                    bg.cornerRadius = dp(8).toFloat()
-                    bg.setColor(resources.getColor(R.color.bg_surface, null))
-                    bg.setStroke(dp(1), resources.getColor(R.color.glass_border, null))
-                    background = bg
-                    clipChildren = true
-                    clipToPadding = true
-                }
-                val imgView = ImageView(this).apply {
-                    scaleType = ImageView.ScaleType.FIT_CENTER
-                    layoutParams = FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT
-                    )
-                    setImageURI(Uri.fromFile(java.io.File(path)))
-                }
-                val scanBar = View(this).apply {
-                    background = GradientDrawable().apply {
-                        cornerRadius = dp(12).toFloat()
-                        setColor(resources.getColor(R.color.accent_pink, null))
-                    }
-                    alpha = 0.82f
-                    layoutParams = FrameLayout.LayoutParams(dp(126), dp(14), Gravity.TOP or Gravity.CENTER_HORIZONTAL)
-                }
-                frame.addView(imgView)
-                frame.addView(View(this).apply {
-                    background = GradientDrawable().apply {
-                        setColor(0x22000000)
-                    }
-                    layoutParams = FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT
-                    )
-                })
-                frame.addView(scanBar)
-                stripInner.addView(frame)
-                frame.post {
-                    val travel = (frame.height - dp(30)).coerceAtLeast(dp(110))
-                    loadingAnimators += ObjectAnimator.ofFloat(scanBar, View.TRANSLATION_Y, 0f, travel.toFloat()).apply {
-                        duration = 1700
-                        repeatCount = ValueAnimator.INFINITE
-                        repeatMode = ValueAnimator.REVERSE
-                        interpolator = LinearInterpolator()
-                        start()
-                    }
-                }
-            }
-            strip.addView(stripInner)
-            root.addView(strip)
+            
+            root.addView(previewCard)
         } else if (imageUri != null) {
-            val imageView = ImageView(this).apply {
-                scaleType = ImageView.ScaleType.FIT_CENTER
+            val previewCard = FrameLayout(this).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(292)
-                ).apply { bottomMargin = dp(18) }
+                    dp(360)
+                ).apply { bottomMargin = dp(16) }
+                val bg = GradientDrawable()
+                bg.cornerRadius = dp(20).toFloat()
+                bg.setColor(resources.getColor(R.color.bg_surface, null))
+                background = bg
+                clipChildren = true
+            }
+            val imgView = ImageView(this).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
                 setImageURI(imageUri)
             }
-            root.addView(imageView)
+            previewCard.addView(imgView)
+            previewCard.isClickable = true
+            previewCard.isFocusable = true
+            previewCard.setOnClickListener { showFullScreenPreview(imageUri) }
+            root.addView(previewCard)
         }
 
         // Loading panel
-        val loadView = FrameLayout(this).apply {
+        val loadView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (180 * resources.displayMetrics.density).toInt()
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            setPadding(dp(18), dp(20), dp(18), dp(20))
+            setPadding(dp(24), dp(32), dp(24), dp(32))
             background = GradientDrawable().apply {
                 cornerRadius = dp(24).toFloat()
                 setColor(resources.getColor(R.color.bg_card, null))
@@ -221,98 +216,37 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         }
         loadingState = loadView
 
-        val glow = View(this).apply {
-            alpha = 0.32f
-            background = GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(
-                    resources.getColor(R.color.accent_violet, null),
-                    resources.getColor(R.color.accent_magenta, null),
-                    resources.getColor(R.color.accent_pink, null)
-                )
-            ).apply { shape = GradientDrawable.OVAL }
-            layoutParams = FrameLayout.LayoutParams(dp(92), dp(92), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply {
-                topMargin = dp(8)
-            }
+        // Animated ring - use arc drawable for visible rotation
+        val ringContainer = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(64), dp(64)).apply { bottomMargin = dp(16) }
         }
-        loadView.addView(glow)
+        loadView.addView(ringContainer)
 
-        val orbit = FrameLayout(this).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(96), dp(96), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply {
-                topMargin = dp(4)
-            }
+        val ring = android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleLarge).apply {
+            isIndeterminate = true
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(resources.getColor(R.color.accent_violet, null))
+            layoutParams = FrameLayout.LayoutParams(dp(64), dp(64))
         }
-        loadView.addView(orbit)
+        ringContainer.addView(ring)
 
-        val dotColors = intArrayOf(
-            resources.getColor(R.color.accent_violet, null),
-            resources.getColor(R.color.accent_magenta, null),
-            resources.getColor(R.color.accent_pink, null)
-        )
-        repeat(3) { i ->
-            val dot = View(this).apply {
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(dotColors[i])
-                }
-                layoutParams = FrameLayout.LayoutParams(dp(18), dp(18), Gravity.CENTER)
-            }
-            orbit.addView(dot)
-            val angle = Math.toRadians((i * 120).toDouble())
-            dot.translationX = (Math.cos(angle) * dp(30)).toFloat()
-            dot.translationY = (Math.sin(angle) * dp(30)).toFloat()
-        }
-
-        val copy = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            )
-        }
-        loadView.addView(copy)
-
-        copy.addView(TextView(this).apply {
+        loadView.addView(TextView(this).apply {
             text = "RizzSe is thinking"
-            textSize = 16f
+            textSize = 18f
             setTypeface(null, android.graphics.Typeface.BOLD)
             setTextColor(resources.getColor(R.color.text_primary, null))
         })
 
         val imageCount = imagePaths.size
-        copy.addView(TextView(this).apply {
+        loadView.addView(TextView(this).apply {
             text = if (imageCount > 1) "Reading $imageCount screenshots..." else "Reading the screenshot and crafting replies"
-            textSize = 12f
+            textSize = 13f
             setTextColor(resources.getColor(R.color.text_muted, null))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(4) }
+            ).apply { topMargin = dp(8) }
         })
 
-        val shimmerTrack = FrameLayout(this).apply {
-            background = GradientDrawable().apply {
-                cornerRadius = dp(3).toFloat()
-                setColor(resources.getColor(R.color.shimmer, null))
-            }
-            layoutParams = LinearLayout.LayoutParams(dp(150), dp(5)).apply { topMargin = dp(14) }
-        }
-        val shimmerSweep = View(this).apply {
-            background = GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(
-                    resources.getColor(R.color.accent_violet, null),
-                    resources.getColor(R.color.accent_magenta, null)
-                )
-            ).apply { cornerRadius = dp(3).toFloat() }
-            layoutParams = FrameLayout.LayoutParams(dp(54), dp(5))
-        }
-        shimmerTrack.addView(shimmerSweep)
-        copy.addView(shimmerTrack)
-
-        startGeminiStyleLoading(glow, orbit, shimmerSweep)
         root.addView(loadView)
 
         convoSection = LinearLayout(this).apply {
@@ -347,17 +281,15 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
         val uris = imagePaths.map { Uri.fromFile(java.io.File(it)) }
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val response = apiClient.uploadScreenshots(uris, chatContext, this@ScreenshotAnalysisActivity, persona, intentType, platform)
+                val response = if (uris.size == 1) {
+                    apiClient.uploadScreenshot(uris.first(), persona, this@ScreenshotAnalysisActivity, intentType, platform)
+                } else {
+                    apiClient.uploadScreenshots(uris, chatContext, this@ScreenshotAnalysisActivity, persona, intentType, platform)
+                }
                 withContext(Dispatchers.Main) {
                     if (response != null && response.suggestions?.isNotEmpty() == true) {
                         val suggestions = response.suggestions.orEmpty()
                         showResults(response)
-                        AppHistoryStore.add(
-                            this@ScreenshotAnalysisActivity,
-                            "Screenshots",
-                            chatContext.ifBlank { "Multi-screenshot analysis" },
-                            suggestions
-                        )
                         saveToKeyboardSuggestions(suggestions)
                     } else {
                         showError("Analysis failed")
@@ -369,7 +301,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { showError("Error: ${e.message?.take(80)}") }
             } finally {
-                imagePaths.forEach { java.io.File(it).delete() }
             }
         }
     }
@@ -416,7 +347,7 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
             .commit()
 
         val handoff = Intent("com.datingcopilot.keyboard.RIZZSE_SUGGESTIONS").apply {
-            setPackage("helium314.keyboard.debug")
+            setPackage(packageName)
             putExtra("pending_keyboard_suggestions", json)
             putExtra("pending_keyboard_context", getSharedPreferences("dating_copilot", Context.MODE_PRIVATE).getString("pending_chat_context", "") ?: "")
         }
@@ -425,7 +356,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
 
     private fun showResults(response: AnalyzeResponse) {
         val density = resources.displayMetrics.density
-        stopLoadingAnimations()
         loadingState.visibility = View.GONE
         convoSection.removeAllViews()
         insightsSection.removeAllViews()
@@ -588,7 +518,6 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
     }
 
     private fun showSuggestions(suggestions: List<SuggestionOption>) {
-        stopLoadingAnimations()
         loadingState.visibility = View.GONE
         val density = resources.displayMetrics.density
         val label = TextView(this).apply {
@@ -708,44 +637,78 @@ class ScreenshotAnalysisActivity : AppCompatActivity() {
     }
 
     private fun showError(msg: String) {
-        stopLoadingAnimations()
         loadingState.visibility = View.GONE
-        Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
-        finish()
+        suggSection.removeAllViews()
+        suggSection.visibility = View.VISIBLE
+        suggSection.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(16), dp(18), dp(16))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat()
+                setColor(resources.getColor(R.color.bg_card, null))
+                setStroke(dp(1), resources.getColor(R.color.accent_pink, null))
+            }
+            addView(TextView(this@ScreenshotAnalysisActivity).apply {
+                text = "Analysis did not return suggestions"
+                textSize = 15f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(resources.getColor(R.color.text_primary, null))
+            })
+            addView(TextView(this@ScreenshotAnalysisActivity).apply {
+                text = msg
+                textSize = 13f
+                setTextColor(resources.getColor(R.color.text_muted, null))
+                setPadding(0, dp(8), 0, 0)
+            })
+        })
     }
 
     override fun onDestroy() {
-        stopLoadingAnimations()
         super.onDestroy()
     }
 
-    private fun startGeminiStyleLoading(glow: View, orbit: View, shimmerSweep: View) {
-        loadingAnimators += ObjectAnimator.ofFloat(glow, View.SCALE_X, 0.82f, 1.08f).apply {
-            duration = 1200; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.REVERSE
-            interpolator = AccelerateDecelerateInterpolator(); start()
+    private fun showFullScreenPreview(uri: Uri) {
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val layout = FrameLayout(this).apply {
+            setBackgroundColor(0xFF050009.toInt())
+            isClickable = true
+            setOnClickListener { dialog.dismiss() }
         }
-        loadingAnimators += ObjectAnimator.ofFloat(glow, View.SCALE_Y, 0.82f, 1.08f).apply {
-            duration = 1200; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.REVERSE
-            interpolator = AccelerateDecelerateInterpolator(); start()
-        }
-        loadingAnimators += ObjectAnimator.ofFloat(glow, View.ALPHA, 0.18f, 0.46f).apply {
-            duration = 1200; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.REVERSE
-            interpolator = AccelerateDecelerateInterpolator(); start()
-        }
-        loadingAnimators += ObjectAnimator.ofFloat(orbit, View.ROTATION, 0f, 360f).apply {
-            duration = 1800; repeatCount = ValueAnimator.INFINITE
-            interpolator = LinearInterpolator(); start()
-        }
-        loadingAnimators += ObjectAnimator.ofFloat(shimmerSweep, View.TRANSLATION_X, 0f, dp(96).toFloat()).apply {
-            duration = 950; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.REVERSE
-            interpolator = AccelerateDecelerateInterpolator(); start()
-        }
-    }
 
-    private fun stopLoadingAnimations() {
-        loadingAnimators.forEach { it.cancel() }
-        loadingAnimators.clear()
+        layout.addView(ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            adjustViewBounds = true
+            setImageURI(uri)
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ).apply { setMargins(dp(8), dp(48), dp(8), dp(72)) }
+            setOnClickListener { dialog.dismiss() }
+        })
+
+        layout.addView(TextView(this).apply {
+            text = "Tap anywhere to close"
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTextColor(0xFFEBD5FF.toInt())
+            setBackgroundColor(0x66000000.toInt())
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            ).apply { bottomMargin = dp(28) }
+            setOnClickListener { dialog.dismiss() }
+        })
+
+        dialog.setContentView(layout)
+        dialog.show()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private fun statusBarHeight(): Int {
+        val id = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (id > 0) resources.getDimensionPixelSize(id) else dp(24)
+    }
 }

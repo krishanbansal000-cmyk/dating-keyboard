@@ -92,16 +92,16 @@ internal fun NboardImeService.refreshUi() {
     setVisibleAnimated(aiPromptRow, isAiMode)
     setVisibleAnimated(clipboardPanel, isClipboardOpen && !isEmojiMode)
     setVisibleAnimated(emojiPanel, isEmojiMode)
-    setVisibleAnimated(recentClipboardRow, shouldShowRecentClipboardRow())
-    setVisibleAnimated(predictionRow, shouldShowPredictionRow() && hasPredictionSuggestions)
+    setVisibleAnimated(recentClipboardRow, false)
+    setVisibleAnimated(predictionRow, false)
     setVisibleAnimated(keyRowsContainer, !isClipboardOpen && (!isEmojiMode || isEmojiSearchMode))
 
     val gboardLayout = isGboardLayoutActive()
     setVisibleAnimated(modeSwitchButton, gboardLayout || !isClipboardOpen)
     setVisibleAnimated(leftPunctuationButton, gboardLayout && !isClipboardOpen)
-    setVisibleAnimated(aiModeButton, gboardLayout || !isClipboardOpen)
+    setVisibleAnimated(aiModeButton, false)
     setVisibleAnimated(rightPunctuationButton, gboardLayout && !isClipboardOpen)
-    setVisibleAnimated(clipboardButton, !gboardLayout)
+    setVisibleAnimated(clipboardButton, false)
     setVisibleAnimated(actionButton, true)
     applyBottomRowLayoutForClipboard(isClipboardOpen)
 
@@ -170,11 +170,11 @@ internal fun NboardImeService.applyBottomRowLayoutForClipboard(clipboardOpen: Bo
         updateBottomKeyLayout(actionButton, 1.75f, marginEndDp = 0)
         return
     }
-    updateBottomKeyLayout(modeSwitchButton, 1.2f, marginEndDp = KEY_HORIZONTAL_GAP_DP)
-    updateBottomKeyLayout(aiModeButton, 1f, marginEndDp = KEY_HORIZONTAL_GAP_DP)
-    updateBottomKeyLayout(spaceButton, if (clipboardOpen) 8.1f else 5.4f, marginEndDp = KEY_HORIZONTAL_GAP_DP)
-    updateBottomKeyLayout(clipboardButton, 1f, marginEndDp = KEY_HORIZONTAL_GAP_DP)
-    updateBottomKeyLayout(actionButton, if (clipboardOpen) 1.35f else 1.9f, marginEndDp = 0)
+    updateBottomKeyLayout(modeSwitchButton, 1.35f, marginEndDp = KEY_HORIZONTAL_GAP_DP)
+    updateBottomKeyLayout(aiModeButton, 0f, marginEndDp = 0)
+    updateBottomKeyLayout(spaceButton, 7.9f, marginEndDp = KEY_HORIZONTAL_GAP_DP)
+    updateBottomKeyLayout(clipboardButton, 0f, marginEndDp = 0)
+    updateBottomKeyLayout(actionButton, 1.5f, marginEndDp = 0)
 }
 
 internal fun NboardImeService.updateBottomKeyLayout(view: View, weight: Float, marginEndDp: Int) {

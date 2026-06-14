@@ -1,0 +1,137 @@
+topic: Android Long Screenshot Techniques and Libraries for Chat and Chart Vertical Stitching
+
+items:
+  # === Native Android APIs ===
+  - name: MediaProjection API
+    type: native_api
+    platform: Android 5.0+ (API 21+)
+    note: Built-in screen capture; requires foreground service on Android 14+ with mediaProjection type
+
+  - name: ScrollCapture API (View.scrollCapture)
+    type: native_api
+    platform: Android 12+ (API 31+)
+    note: Captures long content within a scrollable view natively; no stitching required
+
+  - name: ScrollCaptureCallback
+    type: native_api
+    platform: Android 12+ (API 31+)
+    note: Granular callback API for capturing scrollable content
+
+  - name: Jetpack Compose ScrollCapture support
+    type: native_api
+    platform: Compose UI 1.7+
+    note: Experimental long-screenshot support for Compose scroll containers (LazyColumn, etc.)
+
+  - name: Android 14/15 MediaProjection Enhancements
+    type: native_api
+    platform: Android 14+ (API 34+)
+    note: App-screen sharing, foreground service type=mediaProjection, status-bar chip, auto-stop, one-token-per-session
+
+  - name: AccessibilityService takeScreenshot
+    type: native_api
+    platform: Android 11+ (API 30+)
+    note: Trigger native system screenshot including long screenshot
+
+  - name: AOSP SystemUI LongScreenshotActivity
+    type: native_api
+    platform: AOSP / Android 12+
+    note: Reference implementation of system-level long screenshot in AOSP source
+
+  - name: Chromium Android ScrollCapture implementation
+    type: native_api
+    platform: Chromium-based WebView
+    note: Production-grade integration of ScrollCaptureCallback for web content
+
+  # === Open Source Libraries ===
+  - name: ekibun/Stitch
+    type: library
+    platform: Android
+    note: Most-cited open-source long screenshot stitcher baseline for Android apps
+
+  - name: yschimke/compose-ai-tools ScrollSliceStitcher
+    type: library
+    platform: Android (Kotlin/Compose)
+    note: 2026 implementation using pixel matching (not reported scroll offsets) with duplicate detection
+
+  - name: ericleong/scrollshot
+    type: library
+    platform: Android
+    note: Overlap-aware Android scroll+stitch with footer-ignore for sticky UI
+
+  - name: PGSSoft/scrollscreenshot
+    type: library
+    platform: Android
+    note: Auto scrolling with scroll-area edge detection and smooth stitch mode
+
+  - name: peter1492/LongScreenshot
+    type: library
+    platform: Android
+    note: App-side library for RecyclerView/NestedScrollView/ScrollView long capture
+
+  - name: HelloHuDi/ViewCapture
+    type: library
+    platform: Android
+    note: No-scroll/no-stitch alternative; renders full content offscreen (good for charts)
+
+  - name: FPhoenixCorneaE/LongScreenShotShare
+    type: library
+    platform: Android
+    note: Long capture for NestedScrollView/RecyclerView/ListView/WebView with async item loading
+
+  - name: cvzi/ScreenshotTile
+    type: library
+    platform: Android
+    note: Quick Settings tile that triggers native OEM/system screenshot or Accessibility takeScreenshot
+
+  - name: cashapp/paparazzi long screenshot
+    type: library
+    platform: Android (testing)
+    note: Notes Compose long screenshot support in 1.7; useful for testing workflows
+
+  # === Algorithm / Post-Process References ===
+  - name: nocoo/image-stitch
+    type: library
+    platform: Cross-platform (Python/JS)
+    note: ORB-based overlap detection, vertical stitching, alignment correction, auto-cropping
+
+  - name: mate-matt/screenshot-stitcher
+    type: library
+    platform: Cross-platform
+    note: Deterministic overlap detection + seam selection + fallback scoring; good algorithm reference
+
+  - name: id-fa/stitch-candidates
+    type: library
+    platform: Cross-platform
+    note: Candidate generation stitching with SSIM/NCC/phase-correlation scoring
+
+  - name: jswysnemc/wayscrollshot
+    type: library
+    platform: Cross-platform
+    note: Column-sampling algorithm for memory-efficient very-long captures
+
+  # === Test/Automation Tools ===
+  - name: uiautomator2
+    type: tool
+    platform: Android (Python/Java)
+    note: Can scroll + screenshot, but stitching logic must be implemented
+
+  - name: Appium
+    type: tool
+    platform: Cross-platform
+    note: Test framework with built-in scroll+stitch support
+
+  - name: Espresso + UiAutomator
+    type: tool
+    platform: Android
+    note: Can trigger scrolls for capture; stitching is external
+
+  # === Future / Research ===
+  - name: AI/ML stitching tools (UniStitch 2026, MDPI 2026)
+    type: research
+    platform: Research papers
+    note: Semantic+geometric stitching under repetitive/low-texture scenes; not mobile-ready yet
+
+execution:
+  batch_size: 3
+  items_per_agent: 4
+  output_dir: ./results

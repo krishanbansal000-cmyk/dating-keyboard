@@ -4,6 +4,7 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
@@ -23,7 +24,7 @@ class SuggestionCardAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CardViewHolder {
         val container = LinearLayout(parent.context).apply {
-            orientation = LinearLayout.VERTICAL
+            orientation = LinearLayout.HORIZONTAL
             layoutParams = ViewGroup.MarginLayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -48,37 +49,56 @@ class SuggestionCardAdapter(
         fun bind(suggestion: SuggestionOption) {
             val context = container.context
             val density = context.resources.displayMetrics.density
-            
-            container.removeAllViews()
-            container.setPadding(
-                (16 * density).toInt(),
-                (16 * density).toInt(),
-                (16 * density).toInt(),
-                (14 * density).toInt()
-            )
-            container.setBackgroundResource(0)
-            
-            val cardBg = GradientDrawable()
-            cardBg.cornerRadius = 18 * density
-            cardBg.setColor(context.resources.getColor(R.color.bg_card, null))
-            cardBg.setStroke(1, context.resources.getColor(R.color.glass_border, null))
-            container.background = cardBg
 
-            // Top row: badge + copy icon
+            container.removeAllViews()
+
+            val accentColor = when (suggestion.persona.lowercase()) {
+                "safe" -> R.color.accent_pink
+                "smooth" -> R.color.accent_violet
+                "bold" -> R.color.accent_magenta
+                else -> R.color.accent_violet
+            }
+            val accentInt = context.resources.getColor(accentColor, null)
+
+            val leftStrip = View(context).apply {
+                background = GradientDrawable().apply {
+                    cornerRadius = 4 * density
+                    setColor(accentInt)
+                }
+                layoutParams = LinearLayout.LayoutParams((4 * density).toInt(), LinearLayout.LayoutParams.MATCH_PARENT)
+            }
+            container.addView(leftStrip)
+
+            val card = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                setPadding(
+                    (16 * density).toInt(),
+                    (14 * density).toInt(),
+                    (16 * density).toInt(),
+                    (14 * density).toInt()
+                )
+                val cardBg = GradientDrawable()
+                cardBg.cornerRadius = 18 * density
+                cardBg.setColor(context.resources.getColor(R.color.bg_card, null))
+                cardBg.setStroke(1, context.resources.getColor(R.color.glass_border, null))
+                background = cardBg
+            }
+
             val topRow = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                )
+                ).apply { bottomMargin = (8 * density).toInt() }
             }
 
-            val personaBadge = TextView(context).apply {
+            topRow.addView(TextView(context).apply {
                 text = suggestion.persona.replaceFirstChar { it.uppercase() }
                 textSize = 10f
                 setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(context.resources.getColor(R.color.accent_violet, null))
+                setTextColor(accentInt)
                 setPadding(
                     (8 * density).toInt(),
                     (3 * density).toInt(),
@@ -89,36 +109,29 @@ class SuggestionCardAdapter(
                 bg.cornerRadius = 8 * density
                 bg.setColor(context.resources.getColor(R.color.bg_surface, null))
                 background = bg
-            }
-            topRow.addView(personaBadge)
+            })
 
-            val spacer = View(context).apply {
+            topRow.addView(View(context).apply {
                 layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
-            }
-            topRow.addView(spacer)
+            })
 
-            val copyIcon = TextView(context).apply {
-                text = "📋"
+            topRow.addView(TextView(context).apply {
+                text = "${suggestion.confidence}%"
+                textSize = 10f
+                setTextColor(context.resources.getColor(R.color.text_muted, null))
+                setPadding(0, 0, (8 * density).toInt(), 0)
+            })
+
+            topRow.addView(TextView(context).apply {
+                text = "\uD83D\uDCCB"
                 textSize = 16f
                 setPadding((6 * density).toInt(), (4 * density).toInt(), (6 * density).toInt(), (4 * density).toInt())
-                setOnClickListener {
-                    onCopyClicked(suggestion)
-                }
-            }
-            topRow.addView(copyIcon)
+                setOnClickListener { onCopyClicked(suggestion) }
+            })
 
-            container.addView(topRow)
+            card.addView(topRow)
 
-            // Suggestion text
-            val spacing = View(context).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    (10 * density).toInt()
-                )
-            }
-            container.addView(spacing)
-
-            val textView = TextView(context).apply {
+            card.addView(TextView(context).apply {
                 text = suggestion.text
                 textSize = 15f
                 setTextColor(context.resources.getColor(R.color.text_primary, null))
@@ -127,8 +140,9 @@ class SuggestionCardAdapter(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 )
-            }
-            container.addView(textView)
+            })
+
+            container.addView(card)
         }
     }
 }

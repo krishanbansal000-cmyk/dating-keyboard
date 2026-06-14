@@ -5,13 +5,22 @@ import android.animation.ValueAnimator
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.util.Log
+import android.view.ScrollCaptureCallback
+import android.view.ScrollCaptureSession
+import android.view.Surface
+import android.view.inputmethod.InputMethodManager
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -31,7 +40,12 @@ import androidx.recyclerview.widget.RecyclerView
 import com.datingcopilot.keyboard.R
 import com.datingcopilot.keyboard.SettingsSheet
 import com.datingcopilot.keyboard.ChatContextService
+import com.mikepenz.iconics.IconicsDrawable
+import com.mikepenz.iconics.typeface.library.googlematerial.GoogleMaterial
+import com.mikepenz.iconics.utils.colorInt
+import com.mikepenz.iconics.utils.sizeDp
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -66,8 +80,10 @@ class ChatActivity : AppCompatActivity() {
     private var selectedToneChip: TextView? = null
     private var lastInputText = ""
     private var loadingPulseAnimator: ObjectAnimator? = null
+    private var lastPendingKeyboardSuggestionsJson: String? = null
 
     private val apiClient by lazy { com.datingcopilot.keyboard.ApiClient(this) }
+    private val personaManager by lazy { PersonaManager(this) }
     private val gson by lazy { Gson() }
 
     private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -84,15 +100,26 @@ class ChatActivity : AppCompatActivity() {
             finish()
             return
         }
-
         currentPersona = prefs.getString("persona", "playful") ?: "playful"
         currentIntent = prefs.getString("intent", "flirt") ?: "flirt"
         currentPlatform = ChatContextService.getChatPlatform(this)
+
+        val recommended = personaManager.getRecommendedPersona()
+        if (recommended != null && recommended != currentPersona && prefs.getBoolean("auto_persona", false)) {
+            currentPersona = recommended
+            savePreference("persona", recommended)
+        }
 
         buildUI()
         handleSendImage(intent)
         handleOpenImagePicker(intent)
         handleRizzseAction(intent)
+        showPendingKeyboardSuggestions()
+        try {
+            window?.registerScrollCaptureCallback(RizzseScrollCaptureCallback())
+        } catch (e: Throwable) {
+            Log.w("ChatActivity", "ScrollCaptureCallback register failed: ${e.message}")
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -101,6 +128,21 @@ class ChatActivity : AppCompatActivity() {
         handleSendImage(intent)
         handleOpenImagePicker(intent)
         handleRizzseAction(intent)
+        showPendingKeyboardSuggestions()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        showPendingKeyboardSuggestions()
+        // Show keyboard if capture is active (IME may have been killed by projection dialog)
+        val prefs = getSharedPreferences("dating_copilot", android.content.Context.MODE_PRIVATE)
+        if (prefs.getBoolean("capture_active", false) && ::messageInput.isInitialized) {
+            messageInput.postDelayed({
+                messageInput.requestFocus()
+                val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                imm?.showSoftInput(messageInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+            }, 200)
+        }
     }
 
     private fun handleRizzseAction(intent: Intent?) {
@@ -467,6 +509,7 @@ class ChatActivity : AppCompatActivity() {
         }
         suggestionAdapter = SuggestionCardAdapter { suggestion ->
             copyToClipboard(suggestion.text)
+            personaManager.recordCopy(suggestion.persona)
             Toast.makeText(this, "Reply copied. Paste it in your chat", Toast.LENGTH_SHORT).show()
         }
         suggestionsRecyclerView.adapter = suggestionAdapter
@@ -490,11 +533,6 @@ class ChatActivity : AppCompatActivity() {
                 (10 * resources.displayMetrics.density).toInt()
             )
         }
-
-        toneBar.addView(toneChip("Rizz", "playful", "flirt", selected = currentPersona == "playful" && currentIntent == "flirt"))
-        toneBar.addView(toneChip("Funny", "witty", "recover_dry", selected = currentPersona == "witty"))
-        toneBar.addView(toneChip("Chill", "chill", "keep_going", selected = currentPersona == "chill"))
-        toneBar.addView(toneChip("Ask out", "direct", "ask_date", selected = currentPersona == "direct"))
 
         toneScroll.addView(toneBar)
         mainLayout.addView(toneScroll)
@@ -606,7 +644,7 @@ class ChatActivity : AppCompatActivity() {
 
         emptyStateView = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(10), dp(14), dp(18))
+            setPadding(dp(14), statusBarHeight() + dp(10), dp(14), dp(18))
         }
 
         val topBar = LinearLayout(this).apply {
@@ -621,69 +659,28 @@ class ChatActivity : AppCompatActivity() {
             setTextColor(0xFFFF38F8.toInt())
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         })
-        topBar.addView(TextView(this).apply {
-            text = "i"
-            textSize = 13f
-            gravity = Gravity.CENTER
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.text_primary, null))
+        topBar.addView(ImageView(this).apply {
+            setImageDrawable(
+                IconicsDrawable(this@ChatActivity, GoogleMaterial.Icon.gmd_settings).apply {
+                    colorInt = 0xFFE9D5FF.toInt()
+                    sizeDp = 18
+                }
+            )
+            scaleType = ImageView.ScaleType.CENTER
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(0xFF231331.toInt())
                 setStroke(dp(1), 0xFFE9D5FF.toInt())
             }
-            layoutParams = LinearLayout.LayoutParams(dp(30), dp(30))
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
             setOnClickListener { SettingsSheet().show(supportFragmentManager, "settings") }
         })
         emptyStateView.addView(topBar)
 
         emptyStateView.addView(personaCard())
 
-        emptyStateView.addView(TextView(this).apply {
-            text = "Select Your Vibe"
-            textSize = 16f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.text_primary, null))
-            setPadding(dp(4), dp(18), 0, dp(10))
-        })
-
-        val vibeGrid = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        vibeGrid.addView(vibeRow(
-            vibeTile("Funny", "playful", "flirt", true),
-            vibeTile("Chill", "chill", "keep_going", false)
-        ))
-        vibeGrid.addView(vibeRow(
-            vibeTile("Direct", "direct", "ask_date", false),
-            vibeTile("Flirty", "witty", "recover_dry", false)
-        ))
-        emptyStateView.addView(vibeGrid)
-
         emptyStateView.addView(analyzeCard())
 
-        val quickHeader = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(4), dp(18), dp(4), dp(8))
-        }
-        quickHeader.addView(TextView(this).apply {
-            text = "Quick Starters"
-            textSize = 15f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(resources.getColor(R.color.text_primary, null))
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        })
-        quickHeader.addView(TextView(this).apply {
-            text = "See all"
-            textSize = 12f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(0xFFFF38F8.toInt())
-        })
-        emptyStateView.addView(quickHeader)
-
-        emptyStateView.addView(quickStarter("Are you a Wi-Fi router? Because I'm feeling a connection..."))
-        emptyStateView.addView(quickStarter("I usually wait for a few days but you're too interesting."))
-
-        emptyStateView.addView(proCard())
         scroll.addView(emptyStateView)
         mainLayout.addView(scroll)
 
@@ -728,11 +725,47 @@ class ChatActivity : AppCompatActivity() {
         suggestionsRecyclerView.adapter = suggestionAdapter
         mainLayout.addView(suggestionsRecyclerView)
 
-        messageInput = android.widget.EditText(this).apply {
-            visibility = View.GONE
+        inputRow = LinearLayout(this).apply {
             tag = "input_row"
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            background = GradientDrawable().apply {
+                setColor(0xFF160720.toInt())
+                setStroke(dp(1), 0xFF4C1D65.toInt())
+            }
         }
-        mainLayout.addView(messageInput, LinearLayout.LayoutParams(1, 1))
+        messageInput = android.widget.EditText(this).apply {
+            hint = "Type or tap for RizzSe keyboard"
+            textSize = 14f
+            setSingleLine(true)
+            setTextColor(resources.getColor(R.color.text_primary, null))
+            setHintTextColor(resources.getColor(R.color.text_muted, null))
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat()
+                setColor(resources.getColor(R.color.bg_input, null))
+                setStroke(dp(1), resources.getColor(R.color.glass_border, null))
+            }
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(8)
+            }
+        }
+        inputRow.addView(messageInput)
+        inputRow.addView(TextView(this).apply {
+            text = "Go"
+            textSize = 13f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(resources.getColor(R.color.white, null))
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat()
+                setColor(resources.getColor(R.color.accent_violet, null))
+            }
+            setOnClickListener { analyzeText(messageInput.text.toString().trim()) }
+        })
+        mainLayout.addView(inputRow)
 
         mainLayout.addView(bottomNav())
         root.addView(mainLayout)
@@ -772,14 +805,24 @@ class ChatActivity : AppCompatActivity() {
         root.addView(loadingView)
 
         setContentView(root)
+
+        messageInput.postDelayed({
+            messageInput.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.showSoftInput(messageInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }, 400)
     }
 
     private fun personaCard(): View {
+        val personaDisplay = currentPersona.replaceFirstChar { it.uppercase() }
+        val recommendedPersona = personaManager.getRecommendedPersona()
+
         return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(16), dp(18), dp(16))
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(12), dp(16), dp(12))
             background = GradientDrawable().apply {
-                cornerRadius = dp(10).toFloat()
+                cornerRadius = dp(14).toFloat()
                 setColor(0xFF3A1648.toInt())
                 setStroke(dp(1), 0xFF5D2872.toInt())
             }
@@ -787,44 +830,53 @@ class ChatActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            addView(TextView(this@ChatActivity).apply {
-                text = "CURRENT PERSONA"
-                textSize = 12f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(0xFFC084FC.toInt())
+            addView(ImageView(this@ChatActivity).apply {
+                setImageDrawable(
+                    IconicsDrawable(this@ChatActivity, GoogleMaterial.Icon.gmd_mood).apply {
+                        colorInt = 0xFFC084FC.toInt()
+                        sizeDp = 24
+                    }
+                )
+                layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginEnd = dp(12) }
             })
-            addView(TextView(this@ChatActivity).apply {
-                text = "The Comedian"
-                textSize = 23f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(0xFFE9D5FF.toInt())
-            })
-            val row = LinearLayout(this@ChatActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, dp(18), 0, 0)
-            }
-            row.addView(TextView(this@ChatActivity).apply {
-                text = "Daily Rizz Power"
-                textSize = 12f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(0xFFE9D5FF.toInt())
+            addView(LinearLayout(this@ChatActivity).apply {
+                orientation = LinearLayout.VERTICAL
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            })
-            row.addView(TextView(this@ChatActivity).apply {
-                text = "69%"
-                textSize = 16f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(0xFFE9D5FF.toInt())
-            })
-            addView(row)
-            addView(View(this@ChatActivity).apply {
-                background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFFFF38F8.toInt(), 0xFFE11D8F.toInt()))
-                layoutParams = LinearLayout.LayoutParams(0, dp(5)).apply {
-                    width = dp(190)
-                    topMargin = dp(6)
+                addView(TextView(this@ChatActivity).apply {
+                    text = personaDisplay
+                    textSize = 17f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setTextColor(0xFFE9D5FF.toInt())
+                })
+                if (recommendedPersona != null && recommendedPersona != currentPersona) {
+                    addView(TextView(this@ChatActivity).apply {
+                        text = "⭐ Try ${recommendedPersona.replaceFirstChar { it.uppercase() }}"
+                        textSize = 11f
+                        setTextColor(0xFFFFD700.toInt())
+                    })
                 }
             })
+            if (recommendedPersona != null && recommendedPersona != currentPersona) {
+                addView(TextView(this@ChatActivity).apply {
+                    text = "Switch"
+                    textSize = 12f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    setTextColor(0xFFFF38F8.toInt())
+                    setPadding(dp(12), dp(6), dp(12), dp(6))
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(12).toFloat()
+                        setColor(0xFF5B1173.toInt())
+                    }
+                    setOnClickListener {
+                        savePreference("persona", recommendedPersona)
+                        if (recommendedPersona == "playful") savePreference("intent", "flirt")
+                        else if (recommendedPersona == "witty") savePreference("intent", "recover_dry")
+                        else if (recommendedPersona == "chill") savePreference("intent", "keep_going")
+                        else if (recommendedPersona == "direct") savePreference("intent", "ask_date")
+                        recreate()
+                    }
+                })
+            }
         }
     }
 
@@ -833,6 +885,22 @@ class ChatActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             addView(left)
             addView(right)
+        }
+    }
+
+    private fun showPendingKeyboardSuggestions() {
+        val prefs = getSharedPreferences("dating_copilot", Context.MODE_MULTI_PROCESS)
+        val json = prefs.getString(PREF_PENDING_KEYBOARD_SUGGESTIONS, null) ?: return
+        if (json == lastPendingKeyboardSuggestionsJson) return
+        lastPendingKeyboardSuggestionsJson = json
+        try {
+            val type = object : TypeToken<List<SuggestionOption>>() {}.type
+            val suggestions: List<SuggestionOption> = gson.fromJson(json, type) ?: emptyList()
+            if (suggestions.isNotEmpty()) {
+                showSuggestions(suggestions)
+            }
+        } catch (e: Exception) {
+            Log.w("ChatActivity", "Failed to load pending suggestions: ${e.message}")
         }
     }
 
@@ -853,6 +921,9 @@ class ChatActivity : AppCompatActivity() {
             }
             isClickable = true
             setOnClickListener {
+                if (this@ChatActivity.currentPersona != persona) {
+                    this@ChatActivity.personaManager.recordSelection(persona)
+                }
                 currentPersona = persona
                 currentIntent = intent
                 savePreference("persona", persona)
@@ -864,77 +935,56 @@ class ChatActivity : AppCompatActivity() {
 
     private fun analyzeCard(): View {
         return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(16), dp(24), dp(16), dp(24))
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(20), dp(20), dp(20))
             background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFFBE00FF.toInt(), 0xFFE41487.toInt())).apply {
                 cornerRadius = dp(12).toFloat()
             }
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(132)
+                dp(100)
             ).apply { topMargin = dp(18) }
             isClickable = true
             setOnClickListener { showImagePicker() }
-            addView(TextView(this@ChatActivity).apply {
-                text = "+"
-                textSize = 30f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                setTextColor(Color.WHITE)
+            
+            val iconContainer = FrameLayout(this@ChatActivity).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(60), dp(60)).apply { marginEnd = dp(16) }
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(0x40FFFFFF.toInt())
+                }
+            }
+            iconContainer.addView(ImageView(this@ChatActivity).apply {
+                setImageDrawable(
+                    IconicsDrawable(this@ChatActivity, GoogleMaterial.Icon.gmd_camera_alt).apply {
+                        colorInt = Color.WHITE
+                        sizeDp = 30
+                    }
+                )
+                scaleType = ImageView.ScaleType.CENTER
+                layoutParams = FrameLayout.LayoutParams(dp(60), dp(60))
             })
-            addView(TextView(this@ChatActivity).apply {
+            addView(iconContainer)
+            
+            val textColumn = LinearLayout(this@ChatActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            textColumn.addView(TextView(this@ChatActivity).apply {
                 text = "Analyze Chat"
-                textSize = 22f
+                textSize = 20f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(Color.WHITE)
             })
-            addView(TextView(this@ChatActivity).apply {
+            textColumn.addView(TextView(this@ChatActivity).apply {
                 text = "Upload screenshot for instant rizz"
                 textSize = 12f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 setTextColor(0xFFFFD6F2.toInt())
+                setPadding(0, dp(2), 0, 0)
             })
-        }
-    }
-
-    private fun quickStarter(textValue: String): TextView {
-        return TextView(this).apply {
-            text = "\"$textValue\""
-            textSize = 13f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(0xFFE9D5FF.toInt())
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(4).toFloat()
-                setColor(0xFF2D1D36.toInt())
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(8) }
-            isClickable = true
-            setOnClickListener {
-                messageInput.setText(textValue)
-                analyzeText(textValue)
-            }
-        }
-    }
-
-    private fun proCard(): View {
-        return TextView(this).apply {
-            text = "Unlock Pro Mode\nGet unlimited analysis and elite personas."
-            textSize = 18f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(Color.WHITE)
-            gravity = Gravity.BOTTOM or Gravity.START
-            setPadding(dp(16), 0, dp(16), dp(18))
-            background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFF090312.toInt(), 0xFF51115E.toInt(), 0xFFEE1AA8.toInt())).apply {
-                cornerRadius = dp(10).toFloat()
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(118)
-            ).apply { topMargin = dp(16) }
+            addView(textColumn)
         }
     }
 
@@ -951,21 +1001,43 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
-    private fun navItem(label: String, selected: Boolean, action: () -> Unit): TextView {
-        return TextView(this).apply {
-            text = label
-            textSize = 11f
+    private fun navItem(label: String, selected: Boolean, action: () -> Unit): LinearLayout {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setTextColor(if (selected) Color.WHITE else 0xFFC4B5FD.toInt())
             background = if (selected) GradientDrawable().apply {
                 cornerRadius = dp(20).toFloat()
                 setColor(0xFF5B1173.toInt())
             } else null
-            layoutParams = LinearLayout.LayoutParams(0, dp(42), 1f).apply { marginEnd = dp(4) }
+            layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(4) }
             isClickable = true
             setOnClickListener { action() }
         }
+        val icon = when (label) {
+            "Home" -> GoogleMaterial.Icon.gmd_home
+            "History" -> GoogleMaterial.Icon.gmd_history
+            "Setup" -> GoogleMaterial.Icon.gmd_keyboard
+            "Settings" -> GoogleMaterial.Icon.gmd_settings
+            else -> GoogleMaterial.Icon.gmd_circle
+        }
+        container.addView(ImageView(this).apply {
+            setImageDrawable(
+                IconicsDrawable(this@ChatActivity, icon).apply {
+                    colorInt = if (selected) Color.WHITE else 0xFFC4B5FD.toInt()
+                    sizeDp = 22
+                }
+            )
+            layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
+        })
+        container.addView(TextView(this@ChatActivity).apply {
+            text = label
+            textSize = 10f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setTextColor(if (selected) Color.WHITE else 0xFFC4B5FD.toInt())
+            setPadding(0, dp(2), 0, 0)
+        })
+        return container
     }
 
     private fun sectionLabel(text: String): TextView {
@@ -1005,7 +1077,15 @@ class ChatActivity : AppCompatActivity() {
     }
 
     private fun toneChip(label: String, persona: String, intent: String, selected: Boolean = false): TextView {
-        val chip = choiceChip(label, selected) { view ->
+        val stats = personaManager.getAllPersonaStats()
+        val personaStats = stats.find { it.persona == persona }
+        val isRecommended = personaManager.getRecommendedPersona() == persona
+        val displayLabel = if (isRecommended && personaStats?.copyCount ?: 0 > 0) "⭐ $label" else label
+
+        val chip = choiceChip(displayLabel, selected) { view ->
+            if (currentPersona != persona) {
+                personaManager.recordSelection(persona)
+            }
             currentPersona = persona
             currentIntent = intent
             savePreference("persona", persona)
@@ -1348,5 +1428,82 @@ class ChatActivity : AppCompatActivity() {
 
     private fun dp(value: Int): Int {
         return (value * resources.displayMetrics.density).toInt()
+    }
+
+    private fun statusBarHeight(): Int {
+        val id = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (id > 0) resources.getDimensionPixelSize(id) else dp(24)
+    }
+
+    private inner class RizzseScrollCaptureCallback : ScrollCaptureCallback {
+        override fun onScrollCaptureSearch(
+            signal: CancellationSignal,
+            onReady: java.util.function.Consumer<Rect>
+        ) {
+            val root = window?.decorView ?: return onReady.accept(Rect())
+            val visible = Rect(0, 0, root.width, root.height)
+            onReady.accept(visible)
+        }
+
+        override fun onScrollCaptureStart(
+            session: ScrollCaptureSession,
+            signal: CancellationSignal,
+            onReady: Runnable
+        ) {
+            val root = window?.decorView
+            if (root == null) {
+                onReady.run()
+                return
+            }
+            root.post {
+                onReady.run()
+            }
+        }
+
+        override fun onScrollCaptureImageRequest(
+            session: ScrollCaptureSession,
+            signal: CancellationSignal,
+            captureArea: Rect,
+            onComplete: java.util.function.Consumer<Rect>
+        ) {
+            val root = window?.decorView
+            val surface = session.surface
+            if (root == null) {
+                onComplete.accept(Rect())
+                return
+            }
+            try {
+                val pixelCount = captureArea.width() * captureArea.height()
+                if (pixelCount <= 0) {
+                    onComplete.accept(Rect())
+                    return
+                }
+                val buffer = java.nio.ByteBuffer.allocateDirect(pixelCount * 4)
+                buffer.order(java.nio.ByteOrder.nativeOrder())
+                val pixelSrc = IntArray(pixelCount)
+                val out = IntArray(pixelCount)
+                root.draw(android.graphics.Canvas(android.graphics.Bitmap.createBitmap(
+                    captureArea.width(), captureArea.height(), android.graphics.Bitmap.Config.ARGB_8888
+                )))
+                val bmp = android.graphics.Bitmap.createBitmap(
+                    captureArea.width(), captureArea.height(), android.graphics.Bitmap.Config.ARGB_8888
+                )
+                val canvas = Canvas(bmp)
+                canvas.translate(-captureArea.left.toFloat(), -captureArea.top.toFloat())
+                canvas.clipRect(captureArea)
+                root.draw(canvas)
+                bmp.copyPixelsToBuffer(buffer)
+                buffer.rewind()
+                bmp.recycle()
+                onComplete.accept(captureArea)
+            } catch (e: Throwable) {
+                Log.w("ChatActivity", "ScrollCapture image request failed: ${e.message}")
+                onComplete.accept(Rect())
+            }
+        }
+
+        override fun onScrollCaptureEnd(onReady: Runnable) {
+            onReady.run()
+        }
     }
 }

@@ -139,12 +139,13 @@ object KeyboardModeSettings {
 
     fun loadLayoutMode(context: Context): KeyboardLayoutMode {
         val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_LAYOUT_MODE, KeyboardLayoutMode.AZERTY.value)
+            .getString(KEY_LAYOUT_MODE, KeyboardLayoutMode.QWERTY.value)
         return when (raw) {
+            KeyboardLayoutMode.AZERTY.value -> KeyboardLayoutMode.QWERTY
             KeyboardLayoutMode.QWERTY.value -> KeyboardLayoutMode.QWERTY
-            KeyboardLayoutMode.GBOARD_AZERTY.value -> KeyboardLayoutMode.GBOARD_AZERTY
+            KeyboardLayoutMode.GBOARD_AZERTY.value -> KeyboardLayoutMode.GBOARD_QWERTY
             KeyboardLayoutMode.GBOARD_QWERTY.value -> KeyboardLayoutMode.GBOARD_QWERTY
-            else -> KeyboardLayoutMode.AZERTY
+            else -> KeyboardLayoutMode.QWERTY
         }
     }
 
@@ -159,6 +160,12 @@ object KeyboardModeSettings {
     fun loadActiveLayoutPackId(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val explicit = prefs.getString(KEY_ACTIVE_LAYOUT_PACK_ID, null)?.trim().orEmpty()
+        if (explicit == LayoutPackManager.BUILTIN_AZERTY_CLASSIC_ID) {
+            return LayoutPackManager.BUILTIN_QWERTY_CLASSIC_ID
+        }
+        if (explicit == LayoutPackManager.BUILTIN_AZERTY_GBOARD_ID) {
+            return LayoutPackManager.BUILTIN_QWERTY_GBOARD_ID
+        }
         if (explicit.isNotBlank()) {
             return explicit
         }
@@ -174,12 +181,12 @@ object KeyboardModeSettings {
 
     fun loadLanguageMode(context: Context): KeyboardLanguageMode {
         val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_LANGUAGE_MODE, KeyboardLanguageMode.FRENCH.value)
+            .getString(KEY_LANGUAGE_MODE, KeyboardLanguageMode.ENGLISH.value)
         return when (raw) {
             KeyboardLanguageMode.ENGLISH.value -> KeyboardLanguageMode.ENGLISH
             KeyboardLanguageMode.BOTH.value -> KeyboardLanguageMode.BOTH
             KeyboardLanguageMode.DISABLED.value -> KeyboardLanguageMode.DISABLED
-            else -> KeyboardLanguageMode.FRENCH
+            else -> KeyboardLanguageMode.ENGLISH
         }
     }
 

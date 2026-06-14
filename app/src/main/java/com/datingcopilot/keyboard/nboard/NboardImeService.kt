@@ -4,10 +4,12 @@ import com.datingcopilot.keyboard.BuildConfig
 import android.Manifest
 import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
+import android.content.BroadcastReceiver
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -148,7 +150,14 @@ class NboardImeService : InputMethodService() {
     internal lateinit var clipboardButton: ImageButton
     internal lateinit var rizzseButton: ImageButton
     internal lateinit var rizzseRecordButton: Button
-    internal lateinit var rizzseAiButton: ImageButton
+    private lateinit var rizzseSuggestionsPanel: android.widget.LinearLayout
+    private lateinit var rizzseSuggestion1: android.widget.LinearLayout
+    private lateinit var rizzseSuggestion2: android.widget.LinearLayout
+    private lateinit var rizzseSuggestion3: android.widget.LinearLayout
+    private lateinit var rizzseSuggestion1Text: android.widget.TextView
+    private lateinit var rizzseSuggestion2Text: android.widget.TextView
+    private lateinit var rizzseSuggestion3Text: android.widget.TextView
+    internal lateinit var rizzseAiButton: Button
     internal lateinit var actionButton: ImageButton
 
     internal var isAiMode = false
@@ -168,7 +177,7 @@ class NboardImeService : InputMethodService() {
     internal var leftBottomModeOptions = listOf(BottomKeyMode.AI, BottomKeyMode.EMOJI)
     internal var rightBottomModeOptions = listOf(BottomKeyMode.CLIPBOARD, BottomKeyMode.EMOJI)
     internal var activeLayoutPack = LayoutPackManager.defaultPack()
-    internal var keyboardLanguageMode = KeyboardLanguageMode.FRENCH
+    internal var keyboardLanguageMode = KeyboardLanguageMode.ENGLISH
     private var keyboardFontMode = KeyboardFontMode.INTER
     private var appThemeMode = AppThemeMode.SYSTEM
     internal var wordPredictionEnabled = true
@@ -234,9 +243,28 @@ class NboardImeService : InputMethodService() {
         captureClipboardPrimary()
     }
 
+    private val restoreImeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == ACTION_SHOW_IME) {
+                requestShowSelf(0)
+            }
+        }
+    }
+
+    companion object {
+        private const val ACTION_SHOW_IME = "com.datingcopilot.keyboard.SHOW_IME"
+    }
+
     override fun onCreate() {
         super.onCreate()
         keyboardUiContext = this
+        val filter = IntentFilter(ACTION_SHOW_IME)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(restoreImeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(restoreImeReceiver, filter)
+        }
         clipboardHistoryStore = ClipboardHistoryStore(this)
         reloadTypingSettings()
         autoCorrectEngine = AutoCorrect(this)
@@ -279,6 +307,7 @@ class NboardImeService : InputMethodService() {
         savePredictionLearning(force = true)
         recentClipboardExpiryJob?.cancel()
         clipboardManager?.removePrimaryClipChangedListener(clipboardListener)
+        unregisterReceiver(restoreImeReceiver)
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -435,9 +464,20 @@ class NboardImeService : InputMethodService() {
     }
 
     internal fun dispatchRizzseAction(action: String) {
+        if (action == "open_app") {
+            requestHideSelf(0)
+            startActivity(Intent(this, com.datingcopilot.keyboard.chat.ChatActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            })
+            return
+        }
+        if (action == "record" || action == "screenshot") {
+            requestHideSelf(0)
+        }
         val prefs = getSharedPreferences("dating_copilot", MODE_MULTI_PROCESS)
         val chatContext = prefs.getString("rizzse_chat_context", "") ?: ""
         val intent = Intent("com.datingcopilot.keyboard.RIZZSE_ACTION").apply {
+            setPackage(packageName)
             putExtra("action", action)
             putExtra("chat_context", chatContext)
         }
@@ -451,7 +491,29 @@ class NboardImeService : InputMethodService() {
     private val rizzsePollRunnable = object : Runnable {
         override fun run() {
             checkRizzseSuggestions()
+            checkCaptureState()
             rizzseHandler.postDelayed(this, 2000)
+        }
+    }
+
+    private fun checkCaptureState() {
+        if (!::rizzseRecordButton.isInitialized) return
+        val prefs = getSharedPreferences("dating_copilot", MODE_PRIVATE)
+        val isCapturing = prefs.getBoolean("capture_active", false)
+        android.util.Log.d("CaptureCheck", "isCapturing=$isCapturing, buttonText=${rizzseRecordButton.text}")
+
+        if (isCapturing && rizzseRecordButton.text != "STOP") {
+            rizzseRecordButton.text = "STOP"
+            rizzseRecordButton.setTextColor(0xFFFF6B6B.toInt())
+            rizzseRecordButton.setOnClickListener {
+                val p = getSharedPreferences("dating_copilot", MODE_PRIVATE)
+                p.edit().putBoolean("capture_active", false).apply()
+            }
+        } else if (!isCapturing && rizzseRecordButton.text == "STOP") {
+            rizzseRecordButton.text = "RECORD"
+            rizzseRecordButton.setTextColor(uiColor(R.color.accent_violet))
+            rizzseRecordButton.setOnClickListener(null)
+            rizzseRecordButton.setOnLongClickListener(null)
         }
     }
 
@@ -471,6 +533,7 @@ class NboardImeService : InputMethodService() {
                 lastRizzseJson = null
                 rizzseSuggestions = emptyList()
                 setPredictionWords(emptyList())
+                hideSuggestionsPanel()
             }
             return
         }
@@ -481,7 +544,56 @@ class NboardImeService : InputMethodService() {
             val suggestions: List<com.google.gson.JsonObject> = com.google.gson.Gson().fromJson(json, type)
             rizzseSuggestions = suggestions.map { it.get("text").asString }
             setPredictionWords(rizzseSuggestions)
+            showSuggestionsPanel(rizzseSuggestions)
         } catch (_: Exception) {}
+    }
+
+    private fun showSuggestionsPanel(suggestions: List<String>) {
+        if (!::rizzseSuggestionsPanel.isInitialized) return
+        val panels = listOf(rizzseSuggestion1, rizzseSuggestion2, rizzseSuggestion3)
+        val texts = listOf(rizzseSuggestion1Text, rizzseSuggestion2Text, rizzseSuggestion3Text)
+        var visibleCount = 0
+        for (i in 0 until minOf(suggestions.size, 3)) {
+            texts[i].text = suggestions[i]
+            panels[i].visibility = android.view.View.VISIBLE
+            visibleCount++
+        }
+        for (i in visibleCount until 3) {
+            panels[i].visibility = android.view.View.GONE
+        }
+        rizzseSuggestionsPanel.visibility = if (visibleCount > 0) android.view.View.VISIBLE else android.view.View.GONE
+    }
+
+    private fun hideSuggestionsPanel() {
+        if (!::rizzseSuggestionsPanel.isInitialized) return
+        rizzseSuggestionsPanel.visibility = android.view.View.GONE
+    }
+
+    private fun dismissSuggestion(index: Int) {
+        val panels = listOf(rizzseSuggestion1, rizzseSuggestion2, rizzseSuggestion3)
+        if (index < panels.size) {
+            panels[index].visibility = android.view.View.GONE
+        }
+        val remaining = listOf(rizzseSuggestion1, rizzseSuggestion2, rizzseSuggestion3).count { it.visibility == android.view.View.VISIBLE }
+        if (remaining == 0) {
+            hideSuggestionsPanel()
+            lastRizzseJson = null
+            rizzseSuggestions = emptyList()
+            val prefs = getSharedPreferences("dating_copilot", MODE_MULTI_PROCESS)
+            prefs.edit().remove("pending_keyboard_suggestions").apply()
+        }
+    }
+
+    private fun onSuggestionClicked(view: android.widget.TextView) {
+        val text = view.text.toString()
+        if (text.isNotEmpty()) {
+            currentInputConnection?.commitText(text, 1)
+        }
+        hideSuggestionsPanel()
+        lastRizzseJson = null
+        rizzseSuggestions = emptyList()
+        val prefs = getSharedPreferences("dating_copilot", MODE_MULTI_PROCESS)
+        prefs.edit().remove("pending_keyboard_suggestions").apply()
     }
 
     private fun createUiModeContext(uiNightMode: Int): Context {
@@ -609,6 +721,22 @@ class NboardImeService : InputMethodService() {
         rizzseAiButton = root.findViewById(R.id.rizzseAiButton)
         actionButton = root.findViewById(R.id.actionButton)
 
+        rizzseSuggestionsPanel = root.findViewById(R.id.rizzseSuggestionsPanel)
+        rizzseSuggestion1 = root.findViewById(R.id.rizzseSuggestion1)
+        rizzseSuggestion2 = root.findViewById(R.id.rizzseSuggestion2)
+        rizzseSuggestion3 = root.findViewById(R.id.rizzseSuggestion3)
+        rizzseSuggestion1Text = root.findViewById(R.id.rizzseSuggestion1Text)
+        rizzseSuggestion2Text = root.findViewById(R.id.rizzseSuggestion2Text)
+        rizzseSuggestion3Text = root.findViewById(R.id.rizzseSuggestion3Text)
+
+        rizzseSuggestion1.setOnClickListener { onSuggestionClicked(rizzseSuggestion1Text) }
+        rizzseSuggestion2.setOnClickListener { onSuggestionClicked(rizzseSuggestion2Text) }
+        rizzseSuggestion3.setOnClickListener { onSuggestionClicked(rizzseSuggestion3Text) }
+
+        root.findViewById<android.view.View>(R.id.rizzseSuggestion1Close)?.setOnClickListener { dismissSuggestion(0) }
+        root.findViewById<android.view.View>(R.id.rizzseSuggestion2Close)?.setOnClickListener { dismissSuggestion(1) }
+        root.findViewById<android.view.View>(R.id.rizzseSuggestion3Close)?.setOnClickListener { dismissSuggestion(2) }
+
         keyboardRoot.clipChildren = false
         keyRowsContainer.clipChildren = false
         row0.clipChildren = false
@@ -642,6 +770,7 @@ class NboardImeService : InputMethodService() {
         rightPunctuationButton.background = uiDrawable(R.drawable.bg_key)
         clipboardButton.background = uiDrawable(R.drawable.bg_special_key)
         actionButton.background = uiDrawable(R.drawable.bg_special_key)
+        rizzseAiButton.background = uiDrawable(R.drawable.bg_chip)
         emojiSearchPill.background = uiDrawable(R.drawable.bg_ai_pill)
         emojiSearchIconButton.background = null
         recentClipboardChip.background = uiDrawable(R.drawable.bg_chip)
@@ -700,9 +829,9 @@ class NboardImeService : InputMethodService() {
         aiModeButton.contentDescription = "Left mode key"
         rightPunctuationButton.contentDescription = "Period key"
         clipboardButton.contentDescription = "Right mode key"
-        rizzseButton.contentDescription = "RizzSe"
+        rizzseButton.contentDescription = "RizzSe screenshot"
         rizzseRecordButton.text = "RECORD"
-        rizzseAiButton.contentDescription = "AI Assistant"
+        rizzseAiButton.contentDescription = "Open RizzSe app"
         actionButton.contentDescription = "Action"
         aiPromptToggleButton.contentDescription = "Toggle AI mode"
         emojiSearchIconButton.contentDescription = "Search emoji"
@@ -711,8 +840,17 @@ class NboardImeService : InputMethodService() {
 
         setIcon(aiPromptToggleButton, R.drawable.ic_ai_custom, R.color.key_text)
         setIcon(rizzseButton, R.drawable.ic_camera_rizzse, R.color.key_text)
+        setIcon(clipboardButton, R.drawable.ic_clipboard_lucide, R.color.key_text)
+        setIcon(actionButton, R.drawable.ic_send_lucide, R.color.key_text)
+        setIcon(aiModeButton, R.drawable.ic_ai_custom, R.color.key_text)
         setIcon(emojiSearchIconButton, R.drawable.ic_smile_lucide, R.color.ai_text)
         setIcon(recentClipboardChevronButton, R.drawable.ic_chevron_down_lucide, R.color.key_text)
+
+        val recordIcon = uiDrawable(R.drawable.ic_mic_lucide)?.mutate()
+        recordIcon?.setTint(uiColor(R.color.key_text))
+        rizzseRecordButton.setCompoundDrawablesRelativeWithIntrinsicBounds(recordIcon, null, null, null)
+        rizzseRecordButton.compoundDrawablePadding = dp(6)
+        rizzseAiButton.setTextColor(uiColor(R.color.accent_violet))
         recentClipboardChevronButton.setPadding(0, 0, 0, 0)
         val clipboardIcon = uiDrawable(R.drawable.ic_clipboard_lucide)?.mutate()
         clipboardIcon?.setTint(uiColor(R.color.key_text))
@@ -723,6 +861,10 @@ class NboardImeService : InputMethodService() {
         recentClipboardChip.minWidth = 0
         recentClipboardChip.minimumWidth = 0
         updateBottomModeIcons()
+
+        rizzseButton.visibility = View.GONE
+        clipboardButton.visibility = View.GONE
+        aiModeButton.visibility = View.GONE
 
         flattenView(aiQuickActionsRow)
         flattenView(aiSummarizeButton)
@@ -937,15 +1079,13 @@ class NboardImeService : InputMethodService() {
             true
         }
 
-        bindPressAction(rizzseRecordButton) { dispatchRizzseAction("screenshot") }
+        bindPressAction(rizzseRecordButton) { dispatchRizzseAction("record") }
         rizzseRecordButton.setOnLongClickListener {
             dispatchRizzseAction("record")
             true
         }
 
-        bindPressAction(rizzseAiButton) {
-            toggleAiMode()
-        }
+        bindPressAction(rizzseAiButton) { dispatchRizzseAction("open_app") }
 
         configureKeyTouch(
             view = actionButton,
