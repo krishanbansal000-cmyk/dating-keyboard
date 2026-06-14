@@ -4,8 +4,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
@@ -22,9 +24,11 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import android.view.Display
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import androidx.core.content.ContextCompat
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -59,9 +63,34 @@ class ScreenshotCaptureService : Service() {
     private var overlayView: View? = null
     private var overlayTimerText: TextView? = null
     private var overlayTimerRunnable: Runnable? = null
+    private var fallbackFinishRunnable: Runnable? = null
+    private var captureEndTime: Long = 0
+
+    private val extendCaptureReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != "com.datingcopilot.keyboard.EXTEND_CAPTURE") return
+            val extendMs = intent.getLongExtra("extend_ms", 2000)
+            if (captureFinished) return
+            captureDurationMs += extendMs
+            captureEndTime += extendMs
+            getSharedPreferences("dating_copilot", MODE_PRIVATE)
+                .edit().putLong("capture_end_time", captureEndTime).apply()
+            // Repost fallback timeout
+            fallbackFinishRunnable?.let { handler.removeCallbacks(it) }
+            val width = captureWidth
+            val height = captureHeight
+            fallbackFinishRunnable = Runnable {
+                if (captureFinished) return@Runnable
+                if (capturedFrames.isEmpty()) Log.w(TAG, "No frames captured")
+                finishCapture(width, height)
+            }
+            handler.postDelayed(fallbackFinishRunnable!!, (captureEndTime - System.currentTimeMillis()).coerceAtLeast(500))
+            Log.d(TAG, "Extended capture by ${extendMs}ms, new duration=${captureDurationMs}ms")
+        }
+    }
 
     private val maxFrames = 10
-    private val captureDurationMs = 5000L
+    private var captureDurationMs = 6000L
     private val minCaptureDurationMs = 1500L
     private val stableStopMs = 600L
     private val frameIntervalMs = 200L
@@ -85,16 +114,25 @@ class ScreenshotCaptureService : Service() {
             }
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
+        ContextCompat.registerReceiver(
+            this,
+            extendCaptureReceiver,
+            IntentFilter("com.datingcopilot.keyboard.EXTEND_CAPTURE"),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+            override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "onStartCommand")
         currentSessionId++
         val sessionId = currentSessionId
+        captureDurationMs = 6000L
+        captureEndTime = System.currentTimeMillis() + captureDurationMs
         val prefs = getSharedPreferences("dating_copilot", MODE_PRIVATE)
         prefs.edit()
             .putBoolean("capture_active", true)
             .putLong("capture_start_time", System.currentTimeMillis())
+            .putLong("capture_end_time", captureEndTime)
             .remove("pending_keyboard_suggestions")
             .remove("suggestions_show_time")
             .apply()
@@ -216,11 +254,12 @@ class ScreenshotCaptureService : Service() {
         handler.post(processingLoopRunnable)
         showRecordingOverlay()
 
-        handler.postDelayed({
-            if (captureFinished) return@postDelayed
+        fallbackFinishRunnable = Runnable {
+            if (captureFinished) return@Runnable
             if (capturedFrames.isEmpty()) Log.w(TAG, "No frames captured")
             finishCapture(width, height)
-        }, captureDurationMs + 500)
+        }
+        handler.postDelayed(fallbackFinishRunnable!!, captureDurationMs + 500)
     }
 
     private fun processImage(image: Image, width: Int, height: Int) {
@@ -476,7 +515,7 @@ class ScreenshotCaptureService : Service() {
             container.addView(dot)
 
             overlayTimerText = TextView(this).apply {
-                text = "  0s / 5s"
+                text = "  0s / 6s"
                 textSize = 13f
                 setTextColor(0xFFFFFFFF.toInt())
                 setTypeface(null, android.graphics.Typeface.BOLD)
@@ -557,6 +596,7 @@ class ScreenshotCaptureService : Service() {
         capturedFrames.forEach { if (!it.isRecycled) it.recycle() }
         capturedFrames.clear()
         getSharedPreferences("dating_copilot", MODE_PRIVATE).edit().putBoolean("capture_active", false).apply()
+        try { unregisterReceiver(extendCaptureReceiver) } catch (_: Exception) {}
         try { stopForeground(STOP_FOREGROUND_REMOVE) } catch (_: Exception) {}
         super.onDestroy()
     }

@@ -1232,11 +1232,27 @@ public class LatinIME extends InputMethodService implements
         if (mInputView == null) {
             return;
         }
+        final int inputHeight = mInputView.getHeight();
         final View visibleKeyboardView = mKeyboardSwitcher.getWrapperView();
+
+        // Minimized capture mode: hide keyboard body, only show recording panel
+        boolean isRecordingMinimized = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+                .getBoolean("capture_active", false);
+        if (isRecordingMinimized && rizzsePanel != null && rizzsePanel.getParent() != null && rizzsePanel.getHeight() > 0
+                && visibleKeyboardView != null) {
+            int panelHeight = rizzsePanel.getHeight();
+            int touchTop = Math.max(0, inputHeight - panelHeight);
+            outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION;
+            outInsets.touchableRegion.set(0, touchTop, visibleKeyboardView.getWidth(), inputHeight + EXTENDED_TOUCHABLE_REGION_HEIGHT);
+            outInsets.contentTopInsets = touchTop;
+            outInsets.visibleTopInsets = touchTop;
+            mInsetsUpdater.setInsets(outInsets);
+            return;
+        }
+
         if (visibleKeyboardView == null) {
             return;
         }
-        final int inputHeight = mInputView.getHeight();
         if (isImeSuppressedByHardwareKeyboard() && !visibleKeyboardView.isShown()) {
             // If there is a hardware keyboard and a visible software keyboard view has been hidden,
             // no visual element will be shown on the screen.
@@ -1537,6 +1553,8 @@ public class LatinIME extends InputMethodService implements
     private boolean rizzseIsShowingSuggestions = false;
     private Runnable rizzseTimerRunnable;
     private Runnable rizzseDismissRunnable;
+    private Runnable rizzseErrorDismissRunnable;
+    private final java.util.List<android.view.View> rizzseHiddenKeyboardViews = new java.util.ArrayList<>();
     private static final long RIZZSE_SUGGESTION_SHELF_LIFE_MS = 3 * 60 * 1000; // 3 minutes
 
     private void showPendingRizzseSuggestions() {
@@ -1553,6 +1571,10 @@ public class LatinIME extends InputMethodService implements
             if (rizzseDismissRunnable != null) {
                 mHandler.removeCallbacks(rizzseDismissRunnable);
                 rizzseDismissRunnable = null;
+            }
+            if (rizzseErrorDismissRunnable != null) {
+                mHandler.removeCallbacks(rizzseErrorDismissRunnable);
+                rizzseErrorDismissRunnable = null;
             }
 
             android.content.SharedPreferences rizzsePrefs = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE);
@@ -1667,18 +1689,34 @@ public class LatinIME extends InputMethodService implements
                 });
                 headerRow.addView(retryBtn);
 
+                // Auto-dismiss error panel after 4 seconds
+                rizzseErrorDismissRunnable = () -> {
+                    try {
+                        getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+                            .edit().remove("capture_error").remove("suggestions_show_time").apply();
+                        currentRizzseSuggestions.clear();
+                        rizzseIsShowingSuggestions = false;
+                        if (rizzsePanel != null) {
+                            android.view.ViewGroup p = (android.view.ViewGroup) rizzsePanel.getParent();
+                            if (p != null) p.removeView(rizzsePanel);
+                            rizzsePanel = null;
+                        }
+                        restoreHiddenKeyboardViews();
+                        if (mInputView != null) mInputView.post(() -> updateFullscreenMode());
+                    } catch (Exception ignored) {}
+                };
+                mHandler.postDelayed(rizzseErrorDismissRunnable, 4000);
+
             } else if (isCapturing) {
                 android.widget.TextView appIcon = new android.widget.TextView(this);
                 appIcon.setText("\u26A1");
                 appIcon.setTextSize(18);
                 headerRow.addView(appIcon);
-                long startTime = rizzsePrefs.getLong("capture_start_time", System.currentTimeMillis());
-                long maxDurationSec = 5;
+                long endTime = rizzsePrefs.getLong("capture_end_time", System.currentTimeMillis() + 6000);
                 android.widget.TextView timerText = new android.widget.TextView(this);
                 timerText.setId(android.view.View.generateViewId());
-                long elapsed = (System.currentTimeMillis() - startTime) / 1000;
-                long remaining = maxDurationSec - elapsed;
-                timerText.setText(String.format("  %ds left", Math.max(0, remaining)));
+                long remaining = Math.max(0, (endTime - System.currentTimeMillis()) / 1000);
+                timerText.setText(String.format("  %ds left", remaining));
                 timerText.setTextSize(14);
                 timerText.setTextColor(0xFFFF38F8);
                 timerText.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -1695,11 +1733,10 @@ public class LatinIME extends InputMethodService implements
                         try {
                             android.widget.TextView tv = rizzsePanel != null ? rizzsePanel.findViewById(timerViewId) : null;
                             if (tv != null) {
-                                long s = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
-                                    .getLong("capture_start_time", System.currentTimeMillis());
-                                long sec = (System.currentTimeMillis() - s) / 1000;
-                                long rem = maxDurationSec - sec;
-                                tv.setText(String.format("  %ds left", Math.max(0, rem)));
+                                long end = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+                                    .getLong("capture_end_time", System.currentTimeMillis());
+                                long rem = Math.max(0, (end - System.currentTimeMillis()) / 1000);
+                                tv.setText(String.format("  %ds left", rem));
                             }
                             if (getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
                                     .getBoolean("capture_active", false)) {
@@ -1709,6 +1746,23 @@ public class LatinIME extends InputMethodService implements
                     }
                 };
                 mHandler.postDelayed(rizzseTimerRunnable, 1000);
+
+                android.widget.TextView extendBtn = new android.widget.TextView(this);
+                extendBtn.setText("  +2s  ");
+                extendBtn.setTextSize(13);
+                extendBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+                extendBtn.setTextColor(0xFFFFFFFF);
+                extendBtn.setPadding(dp * 12, dp * 6, dp * 12, dp * 6);
+                extendBtn.setMinHeight(dp * 34);
+                extendBtn.setGravity(android.view.Gravity.CENTER);
+                android.graphics.drawable.GradientDrawable extendBg = new android.graphics.drawable.GradientDrawable();
+                extendBg.setCornerRadius(dp * 12);
+                extendBg.setColor(0xFF2E7D32);
+                extendBtn.setBackground(extendBg);
+                extendBtn.setClickable(true);
+                extendBtn.setFocusable(true);
+                extendBtn.setOnClickListener(v -> extendRecordingBy(2000));
+                headerRow.addView(extendBtn);
 
                 android.widget.TextView stopBtn = new android.widget.TextView(this);
                 stopBtn.setText("  Stop  ");
@@ -1762,27 +1816,26 @@ public class LatinIME extends InputMethodService implements
                 containerLp.setMarginEnd(dp * 8);
                 spinnerContainer.setLayoutParams(containerLp);
 
-                // Create a circular progress ring using ImageView + ObjectAnimator
+                // Create a circular progress ring using ImageView + rotating animation
                 android.widget.ImageView spinner = new android.widget.ImageView(this);
-                android.graphics.drawable.GradientDrawable ringDrawable = new android.graphics.drawable.GradientDrawable();
-                ringDrawable.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-                ringDrawable.setColor(0x00000000);
-                ringDrawable.setStroke(dp * 3, 0xFFFF38F8);
-                spinner.setBackground(ringDrawable);
+                spinner.setImageResource(R.drawable.rizzse_spinner_ring);
                 android.widget.FrameLayout.LayoutParams spinnerLp = new android.widget.FrameLayout.LayoutParams(
                         android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                         android.widget.FrameLayout.LayoutParams.MATCH_PARENT);
                 spinnerLp.gravity = android.view.Gravity.CENTER;
                 spinner.setLayoutParams(spinnerLp);
+                spinner.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
                 spinnerContainer.addView(spinner);
 
-                // Use ObjectAnimator for smooth, continuous rotation
-                android.animation.ObjectAnimator rotateAnimator = android.animation.ObjectAnimator.ofFloat(
-                        spinner, "rotation", 0f, 360f);
-                rotateAnimator.setDuration(1200);
-                rotateAnimator.setRepeatCount(android.animation.ObjectAnimator.INFINITE);
-                rotateAnimator.setInterpolator(new android.view.animation.LinearInterpolator());
-                rotateAnimator.start();
+                android.view.animation.RotateAnimation rotateAnim = new android.view.animation.RotateAnimation(
+                        0f, 360f,
+                        android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f,
+                        android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f);
+                rotateAnim.setDuration(1200);
+                rotateAnim.setRepeatCount(android.view.animation.Animation.INFINITE);
+                rotateAnim.setInterpolator(new android.view.animation.LinearInterpolator());
+                rotateAnim.setFillAfter(true);
+                spinner.startAnimation(rotateAnim);
 
                 headerRow.addView(spinnerContainer);
 
@@ -1838,17 +1891,11 @@ public class LatinIME extends InputMethodService implements
                     chipText.setTextSize(12);
                     chipText.setTextColor(0xFFE9D5FF);
                     chipText.setPadding(dp * 14, dp * 10, dp * 14, dp * 10);
+                    chipText.setMinHeight(dp * 64);
                     chipText.setGravity(android.view.Gravity.CENTER_VERTICAL);
-                    chipScrollInner.addView(chipText);
-
-                    android.graphics.drawable.GradientDrawable chipBg = new android.graphics.drawable.GradientDrawable();
-                    chipBg.setCornerRadius(dp * 10);
-                    chipBg.setColor(0xFF2A1535);
-                    chipBg.setStroke(dp, chipColors[i % chipColors.length]);
-                    chipScrollInner.setBackground(chipBg);
-                    chipScrollInner.setClickable(true);
-                    chipScrollInner.setFocusable(true);
-                    chipScrollInner.setOnClickListener(v -> {
+                    chipText.setClickable(true);
+                    chipText.setFocusable(true);
+                    chipText.setOnClickListener(v -> {
                         try {
                             final android.view.inputmethod.InputConnection ic = getCurrentInputConnection();
                             if (ic != null) ic.commitText(suggestionText, 1);
@@ -1856,9 +1903,16 @@ public class LatinIME extends InputMethodService implements
                         currentRizzseSuggestions.clear();
                         mHandler.post(() -> removeRizzsePanel());
                     });
+                    chipScrollInner.addView(chipText);
+
+                    android.graphics.drawable.GradientDrawable chipBg = new android.graphics.drawable.GradientDrawable();
+                    chipBg.setCornerRadius(dp * 10);
+                    chipBg.setColor(0xFF2A1535);
+                    chipBg.setStroke(dp, chipColors[i % chipColors.length]);
+                    chipScrollInner.setBackground(chipBg);
 
                     android.widget.LinearLayout.LayoutParams chipLp = new android.widget.LinearLayout.LayoutParams(
-                            dp * 200, dp * 64);
+                            dp * 200, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
                     chipLp.setMargins(dp * 3, 0, dp * 3, 0);
                     chipRow.addView(chipScrollInner, chipLp);
                 }
@@ -1896,12 +1950,20 @@ public class LatinIME extends InputMethodService implements
                 mHandler.postDelayed(rizzseDismissRunnable, RIZZSE_SUGGESTION_SHELF_LIFE_MS);
             }
 
-            // Always add headerRow - it contains timer/stop for recording, or status for analyzing
-            rizzsePanel.addView(headerRow, 0);
+            // Only add headerRow when it has content (recording/analyzing/error states)
+            if (headerRow.getChildCount() > 0) {
+                rizzsePanel.addView(headerRow, 0);
+            }
 
             android.view.ViewGroup mainFrame = findViewByType(mInputView, android.widget.LinearLayout.class);
             if (mainFrame != null) {
                 mainFrame.addView(rizzsePanel, 0);
+                if (isCapturing) {
+                    restoreHiddenKeyboardViews();
+                    minimizeKeyboardViews(mainFrame);
+                } else {
+                    restoreHiddenKeyboardViews();
+                }
             }
 
             mInputView.post(() -> updateFullscreenMode());
@@ -1932,7 +1994,42 @@ public class LatinIME extends InputMethodService implements
                 if (parent != null) parent.removeView(rizzsePanel);
                 rizzsePanel = null;
             }
+            restoreHiddenKeyboardViews();
             mInputView.post(() -> updateFullscreenMode());
+        } catch (Exception ignored) {}
+    }
+
+    private void extendRecordingBy(long ms) {
+        try {
+            android.content.SharedPreferences prefs = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE);
+            long endTime = prefs.getLong("capture_end_time", System.currentTimeMillis() + 5000);
+            long newEndTime = endTime + ms;
+            prefs.edit().putLong("capture_end_time", newEndTime).apply();
+            sendBroadcast(new android.content.Intent("com.datingcopilot.keyboard.EXTEND_CAPTURE")
+                .setPackage(getPackageName())
+                .putExtra("extend_ms", ms));
+        } catch (Exception ignored) {}
+    }
+
+    private void minimizeKeyboardViews(android.view.ViewGroup mainFrame) {
+        try {
+            for (int i = 0; i < mainFrame.getChildCount(); i++) {
+                android.view.View child = mainFrame.getChildAt(i);
+                if (child == rizzsePanel) continue;
+                if (child.getVisibility() != android.view.View.GONE) {
+                    child.setVisibility(android.view.View.GONE);
+                    rizzseHiddenKeyboardViews.add(child);
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void restoreHiddenKeyboardViews() {
+        try {
+            for (android.view.View child : rizzseHiddenKeyboardViews) {
+                child.setVisibility(android.view.View.VISIBLE);
+            }
+            rizzseHiddenKeyboardViews.clear();
         } catch (Exception ignored) {}
     }
 
