@@ -33,6 +33,10 @@ AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "12"))
 AI_MAX_WORKERS = int(os.getenv("AI_MAX_WORKERS", "16"))
 ai_executor = ThreadPoolExecutor(max_workers=AI_MAX_WORKERS)
 
+gemini_session = http_requests.Session()
+adapter = http_requests.adapters.HTTPAdapter(pool_connections=4, pool_maxsize=16)
+gemini_session.mount("https://", adapter)
+
 # Anthropic-compatible models (use Messages API endpoint)
 ANTHROPIC_MODELS = {"qwen3.7-plus", "qwen3.7-max", "qwen3.6-plus", "minimax-m3", "minimax-m2.7", "minimax-m2.5"}
 
@@ -302,7 +306,7 @@ def call_gemini(messages, system_prompt=SYSTEM_PROMPT, max_tokens=120, temperatu
             "candidateCount": 1
         }
     }
-    response = http_requests.post(url, params={"key": GEMINI_API_KEY}, json=payload, timeout=45)
+    response = gemini_session.post(url, params={"key": GEMINI_API_KEY}, json=payload, timeout=15)
     if not response.ok:
         raise RuntimeError(f"Gemini failed: HTTP {response.status_code} - {response.text[:500]}")
     data = response.json()
