@@ -368,7 +368,8 @@ class ApiClient(context: Context) {
         persona: String,
         context: Context,
         intent: String = "keep_going",
-        platform: String = "whatsapp"
+        platform: String = "whatsapp",
+        inputText: String = ""
     ): AnalyzeResponse? {
         return try {
             // Copy URI content to temp file - detect MIME type
@@ -404,6 +405,7 @@ class ApiClient(context: Context) {
                 .addFormDataPart("user_gender", prefs.getString("user_gender", "male") ?: "male")
                 .addFormDataPart("hinglish", if (prefs.getBoolean("hinglish_mode", false)) "true" else "false")
                 .addFormDataPart("user_id", "user_001")
+                .addFormDataPart("input_text", inputText)
                 .build()
 
             val request = Request.Builder()

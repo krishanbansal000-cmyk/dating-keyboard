@@ -167,9 +167,16 @@ public class LatinIME extends InputMethodService implements
                 requestShowSelf(0);
                 mHandler.postDelayed(() -> showPendingRizzseSuggestions(), 500);
             } else if ("com.datingcopilot.keyboard.CAPTURE_STOPPED".equals(action)) {
-                // Capture finished - now show "Analyzing..." and start polling
-                getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
-                    .edit().putBoolean("show_analyzing", true).apply();
+                // Capture finished - check if there's an error before showing "Analyzing..."
+                android.content.SharedPreferences prefs = getSharedPreferences("dating_copilot", Context.MODE_PRIVATE);
+                String error = prefs.getString("capture_error", null);
+                if (error == null) {
+                    // No error, show analyzing
+                    prefs.edit().putBoolean("show_analyzing", true).apply();
+                } else {
+                    // Error occurred, clear analyzing flag so error shows
+                    prefs.edit().putBoolean("show_analyzing", false).apply();
+                }
                 mHandler.postDelayed(() -> showPendingRizzseSuggestions(), 500);
             }
         }
@@ -1608,7 +1615,10 @@ public class LatinIME extends InputMethodService implements
             }
             rizzseIsShowingSuggestions = false;
 
-            if (!isCapturing && !showAnalyzing && !hasSuggestions) return;
+            String captureError = rizzsePrefs.getString("capture_error", null);
+            boolean hasError = captureError != null && !captureError.isEmpty();
+
+            if (!isCapturing && !showAnalyzing && !hasSuggestions && !hasError) return;
 
             int dp = (int) getResources().getDisplayMetrics().density;
 
@@ -1622,7 +1632,42 @@ public class LatinIME extends InputMethodService implements
             headerRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
             headerRow.setPadding(dp * 14, dp * 10, dp * 14, dp * 6);
 
-            if (isCapturing) {
+            if (hasError) {
+                android.widget.TextView appIcon = new android.widget.TextView(this);
+                appIcon.setText("\u26A1");
+                appIcon.setTextSize(18);
+                headerRow.addView(appIcon);
+
+                android.widget.TextView errorText = new android.widget.TextView(this);
+                errorText.setText(captureError);
+                errorText.setTextSize(13);
+                errorText.setTextColor(0xFFFF6B6B);
+                errorText.setTypeface(null, android.graphics.Typeface.BOLD);
+                android.widget.LinearLayout.LayoutParams errorLp = new android.widget.LinearLayout.LayoutParams(
+                        0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                errorLp.setMargins(dp * 4, 0, 0, 0);
+                headerRow.addView(errorText, errorLp);
+
+                android.widget.TextView retryBtn = new android.widget.TextView(this);
+                retryBtn.setText("\u2715");
+                retryBtn.setTextSize(16);
+                retryBtn.setTextColor(0xFFFFFFFF);
+                retryBtn.setClickable(true);
+                retryBtn.setFocusable(true);
+                retryBtn.setOnClickListener(v -> {
+                    getSharedPreferences("dating_copilot", Context.MODE_PRIVATE)
+                        .edit().remove("capture_error").remove("suggestions_show_time").apply();
+                    currentRizzseSuggestions.clear();
+                    rizzseIsShowingSuggestions = false;
+                    if (rizzsePanel != null) {
+                        android.view.ViewGroup p = (android.view.ViewGroup) rizzsePanel.getParent();
+                        if (p != null) p.removeView(rizzsePanel);
+                        rizzsePanel = null;
+                    }
+                });
+                headerRow.addView(retryBtn);
+
+            } else if (isCapturing) {
                 android.widget.TextView appIcon = new android.widget.TextView(this);
                 appIcon.setText("\u26A1");
                 appIcon.setTextSize(18);
@@ -1710,12 +1755,36 @@ public class LatinIME extends InputMethodService implements
                 statusLp.setMargins(dp * 4, 0, 0, 0);
                 headerRow.addView(status, statusLp);
 
-                android.widget.ProgressBar spinner = new android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleSmall);
-                android.widget.LinearLayout.LayoutParams spinnerLp = new android.widget.LinearLayout.LayoutParams(
-                        dp * 22, dp * 22);
-                spinnerLp.setMarginEnd(dp * 8);
-                spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(0xFFFF38F8));
-                headerRow.addView(spinner, spinnerLp);
+                // Animated spinning ring using ObjectAnimator for smooth consistent rotation
+                android.widget.FrameLayout spinnerContainer = new android.widget.FrameLayout(this);
+                android.widget.LinearLayout.LayoutParams containerLp = new android.widget.LinearLayout.LayoutParams(
+                        dp * 28, dp * 28);
+                containerLp.setMarginEnd(dp * 8);
+                spinnerContainer.setLayoutParams(containerLp);
+
+                // Create a circular progress ring using ImageView + ObjectAnimator
+                android.widget.ImageView spinner = new android.widget.ImageView(this);
+                android.graphics.drawable.GradientDrawable ringDrawable = new android.graphics.drawable.GradientDrawable();
+                ringDrawable.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+                ringDrawable.setColor(0x00000000);
+                ringDrawable.setStroke(dp * 3, 0xFFFF38F8);
+                spinner.setBackground(ringDrawable);
+                android.widget.FrameLayout.LayoutParams spinnerLp = new android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT);
+                spinnerLp.gravity = android.view.Gravity.CENTER;
+                spinner.setLayoutParams(spinnerLp);
+                spinnerContainer.addView(spinner);
+
+                // Use ObjectAnimator for smooth, continuous rotation
+                android.animation.ObjectAnimator rotateAnimator = android.animation.ObjectAnimator.ofFloat(
+                        spinner, "rotation", 0f, 360f);
+                rotateAnimator.setDuration(1200);
+                rotateAnimator.setRepeatCount(android.animation.ObjectAnimator.INFINITE);
+                rotateAnimator.setInterpolator(new android.view.animation.LinearInterpolator());
+                rotateAnimator.start();
+
+                headerRow.addView(spinnerContainer);
 
                 mHandler.postDelayed(() -> showPendingRizzseSuggestions(), 1000);
 
@@ -1760,24 +1829,26 @@ public class LatinIME extends InputMethodService implements
                     final String suggestionText = currentRizzseSuggestions.get(i);
                     if (suggestionText.isEmpty()) continue;
 
-                    android.widget.TextView chip = new android.widget.TextView(this);
-                    chip.setText(suggestionText);
-                    chip.setTextSize(12);
-                    chip.setTextColor(0xFFE9D5FF);
-                    chip.setMaxLines(2);
-                    chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                    chip.setPadding(dp * 14, dp * 10, dp * 14, dp * 10);
-                    chip.setMinHeight(dp * 56);
-                    chip.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                    android.widget.ScrollView chipScrollInner = new android.widget.ScrollView(this);
+                    chipScrollInner.setVerticalScrollBarEnabled(false);
+                    chipScrollInner.setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
+
+                    android.widget.TextView chipText = new android.widget.TextView(this);
+                    chipText.setText(suggestionText);
+                    chipText.setTextSize(12);
+                    chipText.setTextColor(0xFFE9D5FF);
+                    chipText.setPadding(dp * 14, dp * 10, dp * 14, dp * 10);
+                    chipText.setGravity(android.view.Gravity.CENTER_VERTICAL);
+                    chipScrollInner.addView(chipText);
 
                     android.graphics.drawable.GradientDrawable chipBg = new android.graphics.drawable.GradientDrawable();
                     chipBg.setCornerRadius(dp * 10);
                     chipBg.setColor(0xFF2A1535);
                     chipBg.setStroke(dp, chipColors[i % chipColors.length]);
-                    chip.setBackground(chipBg);
-                    chip.setClickable(true);
-                    chip.setFocusable(true);
-                    chip.setOnClickListener(v -> {
+                    chipScrollInner.setBackground(chipBg);
+                    chipScrollInner.setClickable(true);
+                    chipScrollInner.setFocusable(true);
+                    chipScrollInner.setOnClickListener(v -> {
                         try {
                             final android.view.inputmethod.InputConnection ic = getCurrentInputConnection();
                             if (ic != null) ic.commitText(suggestionText, 1);
@@ -1786,11 +1857,10 @@ public class LatinIME extends InputMethodService implements
                         mHandler.post(() -> removeRizzsePanel());
                     });
 
-                    // Fixed width so text wraps to 2 lines
                     android.widget.LinearLayout.LayoutParams chipLp = new android.widget.LinearLayout.LayoutParams(
-                            dp * 200, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+                            dp * 200, dp * 64);
                     chipLp.setMargins(dp * 3, 0, dp * 3, 0);
-                    chipRow.addView(chip, chipLp);
+                    chipRow.addView(chipScrollInner, chipLp);
                 }
 
                 // X close button

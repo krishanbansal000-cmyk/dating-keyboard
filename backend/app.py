@@ -714,6 +714,7 @@ def analyze_screenshot():
         intent = request.form.get("intent", "keep_going")
         platform = request.form.get("platform", "whatsapp")
         hinglish = truthy(request.form.get("hinglish", "false"))
+        input_text = request.form.get("input_text", "").strip()
         conversation = []
         suggestions = None
         insights = {}
@@ -738,6 +739,8 @@ def analyze_screenshot():
                 
                 is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
                 context_prompt = build_context_prompt(persona, intent, platform, hinglish)
+                if input_text:
+                    context_prompt += f' The user has started typing: "{input_text}". Use this as guidance for tone/direction.'
                 
                 vision_prompt = f"""Read the chat screenshot. Reply ONLY to the latest message from them. Return EXACTLY these 3 lines and NOTHING else. Each under 100 chars. {context_prompt}
 
@@ -773,10 +776,16 @@ def analyze_screenshot():
                 if response:
                     raw_model_text = get_response_text(response)
                     suggestions = parse_suggestions(raw_model_text, persona)
-                    if len(suggestions) == 3:
+                    if len(suggestions) >= 3:
                         source = "vision_ai"
+                    elif len(suggestions) >= 1:
+                        source = "vision_ai"
+                        app.logger.info(
+                            "screenshot partial first: model=%s suggestions=%d response=%r",
+                            OPENAI_MODEL, len(suggestions), raw_model_text[:300]
+                        )
                     else:
-                        failure_reason = f"First vision response had {len(suggestions)} parseable suggestions"
+                        failure_reason = f"First vision response had 0 parseable suggestions"
                         suggestions = None
 
                 if not suggestions and AI_PROVIDER != "gemini":
@@ -810,10 +819,16 @@ def analyze_screenshot():
                     if retry_response:
                         raw_model_text = get_response_text(retry_response)
                         suggestions = parse_suggestions(raw_model_text, persona)
-                        if len(suggestions) == 3:
+                        if len(suggestions) >= 3:
                             source = "vision_ai_retry"
+                        elif len(suggestions) >= 1:
+                            source = "vision_ai_retry"
+                            app.logger.info(
+                                "screenshot partial retry: model=%s suggestions=%d response=%r",
+                                OPENAI_MODEL, len(suggestions), raw_model_text[:300]
+                            )
                         else:
-                            failure_reason = f"Retry vision response had {len(suggestions)} parseable suggestions"
+                            failure_reason = f"Retry vision response had 0 parseable suggestions"
                             suggestions = None
             
             if os.path.exists(filepath):
@@ -847,7 +862,7 @@ def analyze_screenshot():
         )
         
         return jsonify({
-            "suggestions": suggestions,
+            "suggestions": complete_suggestions(suggestions, persona),
             "persona": persona
         })
         
@@ -866,6 +881,7 @@ def analyze_screenshots():
         platform = request.form.get("platform", "whatsapp")
         hinglish = truthy(request.form.get("hinglish", "false"))
         chat_context = request.form.get("chat_context", "")
+        input_text = request.form.get("input_text", "").strip()
 
         image_files = request.files.getlist("images")
         if not image_files or all(f.filename == "" for f in image_files):
@@ -894,6 +910,8 @@ def analyze_screenshots():
 
             is_anthropic = OPENAI_MODEL in ANTHROPIC_MODELS
             context_prompt = build_context_prompt(persona, intent, platform, hinglish)
+            if input_text:
+                context_prompt += f' The user has started typing: "{input_text}". Use this as guidance for tone/direction.'
 
             context_hint = ""
             if chat_context:
@@ -951,10 +969,16 @@ def analyze_screenshots():
             if response:
                 raw_model_text = get_response_text(response)
                 suggestions = parse_suggestions(raw_model_text, persona)
-                if len(suggestions) == 3:
+                if len(suggestions) >= 3:
                     source = "vision_ai"
+                elif len(suggestions) >= 1:
+                    source = "vision_ai"
+                    app.logger.info(
+                        "analyze-screenshots partial first: model=%s suggestions=%d response=%r",
+                        OPENAI_MODEL, len(suggestions), raw_model_text[:300]
+                    )
                 else:
-                    failure_reason = f"Got {len(suggestions) if suggestions else 0} suggestions, need 3"
+                    failure_reason = f"Got 0 suggestions from first attempt"
                     suggestions = None
 
             if not suggestions and encoded_images and AI_PROVIDER != "gemini":
@@ -983,10 +1007,17 @@ def analyze_screenshots():
                 if retry_response:
                     raw_model_text = get_response_text(retry_response)
                     suggestions = parse_suggestions(raw_model_text, persona)
-                    if len(suggestions) == 3:
+                    if len(suggestions) >= 3:
                         source = "vision_ai_retry"
+                    elif len(suggestions) >= 1:
+                        source = "vision_ai_retry"
+                        app.logger.info(
+                            "analyze-screenshots partial retry: model=%s suggestions=%d response=%r",
+                            OPENAI_MODEL, len(suggestions), raw_model_text[:300]
+                        )
                     else:
-                        failure_reason = f"Retry got {len(suggestions) if suggestions else 0} suggestions"
+                        failure_reason = f"Retry got 0 suggestions"
+                        suggestions = None
 
         if not suggestions:
             app.logger.warning(
@@ -1005,7 +1036,7 @@ def analyze_screenshots():
             OPENAI_MODEL, source, len(suggestions), len(image_files), time.monotonic() - started_at
         )
         return jsonify({
-            "suggestions": suggestions,
+            "suggestions": complete_suggestions(suggestions, persona),
             "persona": persona
         })
 

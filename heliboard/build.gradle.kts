@@ -15,7 +15,7 @@ android {
         minSdk = 26
         ndk {
             abiFilters.clear()
-            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
+            abiFilters.addAll(listOf("arm64-v8a", "x86_64"))
         }
         buildConfigField("String", "VERSION_NAME", "\"3.9.0\"")
         buildConfigField("int", "VERSION_CODE", "3900")

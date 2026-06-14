@@ -29,7 +29,7 @@ class KeyboardScreenshotActivity : AppCompatActivity() {
                 putExtra(ScreenshotCaptureService.EXTRA_CHAT_CONTEXT, chatContext)
             }
             getSharedPreferences("dating_copilot", MODE_PRIVATE)
-                .edit().putBoolean("capture_active", true).apply()
+                .edit().putBoolean("capture_active", true).remove("capture_error").apply()
             startForegroundService(captureIntent)
             finish()
         }

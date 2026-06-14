@@ -28,6 +28,7 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.datingcopilot.keyboard.chat.AppHistoryStore
 import android.widget.Toast
 import java.io.File
 import java.io.FileOutputStream
@@ -59,7 +60,7 @@ class ScreenshotCaptureService : Service() {
     private var overlayTimerText: TextView? = null
     private var overlayTimerRunnable: Runnable? = null
 
-    private val maxFrames = 8
+    private val maxFrames = 10
     private val captureDurationMs = 5000L
     private val minCaptureDurationMs = 1500L
     private val stableStopMs = 600L
@@ -250,10 +251,17 @@ class ScreenshotCaptureService : Service() {
                 frameSamples.add(sampleFrame(croppedBitmap))
                 lastUniqueFrameTime = System.currentTimeMillis()
                 Log.d(TAG, "Captured frame ${capturedFrames.size}")
+                // Keep memory bounded: drop oldest frame if we exceed maxFrames
+                if (capturedFrames.size > maxFrames) {
+                    val old = capturedFrames.removeAt(0)
+                    if (!old.isRecycled) old.recycle()
+                    frameHashes.removeAt(0)
+                    frameSamples.removeAt(0)
+                }
             }
 
-            // Only stop after full 5 seconds, max frames, or user taps stop
-            if (capturedFrames.size >= maxFrames || elapsed >= captureDurationMs) {
+            // Only stop after full 5 seconds or user taps stop — ignore maxFrames
+            if (elapsed >= captureDurationMs) {
                 imageReader?.setOnImageAvailableListener(null, null)
                 finishCapture(width, height)
             }
@@ -390,6 +398,7 @@ class ScreenshotCaptureService : Service() {
                 val resolvedContext = chatContext.ifEmpty {
                     prefs.getString("rizzse_chat_context", "") ?: ""
                 }
+                val inputText = prefs.getString("rizzse_input_text", "") ?: ""
 
                 val t3 = System.currentTimeMillis()
                 val response = ApiClient(this@ScreenshotCaptureService).uploadScreenshot(
@@ -397,7 +406,8 @@ class ScreenshotCaptureService : Service() {
                     persona,
                     this@ScreenshotCaptureService,
                     intentType,
-                    platform
+                    platform,
+                    inputText
                 )
                 val t4 = System.currentTimeMillis()
                 Log.d(TAG, "TIMING API call: ${t4 - t3}ms (includes AI processing on server)")
@@ -414,15 +424,28 @@ class ScreenshotCaptureService : Service() {
                     prefs.edit()
                         .putString("pending_keyboard_suggestions", suggestionsJson)
                         .putString("pending_keyboard_context", resolvedContext)
+                        .remove("capture_error")
                         .apply()
                     Log.d(TAG, "TIMING Total pipeline: ${t4 - t0}ms | Stitch:${t1 - t0}ms | File:${t2 - t1}ms | API+AI:${t4 - t3}ms | Suggestions:${suggestions.size}")
+                    // Save to history
+                    AppHistoryStore.add(this@ScreenshotCaptureService, "Screenshot", resolvedContext, suggestions)
                     // Notify keyboard to show suggestions
                     sendBroadcast(Intent("com.datingcopilot.keyboard.SHOW_IME").apply { setPackage(packageName) })
                 } else {
                     Log.w(TAG, "TIMING API returned no suggestions, total: ${t4 - t0}ms")
+                    prefs.edit()
+                        .putString("capture_error", "No suggestions generated. Try again.")
+                        .putBoolean("show_analyzing", false)
+                        .apply()
+                    sendBroadcast(Intent("com.datingcopilot.keyboard.CAPTURE_STOPPED").apply { setPackage(packageName) })
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "TIMING Failed at ${System.currentTimeMillis() - t0}ms: ${e.message}", e)
+                prefs.edit()
+                    .putString("capture_error", "Analysis failed: ${e.message?.take(50) ?: "Unknown error"}. Try again.")
+                    .putBoolean("show_analyzing", false)
+                    .apply()
+                sendBroadcast(Intent("com.datingcopilot.keyboard.CAPTURE_STOPPED").apply { setPackage(packageName) })
             }
             stopSelf()
         }

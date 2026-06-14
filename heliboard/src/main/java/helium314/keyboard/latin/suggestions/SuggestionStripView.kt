@@ -475,6 +475,13 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     private fun dispatchRizzseAction(action: String) {
         AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS)
+        try {
+            val ime = context as? helium314.keyboard.latin.LatinIME
+            val ic = ime?.currentInputConnection
+            val inputText = ic?.getTextBeforeCursor(500, 0)?.toString()?.take(500) ?: ""
+            context.getSharedPreferences("dating_copilot", android.content.Context.MODE_PRIVATE)
+                .edit().putString("rizzse_input_text", inputText).apply()
+        } catch (e: Exception) {}
         context.sendBroadcast(Intent("com.datingcopilot.keyboard.RIZZSE_ACTION").apply {
             setPackage("com.datingcopilot.keyboard")
             putExtra("action", action)

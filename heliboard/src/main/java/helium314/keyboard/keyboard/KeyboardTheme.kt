@@ -329,9 +329,9 @@ private constructor(val themeId: Int, @JvmField val mStyleId: Int) {
                     hasBorders,
                     "#ff4bc8".toColorInt(),
                     "#16051f".toColorInt(),
-                    "#24122d".toColorInt(),
-                    "#2b1535".toColorInt(),
-                    "#211027".toColorInt(),
+                    "#4a2d5e".toColorInt(),
+                    "#5a3a70".toColorInt(),
+                    "#382048".toColorInt(),
                     "#ead7ff".toColorInt(),
                     "#a98bb9".toColorInt(),
                     keyboardBackground = backgroundImage
