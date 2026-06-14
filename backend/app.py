@@ -742,7 +742,7 @@ def analyze_screenshot():
                 if input_text:
                     context_prompt += f' The user has started typing: "{input_text}". Use this as guidance for tone/direction.'
                 
-                vision_prompt = f"""Read the chat screenshot. Reply ONLY to the latest message from them. Return EXACTLY these 3 lines and NOTHING else. Each under 100 chars. {context_prompt}
+                vision_prompt = f"""This is one chat screenshot, often a long stitched capture. Read the full visible chat from top to bottom. Reply only to the newest incoming message from them, usually near the bottom. Output exactly these 3 lines and nothing else. Keep each under 100 chars. {context_prompt}
 
 >>> Safe:
 >>> Smooth:
@@ -922,7 +922,7 @@ def analyze_screenshots():
                     context_hint = f"\n\nAdditional text context from chat:\n{ctx_text[:600]}"
 
             if len(encoded_images) == 1:
-                vision_prompt = f"""Read the chat screenshot. Reply ONLY to the latest message. Return EXACTLY these 3 lines and NOTHING else. Each under 100 chars. {context_prompt}{context_hint}
+                vision_prompt = f"""This is one chat screenshot, often a long stitched capture. Read the full visible chat from top to bottom. Reply only to the newest incoming message from them, usually near the bottom. Output exactly these 3 lines and nothing else. Keep each under 100 chars. {context_prompt}{context_hint}
 
 >>> Safe:
 >>> Smooth:
