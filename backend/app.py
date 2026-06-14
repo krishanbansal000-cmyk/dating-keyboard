@@ -33,6 +33,10 @@ AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "12"))
 AI_MAX_WORKERS = int(os.getenv("AI_MAX_WORKERS", "16"))
 ai_executor = ThreadPoolExecutor(max_workers=AI_MAX_WORKERS)
 
+gemini_session = http_requests.Session()
+adapter = http_requests.adapters.HTTPAdapter(pool_connections=4, pool_maxsize=16)
+gemini_session.mount("https://", adapter)
+
 # Anthropic-compatible models (use Messages API endpoint)
 ANTHROPIC_MODELS = {"qwen3.7-plus", "qwen3.7-max", "qwen3.6-plus", "minimax-m3", "minimax-m2.7", "minimax-m2.5"}
 
@@ -302,7 +306,7 @@ def call_gemini(messages, system_prompt=SYSTEM_PROMPT, max_tokens=120, temperatu
             "candidateCount": 1
         }
     }
-    response = http_requests.post(url, params={"key": GEMINI_API_KEY}, json=payload, timeout=45)
+    response = gemini_session.post(url, params={"key": GEMINI_API_KEY}, json=payload, timeout=15)
     if not response.ok:
         raise RuntimeError(f"Gemini failed: HTTP {response.status_code} - {response.text[:500]}")
     data = response.json()
@@ -766,8 +770,8 @@ def analyze_screenshot():
                 response, first_error = call_ai_with_error(
                     messages,
                     model=OPENAI_MODEL,
-                    max_tokens=80,
-                    temperature=0.45,
+                    max_tokens=200,
+                    temperature=0.5,
                     timeout_seconds=30
                 )
                 if first_error:
@@ -788,49 +792,6 @@ def analyze_screenshot():
                         failure_reason = f"First vision response had 0 parseable suggestions"
                         suggestions = None
 
-                if not suggestions and AI_PROVIDER != "gemini":
-                    app.logger.warning(
-                        "screenshot parse failed: image=%s response_len=%d response=%r",
-                        image_info,
-                        len(raw_model_text),
-                        raw_model_text[:500]
-                    )
-
-                    retry_prompt = f"""Read this chat screenshot. Write ONLY 3 replies to the latest message. Return ONLY these 3 lines, nothing else. {context_prompt}
-
->>> Safe: <reply>
->>> Smooth: <reply>
->>> Bold: <reply>"""
-                    retry_messages = [
-                        {"role": "user", "content": [
-                            {"type": "text", "text": retry_prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}", "detail": "low"}}
-                        ]}
-                    ]
-                    retry_response, retry_error = call_ai_with_error(
-                        retry_messages,
-                        model=OPENAI_MODEL,
-                        max_tokens=100,
-                        temperature=0.4,
-                        timeout_seconds=30
-                    )
-                    if retry_error:
-                        failure_reason = f"Retry vision call failed: {retry_error}"
-                    if retry_response:
-                        raw_model_text = get_response_text(retry_response)
-                        suggestions = parse_suggestions(raw_model_text, persona)
-                        if len(suggestions) >= 3:
-                            source = "vision_ai_retry"
-                        elif len(suggestions) >= 1:
-                            source = "vision_ai_retry"
-                            app.logger.info(
-                                "screenshot partial retry: model=%s suggestions=%d response=%r",
-                                OPENAI_MODEL, len(suggestions), raw_model_text[:300]
-                            )
-                        else:
-                            failure_reason = f"Retry vision response had 0 parseable suggestions"
-                            suggestions = None
-            
             if os.path.exists(filepath):
                 os.remove(filepath)
         
@@ -959,8 +920,8 @@ def analyze_screenshots():
             response, first_error = call_ai_with_error(
                 messages,
                 model=OPENAI_MODEL,
-                max_tokens=100,
-                temperature=0.45,
+                max_tokens=200,
+                temperature=0.5,
                 timeout_seconds=45
             )
             if first_error:
@@ -980,44 +941,6 @@ def analyze_screenshots():
                 else:
                     failure_reason = f"Got 0 suggestions from first attempt"
                     suggestions = None
-
-            if not suggestions and encoded_images and AI_PROVIDER != "gemini":
-                app.logger.warning("analyze-screenshots retry: model=%s images=%d reason=%s", OPENAI_MODEL, len(encoded_images), failure_reason)
-                retry_prompt = f"""Read this chat screenshot. Write ONLY 3 replies to the latest message. Return ONLY these 3 lines, nothing else. {context_prompt}{context_hint}
-
->>> Safe: <reply>
->>> Smooth: <reply>
->>> Bold: <reply>"""
-                retry_contents = []
-                for enc in encoded_images:
-                    if is_anthropic:
-                        retry_contents.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": enc}})
-                    else:
-                        retry_contents.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{enc}", "detail": "low"}})
-                retry_messages = [{"role": "user", "content": [{"type": "text", "text": retry_prompt}] + retry_contents}]
-                retry_response, retry_error = call_ai_with_error(
-                    retry_messages,
-                    model=OPENAI_MODEL,
-                    max_tokens=120,
-                    temperature=0.4,
-                    timeout_seconds=30
-                )
-                if retry_error:
-                    failure_reason = f"Retry failed: {retry_error}"
-                if retry_response:
-                    raw_model_text = get_response_text(retry_response)
-                    suggestions = parse_suggestions(raw_model_text, persona)
-                    if len(suggestions) >= 3:
-                        source = "vision_ai_retry"
-                    elif len(suggestions) >= 1:
-                        source = "vision_ai_retry"
-                        app.logger.info(
-                            "analyze-screenshots partial retry: model=%s suggestions=%d response=%r",
-                            OPENAI_MODEL, len(suggestions), raw_model_text[:300]
-                        )
-                    else:
-                        failure_reason = f"Retry got 0 suggestions"
-                        suggestions = None
 
         if not suggestions:
             app.logger.warning(
